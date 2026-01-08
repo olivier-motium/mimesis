@@ -49,3 +49,32 @@ All daemon constants live in `packages/daemon/src/config.ts`:
 - Cache limits (PR_CACHE_MAX_SIZE, PR_CACHE_ENTRY_TTL)
 
 This prevents magic numbers scattered across files and enables env var overrides.
+
+### Utility Modules Pattern
+Shared utilities live in `packages/daemon/src/utils/`:
+- `timeout.ts` - withTimeout() wrapper for async operations
+- `colors.ts` - ANSI codes for CLI output
+- `errors.ts` - standardized error message extraction
+
+### Cache Eviction Pattern
+Caches use LRU-style eviction with TTL (see summarizer.ts):
+```typescript
+interface CacheEntry { value: T; timestamp: number; }
+// Evict before lookup: expired entries + oldest if over maxSize
+```
+
+### Security: Command Injection Prevention
+Use `execFile` with array args instead of `exec` with template strings:
+```typescript
+// Bad: execAsync(`gh pr list --head "${branch}"`)
+// Good: execFileAsync("gh", ["pr", "list", "--head", branch])
+```
+
+## Known Issues
+
+### Pre-existing Test Failures
+`pnpm test` in daemon has 7 unique failures (14 total, running twice from dist/src):
+- Status derivation tests have mismatched expectations
+- SessionWatcher test reads real data instead of fixtures
+- Parser test missing test directory setup
+These are unrelated to cache/timeout refactoring.

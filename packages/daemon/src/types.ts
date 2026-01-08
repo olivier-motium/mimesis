@@ -95,8 +95,6 @@ export interface SystemEntry {
   version: string;
   gitBranch: string;
   hookCount?: number;
-  hookInfos?: unknown[];
-  hookErrors?: unknown[];
   preventedContinuation?: boolean;
   stopReason?: string;
   hasOutput?: boolean;

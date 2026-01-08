@@ -58,6 +58,22 @@ These constants are defined in `packages/daemon/src/config.ts` and affect daemon
 | `PENDING_TOOL_BONUS` | 30 | Bonus for pending tool approval |
 | `DECAY_HALF_LIFE_MINUTES` | 30 | Activity score decay rate |
 
+### Summary Cache
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `SUMMARY_CACHE_MAX_SIZE` | 500 | Maximum cached summary entries |
+| `SUMMARY_CACHE_TTL_MS` | 30 minutes | Summary cache entry TTL |
+| `GOAL_CACHE_MAX_SIZE` | 500 | Maximum cached goal entries |
+| `GOAL_CACHE_TTL_MS` | 30 minutes | Goal cache entry TTL |
+
+### External Call Timeouts
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `EXTERNAL_CALL_TIMEOUT_MS` | 30 seconds | Timeout for Anthropic API calls |
+| `GH_CLI_TIMEOUT_MS` | 15 seconds | Timeout for gh CLI operations |
+
 ---
 
 ## Configuration Examples

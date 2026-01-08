@@ -26,6 +26,7 @@ import { SessionWatcher, type SessionEvent, type SessionState } from "./watcher.
 import { StreamServer } from "./server.js";
 import { formatStatus } from "./status.js";
 import { STREAM_PORT, MAX_AGE_HOURS, MAX_AGE_MS } from "./config.js";
+import { colors } from "./utils/colors.js";
 
 // Validate required environment variables at startup
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -34,18 +35,6 @@ if (!ANTHROPIC_API_KEY) {
   console.error("Set ANTHROPIC_API_KEY=sk-ant-... to enable AI summaries");
   process.exit(1);
 }
-
-// ANSI colors
-const colors = {
-  reset: "\x1b[0m",
-  dim: "\x1b[2m",
-  bold: "\x1b[1m",
-  green: "\x1b[32m",
-  yellow: "\x1b[33m",
-  blue: "\x1b[34m",
-  cyan: "\x1b[36m",
-  gray: "\x1b[90m",
-};
 
 /**
  * Check if a session is recent enough to include

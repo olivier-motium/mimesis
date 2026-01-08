@@ -82,3 +82,29 @@ export const MAX_AGE_HOURS = parseInt(process.env.MAX_AGE_HOURS ?? "24", 10);
 
 /** Maximum session age in milliseconds */
 export const MAX_AGE_MS = MAX_AGE_HOURS * 60 * 60 * 1000;
+
+// =============================================================================
+// Summary Cache Configuration
+// =============================================================================
+
+/** Maximum entries in summary cache before eviction */
+export const SUMMARY_CACHE_MAX_SIZE = 500;
+
+/** TTL for summary cache entries (30 minutes) */
+export const SUMMARY_CACHE_TTL_MS = 30 * 60 * 1000;
+
+/** Maximum entries in goal cache before eviction */
+export const GOAL_CACHE_MAX_SIZE = 500;
+
+/** TTL for goal cache entries (30 minutes) */
+export const GOAL_CACHE_TTL_MS = 30 * 60 * 1000;
+
+// =============================================================================
+// External Call Timeouts
+// =============================================================================
+
+/** Timeout for external API calls (30 seconds) */
+export const EXTERNAL_CALL_TIMEOUT_MS = 30_000;
+
+/** Timeout for gh CLI calls (15 seconds) */
+export const GH_CLI_TIMEOUT_MS = 15_000;

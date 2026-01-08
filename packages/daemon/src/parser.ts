@@ -5,6 +5,9 @@ import type {
   UserEntry,
 } from "./types.js";
 
+// Track skipped entries for debugging
+let skippedEntries = 0;
+
 export interface TailResult {
   entries: LogEntry[];
   newPosition: number;
@@ -69,8 +72,14 @@ export async function tailJSONL(
         entries.push(entry);
         bytesConsumed += lineBytes + 1;
       } catch {
-        // Malformed JSON that starts with { - this is unexpected
-        // Skip silently to avoid log spam during active writes
+        // Malformed JSON that starts with { - track for debugging
+        skippedEntries++;
+        // Log periodically to avoid spam (every 100 entries or on first skip)
+        if (skippedEntries === 1 || skippedEntries % 100 === 0) {
+          console.warn(
+            `[parser] Skipped ${skippedEntries} malformed JSON entries (latest in ${filepath})`
+          );
+        }
         bytesConsumed += lineBytes + 1;
       }
     }

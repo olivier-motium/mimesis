@@ -108,6 +108,14 @@ Polling automatically adjusts based on CI status:
 - Requires `gh` CLI installed and authenticated
 - Falls back gracefully if `gh` is unavailable
 
+### Timeout Handling
+
+All `gh` CLI calls are wrapped with a 15-second timeout (`GH_CLI_TIMEOUT_MS`). If a call times out, it logs a warning and returns a null/unknown result rather than blocking indefinitely.
+
+### Security
+
+Uses `execFile` instead of `exec` with array arguments to prevent command injection vulnerabilities. Branch names and PR numbers are passed as separate arguments, not interpolated into shell strings.
+
 ---
 
 ## Git Operations (`git.ts`)
@@ -230,6 +238,20 @@ Clear the summary cache for a specific session.
 - API calls queued through `fastq` with concurrency of 1
 - Prevents rate limit errors from Claude API
 - Requests processed in FIFO order
+- API calls timeout after 30 seconds (`EXTERNAL_CALL_TIMEOUT_MS`)
+
+### Cache Eviction
+
+Both summary and goal caches implement LRU-style eviction to prevent memory leaks:
+
+| Cache | Max Size | TTL |
+|-------|----------|-----|
+| Summary | 500 entries | 30 minutes |
+| Goal | 500 entries | 30 minutes |
+
+Eviction is triggered before each cache lookup. Entries are removed based on:
+1. TTL expiration (entries older than 30 minutes)
+2. Size limit (oldest entries removed when over 500)
 
 ### Quick Summary Logic
 
@@ -252,6 +274,64 @@ For AI-generated summaries, context is built from:
 - Message count
 - Pending tool use flag
 - Last 10 entries (truncated)
+
+---
+
+## Utility Modules (`utils/`)
+
+Shared utilities used across the daemon.
+
+### `timeout.ts`
+
+Provides timeout wrapping for async operations.
+
+```typescript
+import { withTimeout, TimeoutError } from "./utils/timeout.js";
+
+// Wrap a promise with a timeout
+const result = await withTimeout(
+  someAsyncOperation(),
+  15000, // 15 seconds
+  "Operation description"
+);
+
+// Handle timeout errors
+try {
+  await withTimeout(promise, 5000);
+} catch (error) {
+  if (error instanceof TimeoutError) {
+    console.warn(`Timed out after ${error.timeoutMs}ms`);
+  }
+}
+```
+
+### `colors.ts`
+
+ANSI color codes for terminal output.
+
+```typescript
+import { colors } from "./utils/colors.js";
+
+console.log(`${colors.green}Success${colors.reset}`);
+console.log(`${colors.bold}${colors.cyan}Title${colors.reset}`);
+```
+
+Available colors: `reset`, `dim`, `bold`, `green`, `yellow`, `blue`, `cyan`, `magenta`, `red`, `gray`.
+
+### `errors.ts`
+
+Standardized error handling utilities.
+
+```typescript
+import { getErrorMessage, logError, logWarn } from "./utils/errors.js";
+
+// Extract message from unknown error
+const msg = getErrorMessage(error);
+
+// Log with consistent formatting
+logError("github", error, "checking PR");
+logWarn("parser", "Skipped malformed entry");
+```
 
 ---
 

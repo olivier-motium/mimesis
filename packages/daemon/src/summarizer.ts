@@ -8,6 +8,14 @@ import fastq from "fastq";
 import type { queueAsPromised } from "fastq";
 import type { SessionState } from "./watcher.js";
 import type { LogEntry } from "./types.js";
+import {
+  SUMMARY_CACHE_MAX_SIZE,
+  SUMMARY_CACHE_TTL_MS,
+  GOAL_CACHE_MAX_SIZE,
+  GOAL_CACHE_TTL_MS,
+  EXTERNAL_CALL_TIMEOUT_MS,
+} from "./config.js";
+import { withTimeout, TimeoutError } from "./utils/timeout.js";
 
 // Lazy-load client to ensure env vars are loaded first
 let client: Anthropic | null = null;
@@ -49,11 +57,53 @@ function queueAPICall(params: MessageCreateParamsNonStreaming): Promise<string> 
   });
 }
 
+// Cache entry with timestamp for TTL-based eviction
+interface SummaryCacheEntry {
+  summary: string;
+  hash: string;
+  timestamp: number;
+}
+
+interface GoalCacheEntry {
+  goal: string;
+  entryCount: number;
+  timestamp: number;
+}
+
 // Cache summaries to avoid redundant API calls
-const summaryCache = new Map<string, { summary: string; hash: string }>();
+const summaryCache = new Map<string, SummaryCacheEntry>();
 
 // Cache goals with entry count - regenerate if session has grown significantly
-const goalCache = new Map<string, { goal: string; entryCount: number }>();
+const goalCache = new Map<string, GoalCacheEntry>();
+
+/**
+ * Evict stale entries from a cache based on TTL and max size.
+ * Uses LRU-style eviction when size limit is exceeded.
+ */
+function evictStaleEntries<K, V extends { timestamp: number }>(
+  cache: Map<K, V>,
+  ttlMs: number,
+  maxSize: number
+): void {
+  const now = Date.now();
+
+  // Remove expired entries
+  for (const [key, entry] of cache) {
+    if (now - entry.timestamp > ttlMs) {
+      cache.delete(key);
+    }
+  }
+
+  // Enforce max size - remove oldest entries
+  if (cache.size > maxSize) {
+    const entries = Array.from(cache.entries())
+      .sort((a, b) => a[1].timestamp - b[1].timestamp);
+    const toRemove = cache.size - maxSize;
+    for (let i = 0; i < toRemove; i++) {
+      cache.delete(entries[i][0]);
+    }
+  }
+}
 
 /**
  * Generate a content hash for cache invalidation
@@ -121,10 +171,15 @@ export async function generateAISummary(session: SessionState): Promise<string> 
     return getWorkingSummary(session);
   }
 
+  // Evict stale entries before checking cache
+  evictStaleEntries(summaryCache, SUMMARY_CACHE_TTL_MS, SUMMARY_CACHE_MAX_SIZE);
+
   // Check cache
   const contentHash = generateContentHash(entries);
   const cached = summaryCache.get(sessionId);
   if (cached && cached.hash === contentHash) {
+    // Update timestamp on access (LRU behavior)
+    cached.timestamp = Date.now();
     return cached.summary;
   }
 
@@ -132,29 +187,41 @@ export async function generateAISummary(session: SessionState): Promise<string> 
   try {
     const context = extractContext(session);
 
-    const summary = await queueAPICall({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 100,
-      messages: [
-        {
-          role: "user",
-          content: `Summarize this Claude Code session's current state in 5-10 words. Be specific about what was accomplished or what's being worked on. Don't use generic phrases like "working on code" - mention specific files, features, or tasks.
+    const summary = await withTimeout(
+      queueAPICall({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 100,
+        messages: [
+          {
+            role: "user",
+            content: `Summarize this Claude Code session's current state in 5-10 words. Be specific about what was accomplished or what's being worked on. Don't use generic phrases like "working on code" - mention specific files, features, or tasks.
 
 ${context}
 
 Summary:`,
-        },
-      ],
-    });
+          },
+        ],
+      }),
+      EXTERNAL_CALL_TIMEOUT_MS,
+      "AI summary generation timed out"
+    );
 
     const result = summary || "Session active";
 
-    // Cache the result
-    summaryCache.set(sessionId, { summary: result, hash: contentHash });
+    // Cache the result with timestamp
+    summaryCache.set(sessionId, {
+      summary: result,
+      hash: contentHash,
+      timestamp: Date.now(),
+    });
 
     return result;
   } catch (error) {
-    console.error("Failed to generate AI summary:", error);
+    if (error instanceof TimeoutError) {
+      console.warn(`[summarizer] Summary timed out for ${sessionId}`);
+    } else {
+      console.error("Failed to generate AI summary:", error);
+    }
     return getFallbackSummary(session);
   }
 }
@@ -230,9 +297,14 @@ function getFallbackSummary(session: SessionState): string {
 export async function generateGoal(session: SessionState): Promise<string> {
   const { sessionId, originalPrompt, entries } = session;
 
+  // Evict stale entries
+  evictStaleEntries(goalCache, GOAL_CACHE_TTL_MS, GOAL_CACHE_MAX_SIZE);
+
   // Check cache - but regenerate if session has grown 5x since last generation
   const cached = goalCache.get(sessionId);
   if (cached && entries.length < cached.entryCount * 5) {
+    // Update timestamp on access (LRU behavior)
+    cached.timestamp = Date.now();
     return cached.goal;
   }
 
@@ -252,13 +324,14 @@ export async function generateGoal(session: SessionState): Promise<string> {
       ...extractRecentGoalContext(entries),
     ];
 
-    const goalResponse = await queueAPICall({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 30,
-      messages: [
-        {
-          role: "user",
-          content: `What is the HIGH-LEVEL GOAL of this coding session based on what's actually being built/done? Focus on the ACTUAL WORK. Respond with ONLY a short phrase (5-10 words max). No punctuation. No quotes.
+    const goalResponse = await withTimeout(
+      queueAPICall({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 30,
+        messages: [
+          {
+            role: "user",
+            content: `What is the HIGH-LEVEL GOAL of this coding session based on what's actually being built/done? Focus on the ACTUAL WORK. Respond with ONLY a short phrase (5-10 words max). No punctuation. No quotes.
 
 Examples:
 - Build UI for monitoring sessions
@@ -268,18 +341,29 @@ Examples:
 ${context.join("\n")}
 
 Goal:`,
-        },
-      ],
-    });
+          },
+        ],
+      }),
+      EXTERNAL_CALL_TIMEOUT_MS,
+      "Goal generation timed out"
+    );
 
     const goal = cleanGoalText(goalResponse || originalPrompt.slice(0, 50));
 
-    // Cache with current entry count
-    goalCache.set(sessionId, { goal, entryCount: entries.length });
+    // Cache with current entry count and timestamp
+    goalCache.set(sessionId, {
+      goal,
+      entryCount: entries.length,
+      timestamp: Date.now(),
+    });
 
     return goal;
   } catch (error) {
-    console.error("Failed to generate goal:", error);
+    if (error instanceof TimeoutError) {
+      console.warn(`[summarizer] Goal generation timed out for ${sessionId}`);
+    } else {
+      console.error("Failed to generate goal:", error);
+    }
     return cleanGoalText(originalPrompt);
   }
 }

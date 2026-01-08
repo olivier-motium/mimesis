@@ -2,7 +2,7 @@
  * GitHub PR tracking and CI status polling
  */
 
-import { exec } from "node:child_process";
+import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import fastq from "fastq";
 import type { queueAsPromised } from "fastq";
@@ -13,13 +13,19 @@ import {
   CI_POLL_INTERVAL_IDLE,
   PR_CACHE_MAX_SIZE,
   PR_CACHE_ENTRY_TTL,
+  GH_CLI_TIMEOUT_MS,
 } from "./config.js";
+import { withTimeout, TimeoutError } from "./utils/timeout.js";
 
-const defaultExecAsync = promisify(exec);
+const defaultExecFileAsync = promisify(execFile);
 
-// Allow injection of exec function for testing
-type ExecFn = (cmd: string, opts: { cwd: string }) => Promise<{ stdout: string; stderr: string }>;
-let execAsync: ExecFn = defaultExecAsync;
+// Allow injection of execFile function for testing
+type ExecFileFn = (
+  cmd: string,
+  args: string[],
+  opts: { cwd: string }
+) => Promise<{ stdout: string; stderr: string }>;
+let execFileAsync: ExecFileFn = defaultExecFileAsync;
 
 // Types for queue tasks
 interface PRCheckTask {
@@ -113,10 +119,16 @@ async function checkPRForBranch(cwd: string, branch: string, sessionId: string):
   }
 
   try {
-    // Use gh CLI to find PR for this branch
-    const { stdout } = await execAsync(
-      `gh pr list --head "${branch}" --json number,url,title,headRefName --limit 1`,
-      { cwd }
+    // Use gh CLI to find PR for this branch (with timeout)
+    // Using execFile with array args to prevent command injection
+    const { stdout } = await withTimeout(
+      execFileAsync(
+        "gh",
+        ["pr", "list", "--head", branch, "--json", "number,url,title,headRefName", "--limit", "1"],
+        { cwd }
+      ),
+      GH_CLI_TIMEOUT_MS,
+      `gh pr list timed out for branch ${branch}`
     );
 
     const prs = JSON.parse(stdout);
@@ -155,8 +167,12 @@ async function checkPRForBranch(cwd: string, branch: string, sessionId: string):
       startCIPolling(cwd, pr.number, sessionId);
     }
   } catch (error) {
-    // gh CLI not available or not in a git repo
-    console.error(`Failed to check PR for ${branch}:`, (error as Error).message);
+    if (error instanceof TimeoutError) {
+      console.warn(`[PR] ${error.message}`);
+    } else {
+      // gh CLI not available or not in a git repo
+      console.error(`Failed to check PR for ${branch}:`, (error as Error).message);
+    }
     prCache.set(cacheKey, { pr: null, lastChecked: Date.now() });
   }
 }
@@ -169,9 +185,15 @@ async function getCIStatus(cwd: string, prNumber: number): Promise<{
   checks: PRInfo["ciChecks"];
 }> {
   try {
-    const { stdout } = await execAsync(
-      `gh pr checks ${prNumber} --json name,state,link`,
-      { cwd }
+    // Using execFile with array args to prevent command injection
+    const { stdout } = await withTimeout(
+      execFileAsync(
+        "gh",
+        ["pr", "checks", String(prNumber), "--json", "name,state,link"],
+        { cwd }
+      ),
+      GH_CLI_TIMEOUT_MS,
+      `gh pr checks timed out for PR #${prNumber}`
     );
 
     const checks = JSON.parse(stdout);
@@ -203,7 +225,11 @@ async function getCIStatus(cwd: string, prNumber: number): Promise<{
     console.log(`[PR] CI status for PR #${prNumber}: ${overallStatus} (${mappedChecks.length} checks)`);
     return { overallStatus, checks: mappedChecks };
   } catch (error) {
-    console.error(`Failed to get CI status for PR #${prNumber}:`, (error as Error).message);
+    if (error instanceof TimeoutError) {
+      console.warn(`[PR] ${error.message}`);
+    } else {
+      console.error(`Failed to get CI status for PR #${prNumber}:`, (error as Error).message);
+    }
     return { overallStatus: "unknown", checks: [] };
   }
 }
@@ -339,11 +365,11 @@ export function getCachedPR(cwd: string, branch: string): PRInfo | null {
 
 // Test helpers
 export const __test__ = {
-  setExecAsync(fn: ExecFn) {
-    execAsync = fn;
+  setExecFileAsync(fn: ExecFileFn) {
+    execFileAsync = fn;
   },
-  resetExecAsync() {
-    execAsync = defaultExecAsync;
+  resetExecFileAsync() {
+    execFileAsync = defaultExecFileAsync;
   },
   clearCache() {
     prCache.clear();
