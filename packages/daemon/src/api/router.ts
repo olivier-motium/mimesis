@@ -23,6 +23,36 @@ interface RouterDependencies {
 }
 
 /**
+ * Try to recover a terminal link when the stored window ID is invalid.
+ * Searches by user_vars, then cmdline. Returns the valid window ID or null.
+ */
+async function tryRecoverLink(
+  sessionId: string,
+  link: TerminalLink,
+  kittyRc: KittyRc,
+  linkRepo: TerminalLinkRepo
+): Promise<{ windowId: number; recovered: boolean } | null> {
+  // First check if existing ID still works (fast path)
+  const osWindows = await kittyRc.ls();
+  if (kittyRc.windowExists(osWindows, link.kittyWindowId)) {
+    return { windowId: link.kittyWindowId, recovered: false };
+  }
+
+  // Try to find by user_vars or cmdline
+  const found = await kittyRc.findWindowByAny(sessionId);
+  if (found) {
+    linkRepo.updateWindowId(sessionId, found.windowId);
+    console.log(
+      `[API] Recovered link for ${sessionId.slice(0, 8)} via ${found.method}: ` +
+      `${link.kittyWindowId} → ${found.windowId}`
+    );
+    return { windowId: found.windowId, recovered: true };
+  }
+
+  return null; // Window not found, needs new tab
+}
+
+/**
  * Create the API router with all terminal control endpoints.
  */
 export function createApiRouter(deps: RouterDependencies) {
@@ -87,7 +117,7 @@ export function createApiRouter(deps: RouterDependencies) {
     return c.json(result);
   });
 
-  // Focus existing linked terminal
+  // Focus existing linked terminal (with recovery)
   api.post("/sessions/:id/focus", async (c) => {
     const sessionId = c.req.param("id");
     const link = linkRepo.get(sessionId);
@@ -96,18 +126,32 @@ export function createApiRouter(deps: RouterDependencies) {
       return c.json({ error: "No terminal linked" }, 404);
     }
 
-    const success = await kittyRc.focusWindow(link.kittyWindowId);
+    // Try recovery if window ID changed
+    const result = await tryRecoverLink(sessionId, link, kittyRc, linkRepo);
 
-    if (!success) {
+    if (!result) {
       linkRepo.markStale(sessionId);
       await publishLinkUpdate(streamServer, sessionId, linkRepo.get(sessionId));
       return c.json({ error: "Terminal window not found", stale: true }, 410);
     }
 
-    return c.json({ success: true });
+    // If recovered, publish the updated link
+    if (result.recovered) {
+      await publishLinkUpdate(streamServer, sessionId, linkRepo.get(sessionId));
+    }
+
+    const success = await kittyRc.focusWindow(result.windowId);
+
+    if (!success) {
+      linkRepo.markStale(sessionId);
+      await publishLinkUpdate(streamServer, sessionId, linkRepo.get(sessionId));
+      return c.json({ error: "Focus failed" }, 500);
+    }
+
+    return c.json({ success: true, recovered: result.recovered });
   });
 
-  // Focus or create terminal
+  // Focus or create terminal (with recovery)
   api.post("/sessions/:id/open", async (c) => {
     const sessionId = c.req.param("id");
     const allSessions = deps.getAllSessions?.();
@@ -124,17 +168,29 @@ export function createApiRouter(deps: RouterDependencies) {
 
     console.log(`[API] Session found: status=${session.status.status}, cwd=${session.cwd}`);
 
-    // Try existing link first
+    // Try existing link with recovery
     const existingLink = linkRepo.get(sessionId);
-    if (existingLink && !existingLink.stale) {
-      console.log(`[API] Trying existing link: windowId=${existingLink.kittyWindowId}`);
-      const success = await kittyRc.focusWindow(existingLink.kittyWindowId);
-      if (success) {
-        return c.json({ success: true, windowId: existingLink.kittyWindowId });
+    if (existingLink) {
+      console.log(`[API] Trying existing link: windowId=${existingLink.kittyWindowId}, stale=${existingLink.stale}`);
+      const result = await tryRecoverLink(sessionId, existingLink, kittyRc, linkRepo);
+
+      if (result) {
+        // Found or recovered - focus it
+        if (result.recovered) {
+          await publishLinkUpdate(streamServer, sessionId, linkRepo.get(sessionId));
+        }
+        const success = await kittyRc.focusWindow(result.windowId);
+        if (success) {
+          return c.json({
+            success: true,
+            windowId: result.windowId,
+            recovered: result.recovered,
+          });
+        }
       }
-      // Mark stale and continue to create new
-      console.log(`[API] Existing link failed, marking stale`);
-      linkRepo.markStale(sessionId);
+
+      // Recovery failed or focus failed - will create new tab
+      console.log(`[API] Recovery failed or window not found, will create new tab`);
     }
 
     // Create new tab with claude --resume to continue the session
@@ -209,7 +265,7 @@ export function createApiRouter(deps: RouterDependencies) {
     return c.json({ success: true });
   });
 
-  // Send text to terminal
+  // Send text to terminal (with recovery)
   api.post("/sessions/:id/send-text", async (c) => {
     const sessionId = c.req.param("id");
     const body = await c.req.json<{ text: string; submit: boolean }>();
@@ -218,24 +274,27 @@ export function createApiRouter(deps: RouterDependencies) {
     if (!link) {
       return c.json({ error: "No terminal linked" }, 404);
     }
-    if (link.stale) {
-      return c.json({ error: "Terminal link is stale" }, 410);
-    }
 
-    // Verify window exists before sending
-    const osWindows = await kittyRc.ls();
-    if (!kittyRc.windowExists(osWindows, link.kittyWindowId)) {
+    // Try recovery (handles stale links too)
+    const result = await tryRecoverLink(sessionId, link, kittyRc, linkRepo);
+
+    if (!result) {
       linkRepo.markStale(sessionId);
       await publishLinkUpdate(streamServer, sessionId, linkRepo.get(sessionId));
       return c.json({ error: "Terminal window not found", stale: true }, 410);
     }
 
-    await kittyRc.sendText(link.kittyWindowId, body.text, body.submit);
+    // If recovered, publish the updated link
+    if (result.recovered) {
+      await publishLinkUpdate(streamServer, sessionId, linkRepo.get(sessionId));
+    }
+
+    await kittyRc.sendText(result.windowId, body.text, body.submit);
 
     // Log to command history (fire and forget)
-    logCommand(sessionId, link.kittyWindowId, body.text, body.submit);
+    logCommand(sessionId, result.windowId, body.text, body.submit);
 
-    return c.json({ success: true });
+    return c.json({ success: true, recovered: result.recovered });
   });
 
   return api;

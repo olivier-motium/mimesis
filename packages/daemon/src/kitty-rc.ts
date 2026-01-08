@@ -225,6 +225,52 @@ export class KittyRc {
   }
 
   /**
+   * Find window ID for a session by checking cmdline for --resume <sessionId>.
+   * Fallback when user_vars are not set (e.g., manually started sessions).
+   */
+  findWindowByCmdline(
+    osWindows: KittyOsWindow[],
+    sessionId: string
+  ): number | null {
+    for (const osWin of osWindows) {
+      for (const tab of osWin.tabs) {
+        for (const win of tab.windows) {
+          const cmdStr = win.cmdline.join(" ");
+          if (cmdStr.includes("--resume") && cmdStr.includes(sessionId)) {
+            return win.id;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Find window for a session using multiple methods (cascading fallback).
+   * Tries: user_vars → cmdline → returns null if not found.
+   */
+  async findWindowByAny(sessionId: string): Promise<{
+    windowId: number;
+    method: "user_vars" | "cmdline";
+  } | null> {
+    const osWindows = await this.ls();
+
+    // Try user_vars first (most reliable - set by our launchTab)
+    const byUserVars = this.findWindowBySessionId(osWindows, sessionId);
+    if (byUserVars !== null) {
+      return { windowId: byUserVars, method: "user_vars" };
+    }
+
+    // Try cmdline fallback (for windows started with --resume)
+    const byCmdline = this.findWindowByCmdline(osWindows, sessionId);
+    if (byCmdline !== null) {
+      return { windowId: byCmdline, method: "cmdline" };
+    }
+
+    return null;
+  }
+
+  /**
    * Check if a window ID exists in the current window list.
    */
   windowExists(osWindows: KittyOsWindow[], windowId: number): boolean {

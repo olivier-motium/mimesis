@@ -102,6 +102,15 @@ This approach was chosen over:
 - `--dangerously-skip-permissions` skips the folder trust prompt (user controls which sessions to open)
 - Session IDs from our JSONL filenames match Claude Code's internal format
 
+### Terminal Link Recovery (Cascading Fallback)
+Kitty window IDs are ephemeral - they change on kitty restart or when other windows are created/destroyed. Solution: cascading recovery before each terminal operation:
+1. Check if stored window ID exists (fast path)
+2. Search by `user_vars.cc_session_id` (set via `--var` when launching)
+3. Search by `--resume <sessionId>` in cmdline (fallback)
+4. If not found, create new tab or return error
+
+**Important limitation:** Cmdline search only works for windows launched via our "Open in Kitty" button. Windows started as normal shells show `/bin/zsh` in cmdline, not claude. User_vars is the reliable recovery method.
+
 ### Entry Limit to Prevent Memory Leaks
 Sessions can have thousands of log entries over time. Without trimming, memory grows unbounded causing OOM kills (exit 137). Solution: `MAX_ENTRIES_PER_SESSION = 500` in config.ts, trimmed in watcher.ts. This is sufficient for status detection and summarization while preventing memory exhaustion.
 

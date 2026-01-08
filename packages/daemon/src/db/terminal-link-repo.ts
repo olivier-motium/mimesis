@@ -105,6 +105,22 @@ export class TerminalLinkRepo {
   }
 
   /**
+   * Update the window ID for a recovered link.
+   * Called when we find the window via user_vars or cmdline after ID changed.
+   */
+  updateWindowId(sessionId: string, newWindowId: number): void {
+    const db = getDb();
+    db.update(schema.terminalLinks)
+      .set({
+        kittyWindowId: newWindowId,
+        stale: false,
+        linkedAt: new Date().toISOString(),
+      })
+      .where(eq(schema.terminalLinks.sessionId, sessionId))
+      .run();
+  }
+
+  /**
    * Validate all links against current kitty windows.
    * Returns the session IDs that were marked as stale.
    */
