@@ -2,6 +2,46 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+---
+
+## ⚠️ CRITICAL: Start Every Session Here
+
+> **ALWAYS read [`docs/INDEX.md`](docs/INDEX.md) FIRST before starting any task.**
+>
+> The index.md is the documentation hub that tells you which documents to read for your specific task.
+
+### Required Reading Workflow
+
+1. **FIRST: Read [`docs/INDEX.md`](docs/INDEX.md)** — Find the right documentation for your task
+2. **THEN: Read the relevant documentation** based on what index.md tells you
+3. **Check `TODO.md`** for current tasks and priorities
+
+The meta index contains a **Document Map** showing exactly when to read each document. Use it to navigate efficiently.
+
+## 1. Core Philosophy
+
+- **Clarity Over Cleverness**: Write explicit, boring, obvious code. Optimize for human review and AI modification, not keystrokes saved.
+- **Locality Over Abstraction**: Prefer self-contained modules over deep inheritance or distant shared code. Duplication is acceptable when it preserves locality and independence.
+- **Compose Small Units**: Build features from small, single-purpose modules with clear interfaces. Each module should be safely rewritable in isolation.
+- **Stateless by Default**: Keep functions pure where possible; pass state explicitly. Side effects (DB, HTTP, storage) live at the edges behind clear boundaries.
+- **Fail Fast & Loud**: Surface errors to central handlers; no silent catches. Log enough context (request ID, user, operation) for fast triage.
+- **Tests as Specification**: Tests define correct behavior. Code is disposable; tests and interfaces are the source of truth.
+
+## 2. Tooling
+
+- Python 3.11+, `uv` for all environment/package management (never `pip`).
+- Formatting: Black (88 cols) + Ruff. Run on save; no style debates.
+- Type checking: strict mode; CI must pass.
+
+## 3. Code Style
+
+- **Type hints everywhere**: Prefer `list[str]`, `dict[str, T]` over `List`, `Dict`. Avoid `Any`; if unavoidable, use `typing.cast` with a justifying comment.
+- **Naming**: Python files `snake_case`, TS files `kebab-case`. Classes/enums `PascalCase`, constants `UPPER_SNAKE_CASE`.
+- **Imports**: Absolute only. Group: stdlib → third-party → local.
+- **Data contracts**: Pydantic models for request/response validation and API boundaries. No business logic in models.
+
+---
+
 ## Project Overview
 
 Claude Code Session Tracker - A real-time dashboard for monitoring Claude Code sessions across multiple projects. Watches `~/.claude/projects/` for session log changes, derives status using XState, generates AI summaries, and streams updates to a React UI via Durable Streams.

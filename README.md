@@ -114,6 +114,18 @@ The daemon needs an Anthropic API key for AI summaries:
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [docs/index.md](docs/index.md) | Documentation hub - start here |
+| [docs/cli-reference.md](docs/cli-reference.md) | CLI commands and flags |
+| [docs/ui-components.md](docs/ui-components.md) | React component guide |
+| [docs/summarizer.md](docs/summarizer.md) | AI summarization service |
+| [docs/deployment.md](docs/deployment.md) | Production deployment |
+| [spec.md](spec.md) | Full technical specification |
+| [CLAUDE.md](CLAUDE.md) | Claude Code project guidance |
+
 ## Dependencies
 
 - **@durable-streams/*** - Real-time state synchronization

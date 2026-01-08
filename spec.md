@@ -195,7 +195,7 @@ interface TodoItem {
 │  ┌─────────────┐    ┌──────────────┐    ┌──────────────────┐   │
 │  │   Chokidar  │───▶│    JSONL     │───▶│     Status       │   │
 │  │   Watcher   │    │    Parser    │    │    Analyzer      │   │
-│  │   (v5)      │    │              │    │                  │   │
+│  │   (v4)      │    │              │    │                  │   │
 │  └─────────────┘    └──────────────┘    └──────────────────┘   │
 │         │                  │                     │              │
 │         ▼                  ▼                     ▼              │
@@ -210,7 +210,7 @@ interface TodoItem {
 │                    └──────────────────┘                        │
 │                           │                                     │
 │                           ▼                                     │
-│              @durable-streams/server (port 4437)               │
+│              @durable-streams/server (port 4450)               │
 │              - /sessions/{id}      (full session data)         │
 │              - /__registry__       (session metadata)          │
 │                                                                 │
@@ -251,7 +251,7 @@ interface TodoItem {
 }
 ```
 
-Chokidar v5 is ESM-only and requires Node.js 20.19+.
+Chokidar v4 is ESM-only and requires Node.js 20.19+.
 
 ### 3.2 File Watcher (Daemon)
 
@@ -496,7 +496,7 @@ function deriveStatus(entries: LogEntry[], idleThresholdMs = 5 * 60 * 1000): Sta
 ```typescript
 import { DurableStream } from '@durable-streams/client';
 
-const STREAMS_SERVER = 'http://localhost:4437';
+const STREAMS_SERVER = 'http://localhost:4450';
 
 // Create or connect to a session stream
 async function getSessionStream(sessionId: string): Promise<DurableStream> {
@@ -557,7 +557,7 @@ function useRegistryStream() {
 
   useEffect(() => {
     const stream = DurableStream.connect({
-      url: 'http://localhost:4437/v1/stream/__registry__'
+      url: 'http://localhost:4450/v1/stream/__registry__'
     });
 
     const controller = new AbortController();
@@ -775,33 +775,46 @@ claude-code-ui/
 ├── packages/
 │   ├── daemon/
 │   │   ├── src/
-│   │   │   ├── index.ts
-│   │   │   ├── watcher.ts
-│   │   │   ├── parser.ts
-│   │   │   ├── status.ts
-│   │   │   ├── streams.ts
-│   │   │   └── types.ts
+│   │   │   ├── cli.ts           # CLI watcher with --recent/--active flags
+│   │   │   ├── git.ts           # Git operations (branch, remote detection)
+│   │   │   ├── github.ts        # GitHub API (PR status, CI checks)
+│   │   │   ├── parser.ts        # JSONL log file parser
+│   │   │   ├── schema.ts        # Zod schemas for log entries
+│   │   │   ├── serve.ts         # Server entry point
+│   │   │   ├── server.ts        # Durable Streams HTTP server
+│   │   │   ├── status-machine.ts # XState status detection machine
+│   │   │   ├── status.ts        # Status derivation from entries
+│   │   │   ├── summarizer.ts    # AI summary generation (Claude Sonnet)
+│   │   │   ├── types.ts         # TypeScript types
+│   │   │   └── watcher.ts       # Chokidar file system watcher
 │   │   └── package.json
 │   │
 │   └── ui/
 │       ├── src/
 │       │   ├── routes/
-│       │   │   ├── __root.tsx
-│       │   │   ├── index.tsx
-│       │   │   └── boards/
-│       │   │       ├── $boardId.tsx
-│       │   │       └── $boardId.sessions.$sessionId.tsx
+│       │   │   ├── __root.tsx   # Radix Theme provider
+│       │   │   └── index.tsx    # Main board view
 │       │   ├── components/
-│       │   │   ├── KanbanBoard.tsx
-│       │   │   ├── SessionCard.tsx
-│       │   │   └── SessionDetail.tsx
+│       │   │   ├── KanbanColumn.tsx  # Status column (working/waiting/idle)
+│       │   │   ├── RepoSection.tsx   # Repository grouping
+│       │   │   └── SessionCard.tsx   # Individual session card
+│       │   ├── data/
+│       │   │   ├── mockSessions.ts   # Development mock data
+│       │   │   ├── schema.ts         # Zod schemas for UI
+│       │   │   ├── sessionsDb.ts     # StreamDB connection singleton
+│       │   │   └── types.ts          # UI-specific types
 │       │   ├── hooks/
-│       │   │   ├── useRegistry.ts
-│       │   │   └── useSession.ts
+│       │   │   └── useSessions.ts    # SSE subscription hook
 │       │   └── main.tsx
 │       └── package.json
 │
-├── package.json              # Workspace root
+├── docs/                        # Documentation
+│   ├── index.md                 # Documentation hub
+│   ├── cli-reference.md         # CLI flags and usage
+│   ├── ui-components.md         # React component guide
+│   ├── summarizer.md            # AI service documentation
+│   └── deployment.md            # Production deployment
+├── package.json                 # Workspace root
 ├── pnpm-workspace.yaml
 └── spec.md
 ```
@@ -814,13 +827,13 @@ claude-code-ui/
 |-----------|------------|---------|
 | Runtime | Node.js | >=20.19.0 |
 | Package manager | pnpm | latest |
-| File watching | chokidar | ^5.0.0 |
+| File watching | chokidar | ^4.0.3 |
 | Streams server | @durable-streams/server | ^0.1.0 |
 | Streams client | @durable-streams/client | ^0.1.0 |
 | Frontend framework | React | ^19.0.0 |
 | Routing | TanStack Router | latest |
-| Styling | Tailwind CSS | ^4.0.0 |
-| Build tool | Vite | ^6.0.0 |
+| Styling | @radix-ui/themes | ^3.2.1 |
+| Build tool | Vite | ^7.2.4 |
 
 ---
 
