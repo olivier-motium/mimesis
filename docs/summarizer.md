@@ -15,7 +15,18 @@ Each session gets two pieces of AI-generated content:
 
 ## API
 
-**Location:** `packages/daemon/src/summarizer.ts`
+**Location:** `packages/daemon/src/summarizer/`
+
+Module structure:
+
+| File | Purpose |
+|------|---------|
+| `index.ts` | Public exports |
+| `summarizer.ts` | Main `generateAISummary`, `generateGoal` |
+| `context-extraction.ts` | `extractContext`, `extractEarlyContext` |
+| `summaries.ts` | `getWorkingSummary`, `getFallbackSummary` |
+| `cache.ts` | LRU cache with TTL eviction |
+| `text-utils.ts` | `cleanGoalText` |
 
 ### `generateGoal(sessionState)`
 

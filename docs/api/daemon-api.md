@@ -570,6 +570,181 @@ repo.markStale(sessionId);
 
 ---
 
+## Debug Endpoints
+
+### GET /api/debug/sessions
+
+List all sessions known to the watcher. Useful for debugging session discovery.
+
+**Response:**
+```json
+{
+  "total": 42,
+  "sessions": [
+    {
+      "id": "abc123",
+      "status": "working",
+      "cwd": "/path/to/project",
+      "lastActivityAt": "2024-01-15T10:30:00Z"
+    }
+  ]
+}
+```
+
+> **Note:** Limited to 50 sessions for readability.
+
+---
+
+## JSONL Parser (`parser.ts`)
+
+Incremental JSONL parser for Claude Code session logs.
+
+### `tailJSONL(filepath, fromByte)`
+
+Incrementally read new JSONL entries from file starting at a byte offset.
+
+```typescript
+import { tailJSONL } from "./parser.js";
+
+const result = await tailJSONL("/path/to/session.jsonl", 1024);
+// result.entries: LogEntry[]
+// result.newPosition: number (new byte offset)
+// result.hadPartialLine: boolean
+// result.skippedCount: number
+```
+
+**Returns:** `TailResult`
+```typescript
+interface TailResult {
+  entries: LogEntry[];     // Parsed entries
+  newPosition: number;     // New byte offset for next read
+  hadPartialLine: boolean; // True if EOF had incomplete line
+  skippedCount: number;    // Malformed JSON lines skipped
+}
+```
+
+### `extractMetadata(entries)`
+
+Extract session metadata from log entries.
+
+```typescript
+import { extractMetadata } from "./parser.js";
+
+const metadata = extractMetadata(entries);
+// { sessionId, cwd, gitBranch, originalPrompt, startedAt }
+```
+
+### `extractSessionId(filepath)`
+
+Get session ID from filepath (removes `.jsonl` extension).
+
+### `decodeProjectDir(encodedDir)`
+
+Decode Claude's directory encoding (dashes to slashes).
+
+```typescript
+decodeProjectDir("-Users-kyle-code")
+// Returns: "/Users/kyle/code"
+```
+
+---
+
+## File Watcher (`watcher.ts`)
+
+Watches `~/.claude/projects/**/*.jsonl` for session changes.
+
+### `SessionWatcher`
+
+```typescript
+import { SessionWatcher } from "./watcher.js";
+
+const watcher = new SessionWatcher({ debounceMs: 200 });
+
+watcher.on("session", (event) => {
+  // event.type: "created" | "updated" | "deleted"
+  // event.session: SessionState
+});
+
+watcher.on("error", (error) => {
+  console.error("Watch error:", error);
+});
+
+await watcher.start();
+// Later: await watcher.stop();
+```
+
+**Constructor Options:**
+```typescript
+interface WatcherOptions {
+  debounceMs?: number;  // Default: 200
+}
+```
+
+**Events:**
+| Event | Payload | When |
+|-------|---------|------|
+| `session` | `{ type, session }` | Session created/updated/deleted |
+| `error` | `Error` | Watch error occurred |
+
+**Methods:**
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `start()` | `Promise<void>` | Begin watching |
+| `stop()` | `Promise<void>` | Stop watching |
+| `getSessions()` | `Map<string, SessionState>` | Get all sessions |
+
+---
+
+## Core Types
+
+### SessionState
+
+```typescript
+interface SessionState {
+  sessionId: string;
+  cwd: string;
+  gitBranch: string | null;
+  originalPrompt: string;
+  entries: LogEntry[];
+  status: StatusResult;
+  goal?: string;
+  summary?: string;
+  terminalLink?: TerminalLink;
+}
+```
+
+### StatusResult
+
+```typescript
+interface StatusResult {
+  status: "working" | "waiting" | "idle";
+  lastActivityAt: string;       // ISO timestamp
+  hasPendingToolUse: boolean;   // True if waiting for approval
+  pendingTool?: string;         // Tool name if pending
+}
+```
+
+### LogEntry (Discriminated Union)
+
+| Type | Description |
+|------|-------------|
+| `UserEntry` | User prompts and tool results |
+| `AssistantEntry` | Claude responses with TextBlock, ToolUseBlock |
+| `SystemEntry` | Hook summaries, turn duration markers |
+| `QueueOperationEntry` | Queued prompts |
+
+### TerminalLink
+
+```typescript
+interface TerminalLink {
+  kittyWindowId: number;
+  linkedAt: string;
+  stale: boolean;
+}
+```
+
+---
+
 ## Related Documentation
 
 - [Configuration Reference](../operations/configuration.md) - All daemon constants

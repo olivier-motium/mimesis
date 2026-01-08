@@ -8,9 +8,11 @@ The React UI is built with TanStack Router and Radix UI Themes.
 __root.tsx (Radix Theme provider)
 └── index.tsx (Main board view)
     └── RepoSection (per GitHub repo)
-        └── KanbanColumn (per status: Working/Waiting/Idle)
+        └── KanbanColumn (4 columns: Working/Needs Approval/Waiting/Idle)
             └── SessionCard (individual session)
 ```
+
+> **Note:** "Needs Approval" is derived from sessions where `status === "waiting"` and `hasPendingToolUse === true`
 
 ---
 
@@ -75,11 +77,23 @@ Displays sessions filtered by status.
 | waiting | Yellow/Orange |
 | idle | Gray |
 
-### `SessionCard`
+### `SessionCard` Module
 
 Individual session card with details and terminal control actions.
 
-**Location:** `packages/ui/src/components/SessionCard.tsx`
+**Location:** `packages/ui/src/components/session-card/`
+
+The SessionCard is split into modular subcomponents:
+
+| File | Purpose |
+|------|---------|
+| `SessionCard.tsx` | Main orchestrator component |
+| `SessionCardContent.tsx` | Card body content |
+| `SessionCardHoverContent.tsx` | Hover state panel with details |
+| `SessionActions.tsx` | Terminal control dropdown menu |
+| `types.ts` | TypeScript interfaces |
+| `utils.ts` | Utility functions |
+| `constants.ts` | Tool icons and constants |
 
 **Displays:**
 - **Goal**: AI-generated high-level objective
@@ -196,6 +210,27 @@ Singleton StreamDB connection.
 
 **Configuration:**
 - `VITE_STREAM_URL` - Override the daemon endpoint (default: `http://127.0.0.1:4450/sessions`)
+
+---
+
+## Session Scoring
+
+The UI uses an activity scoring algorithm to prioritize repositories.
+
+**Location:** `packages/ui/src/lib/sessionScoring.ts`
+
+### `calculateRepoActivityScore(sessions)`
+
+Calculates repository activity score using:
+- **Activity Decay:** Half-life of 30 minutes (recent activity weighted higher)
+- **Status Weights:** `working=100`, `waiting=50`, `idle=1`
+- **Returns:** Number (higher = more active)
+
+### `groupSessionsByRepo(sessions)`
+
+Groups sessions by repository and sorts by activity score.
+- Repos with higher activity scores appear first
+- Used for the 🔥 indicator on highly active repos
 
 ---
 

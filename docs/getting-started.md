@@ -125,7 +125,7 @@ pnpm watch --active   # Only non-idle sessions
 ## Next Steps
 
 - [CLI Reference](cli-reference.md) - All command options
-- [UI Components](api/ui-components.md) - Understanding the interface
+- [UI Components](ui-components.md) - Understanding the interface
 - [Configuration](operations/configuration.md) - All environment variables
 - [Deployment](operations/deployment.md) - Production setup
 

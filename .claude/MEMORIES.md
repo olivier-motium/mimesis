@@ -127,6 +127,22 @@ Sessions can have thousands of log entries over time. Without trimming, memory g
 ### StreamDB Corruption Recovery
 If durable-streams client shows `Symbol(liveQueryInternal)` errors, the stream data may be corrupted. Fix: backup and clear `~/.claude-code-ui/streams/`, restart daemon. The stream will rebuild from session files.
 
+## Documentation Audit (Jan 2026)
+
+12 documentation fixes applied:
+- Fixed broken link in `getting-started.md` (api/ui-components.md → ui-components.md)
+- Updated SessionCard to module path in `ui-components.md`
+- Updated summarizer to module path in `summarizer.md` and `CLAUDE.md`
+- Added "Needs Approval" column to component hierarchy
+- Documented debug endpoint `/api/debug/sessions` in `daemon-api.md`
+- Documented session scoring algorithm in `ui-components.md`
+- Documented parser API (tailJSONL, extractMetadata) in `daemon-api.md`
+- Documented SessionWatcher API in `daemon-api.md`
+- Added core type definitions (SessionState, StatusResult, LogEntry) to `daemon-api.md`
+- Added database commands (db:generate, db:migrate, db:studio) to `cli-reference.md`
+- Fixed TODO.md reference in CLAUDE.md → .claude/MEMORIES.md
+- Deleted orphaned `packages/ui/README.md` (Vite template)
+
 ## Known Issues
 
 ### Pre-existing Test Failures

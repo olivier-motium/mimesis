@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 1. **FIRST: Read [`docs/index.md`](docs/index.md)** — Find the right documentation for your task
 2. **THEN: Read the relevant documentation** based on what index.md tells you
-3. **Check `TODO.md`** for current tasks and priorities
+3. **Check [`.claude/MEMORIES.md`](.claude/MEMORIES.md)** for current context and decisions
 
 The meta index contains a **Document Map** showing exactly when to read each document. Use it to navigate efficiently.
 
@@ -93,7 +93,7 @@ cd packages/daemon && pnpm build       # TypeScript compile
   - Events: `USER_PROMPT`, `TOOL_RESULT`, `ASSISTANT_STREAMING`, `ASSISTANT_TOOL_USE`, `TURN_END`, timeout events
   - Maps 4 internal states to 3 UI states (working/waiting/idle)
 - **`server.ts`** - Durable Streams server wrapper. Publishes `Session` state to stream, handles PR update callbacks.
-- **`summarizer.ts`** - AI-powered goal/summary generation via Claude Sonnet API
+- **`summarizer/`** - AI-powered goal/summary generation via Claude Sonnet API (modular structure)
 - **`github.ts`** - PR/CI status polling and caching
 - **`git.ts`** - Git repo info extraction (branch, remote URL)
 - **`schema.ts`** - Zod schemas for session state, exported via `@claude-code-ui/daemon/schema`

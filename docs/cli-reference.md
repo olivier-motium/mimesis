@@ -115,3 +115,51 @@ pnpm dev
 
 1. Run `pnpm watch` to find the session ID
 2. Check the JSONL file at `~/.claude/projects/<encoded-dir>/<session-id>.jsonl`
+
+---
+
+## Database Management
+
+The daemon uses SQLite (via Drizzle ORM) for persistent storage.
+
+### Generate Migrations
+
+```bash
+pnpm --filter @claude-code-ui/daemon db:generate
+```
+
+Creates Drizzle ORM schema migrations from `src/db/schema.ts` changes.
+
+### Apply Migrations
+
+```bash
+pnpm --filter @claude-code-ui/daemon db:migrate
+```
+
+Applies pending migrations to the SQLite database.
+
+### Database Studio
+
+```bash
+pnpm --filter @claude-code-ui/daemon db:studio
+```
+
+Opens Drizzle Studio GUI for database inspection and editing.
+
+**Database location:** `~/.claude-code-ui/db.sqlite`
+
+---
+
+## Kitty Terminal Setup
+
+### Automatic Setup
+
+Kitty terminal remote control is automatically configured when the daemon starts.
+
+### Manual Setup
+
+```bash
+pnpm --filter @claude-code-ui/daemon setup:kitty
+```
+
+Manually run the kitty setup process if automatic setup failed.
