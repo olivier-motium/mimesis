@@ -104,20 +104,26 @@ export function deriveStatus(
     // Last entry is assistant message
     const stopReason = lastEntry.message.stop_reason;
 
-    // Check if there's a turn_duration system message after this assistant message
-    // (Claude Code logs stop_reason: null even when done, but adds turn_duration after)
+    // Check if there's a system message indicating turn completion after this assistant message
+    // Claude Code logs stop_reason: null even when done, but adds system messages after:
+    // - "turn_duration" (v2.1.1+)
+    // - "stop_hook_summary" (all versions, when hooks are configured)
     const lastEntryIndex = entries.indexOf(lastEntry);
     const entriesAfterLast = entries.slice(lastEntryIndex + 1);
-    const hasTurnDuration = entriesAfterLast.some(
-      (e): e is SystemEntry => e.type === "system" && (e as SystemEntry).subtype === "turn_duration"
+    const hasTurnEndMarker = entriesAfterLast.some(
+      (e): e is SystemEntry => {
+        if (e.type !== "system") return false;
+        const subtype = (e as SystemEntry).subtype;
+        return subtype === "turn_duration" || subtype === "stop_hook_summary";
+      }
     );
 
-    console.log(`[Status] Assistant entry: hasPendingToolUse=${hasPendingToolUse}, stopReason=${stopReason}, hasTurnDuration=${hasTurnDuration}`);
+    console.log(`[Status] Assistant entry: hasPendingToolUse=${hasPendingToolUse}, stopReason=${stopReason}, hasTurnEndMarker=${hasTurnEndMarker}`);
 
     // "waiting" if:
     // - Claude explicitly finished with end_turn, OR
-    // - There's a turn_duration system message (turn completed even if stop_reason is null)
-    if ((stopReason === "end_turn" || hasTurnDuration) && !hasPendingToolUse) {
+    // - There's a turn-end system message (turn completed even if stop_reason is null)
+    if ((stopReason === "end_turn" || hasTurnEndMarker) && !hasPendingToolUse) {
       status = "waiting";
     } else {
       // Still streaming, or tool executing
