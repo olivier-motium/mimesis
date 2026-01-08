@@ -335,6 +335,123 @@ logWarn("parser", "Skipped malformed entry");
 
 ---
 
+## Kitty Terminal Control (`kitty-rc.ts`)
+
+Remote control wrapper for kitty terminal using `kitten @` commands.
+
+### Public Functions
+
+#### `health(): Promise<boolean>`
+
+Check if kitty is reachable via the socket.
+
+```typescript
+import { KittyRc } from "./kitty-rc.js";
+
+const kitty = new KittyRc();
+const available = await kitty.health();
+```
+
+#### `focusWindow(windowId: number): Promise<boolean>`
+
+Focus a kitty window by ID. Returns true if successful.
+
+#### `launchTab(opts: LaunchOptions): Promise<number>`
+
+Launch a new kitty tab with options. Returns the window ID.
+
+```typescript
+const windowId = await kitty.launchTab({
+  cwd: "/path/to/project",
+  tabTitle: "Session Tab",
+  vars: { cc_session_id: "abc123" },
+});
+```
+
+#### `sendText(windowId: number, text: string, submit: boolean): Promise<void>`
+
+Send text to a window. If submit is true, appends carriage return.
+
+#### `selectWindow(): Promise<number | null>`
+
+Open interactive window picker. Returns null if cancelled.
+
+### Configuration
+
+Requires kitty setup in `~/.config/kitty/kitty.conf`:
+
+```conf
+allow_remote_control password
+listen_on unix:/tmp/claude-cc-kitty
+remote_control_password "your-password-here" ls launch focus-window send-text select-window set-tab-title
+```
+
+Set password via environment variable:
+```bash
+export KITTY_RC_PASSWORD="your-password-here"
+```
+
+---
+
+## Terminal Link API (`api/router.ts`)
+
+HTTP API for terminal control (Port 4451).
+
+### Endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/kitty/health` | Check kitty availability |
+| POST | `/api/sessions/:id/focus` | Focus linked terminal |
+| POST | `/api/sessions/:id/open` | Open/create terminal |
+| POST | `/api/sessions/:id/link-terminal` | Link existing terminal |
+| DELETE | `/api/sessions/:id/link-terminal` | Unlink terminal |
+| POST | `/api/sessions/:id/send-text` | Send text to terminal |
+
+### Request/Response Examples
+
+**Open session terminal:**
+```bash
+curl -X POST http://127.0.0.1:4451/api/sessions/abc123/open
+# { "success": true, "windowId": 42, "created": true }
+```
+
+**Send text:**
+```bash
+curl -X POST http://127.0.0.1:4451/api/sessions/abc123/send-text \
+  -H "Content-Type: application/json" \
+  -d '{"text": "npm test", "submit": true}'
+```
+
+---
+
+## Database (`db/`)
+
+SQLite persistence for terminal links using Drizzle ORM.
+
+### Tables
+
+| Table | Purpose |
+|-------|---------|
+| `terminal_links` | Session to kitty window mappings |
+| `command_history` | Commands sent to terminals |
+| `session_preferences` | Per-session UI preferences |
+
+### TerminalLinkRepo
+
+Repository for terminal link CRUD operations.
+
+```typescript
+import { TerminalLinkRepo } from "./db/terminal-link-repo.js";
+
+const repo = new TerminalLinkRepo();
+const link = repo.get(sessionId);
+repo.upsert({ sessionId, kittyWindowId, linkedAt, stale: false });
+repo.markStale(sessionId);
+```
+
+---
+
 ## Related Documentation
 
 - [Configuration Reference](../operations/configuration.md) - All daemon constants

@@ -5,12 +5,19 @@
 
 import { DurableStreamTestServer } from "@durable-streams/server";
 import { DurableStream } from "@durable-streams/client";
-import { sessionsStateSchema, type Session, type RecentOutput, type PRInfo } from "./schema.js";
+import {
+  sessionsStateSchema,
+  type Session,
+  type RecentOutput,
+  type PRInfo,
+  type TerminalLink,
+} from "./schema.js";
 import type { SessionState } from "./watcher.js";
 import type { LogEntry } from "./types.js";
 import { generateAISummary, generateGoal } from "./summarizer.js";
 import { queuePRCheck, getCachedPR, setOnPRUpdate, stopAllPolling } from "./github.js";
 import { STREAM_HOST, STREAM_PORT, STREAM_PATH, getStreamUrl } from "./config.js";
+import { TerminalLinkRepo } from "./db/terminal-link-repo.js";
 import path from "node:path";
 import os from "node:os";
 
@@ -26,8 +33,11 @@ export class StreamServer {
   private streamUrl: string;
   // Track sessions for PR update callbacks
   private sessionCache = new Map<string, SessionState>();
+  // Terminal link repository for lookups
+  private linkRepo: TerminalLinkRepo;
 
   constructor(options: StreamServerOptions = {}) {
+    this.linkRepo = new TerminalLinkRepo();
     this.port = options.port ?? STREAM_PORT;
     const dataDir = options.dataDir ?? path.join(os.homedir(), ".claude-code-ui", "streams");
 
@@ -111,6 +121,16 @@ export class StreamServer {
       console.log(`[PR] Session ${sessionState.sessionId.slice(0, 8)} has no branch`);
     }
 
+    // Get terminal link if it exists
+    const link = this.linkRepo.get(sessionState.sessionId);
+    const terminalLink = link
+      ? {
+          kittyWindowId: link.kittyWindowId,
+          linkedAt: link.linkedAt,
+          stale: link.stale,
+        }
+      : null;
+
     const session: Session = {
       sessionId: sessionState.sessionId,
       cwd: sessionState.cwd,
@@ -127,6 +147,7 @@ export class StreamServer {
       summary,
       recentOutput: extractRecentOutput(sessionState.entries),
       pr,
+      terminalLink,
     };
 
     // Create the event using the schema helpers
@@ -159,6 +180,16 @@ export class StreamServer {
       generateAISummary(sessionState),
     ]);
 
+    // Get terminal link if it exists
+    const link = this.linkRepo.get(sessionState.sessionId);
+    const terminalLink = link
+      ? {
+          kittyWindowId: link.kittyWindowId,
+          linkedAt: link.linkedAt,
+          stale: link.stale,
+        }
+      : null;
+
     const session: Session = {
       sessionId: sessionState.sessionId,
       cwd: sessionState.cwd,
@@ -175,6 +206,58 @@ export class StreamServer {
       summary,
       recentOutput: extractRecentOutput(sessionState.entries),
       pr,
+      terminalLink,
+    };
+
+    const event = sessionsStateSchema.sessions.update({ value: session });
+    await this.stream.append(event);
+  }
+
+  /**
+   * Publish terminal link update for a session
+   */
+  async publishTerminalLinkUpdate(
+    sessionId: string,
+    terminalLink: TerminalLink | null
+  ): Promise<void> {
+    if (!this.stream) {
+      throw new Error("Server not started");
+    }
+
+    const sessionState = this.sessionCache.get(sessionId);
+    if (!sessionState) {
+      console.log(`[LINK] No cached session state for ${sessionId.slice(0, 8)}`);
+      return;
+    }
+
+    // Generate AI goal and summary
+    const [goal, summary] = await Promise.all([
+      generateGoal(sessionState),
+      generateAISummary(sessionState),
+    ]);
+
+    // Get cached PR info if available
+    const pr = sessionState.gitBranch
+      ? getCachedPR(sessionState.cwd, sessionState.gitBranch)
+      : null;
+
+    const session: Session = {
+      sessionId: sessionState.sessionId,
+      cwd: sessionState.cwd,
+      gitBranch: sessionState.gitBranch,
+      gitRepoUrl: sessionState.gitRepoUrl,
+      gitRepoId: sessionState.gitRepoId,
+      originalPrompt: sessionState.originalPrompt,
+      status: sessionState.status.status,
+      lastActivityAt: sessionState.status.lastActivityAt,
+      messageCount: sessionState.status.messageCount,
+      hasPendingToolUse: sessionState.status.hasPendingToolUse,
+      pendingTool: extractPendingTool(sessionState),
+      goal,
+      summary,
+      recentOutput: extractRecentOutput(sessionState.entries),
+      pr,
+      terminalLink,
     };
 
     const event = sessionsStateSchema.sessions.update({ value: session });

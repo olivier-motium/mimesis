@@ -38,6 +38,14 @@ export const PRInfoSchema = z.object({
 });
 export type PRInfo = z.infer<typeof PRInfoSchema>;
 
+// Terminal link info
+export const TerminalLinkSchema = z.object({
+  kittyWindowId: z.number(),
+  linkedAt: z.string(), // ISO timestamp
+  stale: z.boolean(),
+});
+export type TerminalLink = z.infer<typeof TerminalLinkSchema>;
+
 // Main session state schema
 export const SessionSchema = z.object({
   sessionId: z.string(),
@@ -55,6 +63,7 @@ export const SessionSchema = z.object({
   summary: z.string(), // Current activity summary
   recentOutput: z.array(RecentOutputSchema), // Last few messages for live view
   pr: PRInfoSchema.nullable(), // Associated PR if branch has one
+  terminalLink: TerminalLinkSchema.nullable(), // Linked kitty terminal window
 });
 export type Session = z.infer<typeof SessionSchema>;
 

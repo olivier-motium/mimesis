@@ -22,11 +22,17 @@ for (const envPath of envPaths) {
     break;
   }
 }
+import { serve } from "@hono/node-server";
+import { Hono } from "hono";
 import { SessionWatcher, type SessionEvent, type SessionState } from "./watcher.js";
 import { StreamServer } from "./server.js";
 import { formatStatus } from "./status.js";
-import { STREAM_PORT, MAX_AGE_HOURS, MAX_AGE_MS } from "./config.js";
+import { STREAM_PORT, STREAM_HOST, API_PORT, API_PREFIX, MAX_AGE_HOURS, MAX_AGE_MS } from "./config.js";
 import { colors } from "./utils/colors.js";
+import { createApiRouter } from "./api/router.js";
+import { KittyRc } from "./kitty-rc.js";
+import { TerminalLinkRepo } from "./db/terminal-link-repo.js";
+import { closeDb } from "./db/index.js";
 
 // Validate required environment variables at startup
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -54,10 +60,43 @@ async function main(): Promise<void> {
   await streamServer.start();
 
   console.log(`Stream URL: ${colors.cyan}${streamServer.getStreamUrl()}${colors.reset}`);
-  console.log();
+
+  // Initialize kitty remote control and link repository
+  const kittyRc = new KittyRc();
+  const linkRepo = new TerminalLinkRepo();
 
   // Start the session watcher
   const watcher = new SessionWatcher({ debounceMs: 300 });
+
+  // Create API server with Hono
+  const app = new Hono();
+  app.route(
+    API_PREFIX,
+    createApiRouter({
+      kittyRc,
+      linkRepo,
+      streamServer,
+      getSession: (id) => watcher.getSessions().get(id),
+    })
+  );
+
+  // Start API server on separate port
+  const apiServer = serve({
+    fetch: app.fetch,
+    port: API_PORT,
+    hostname: STREAM_HOST,
+  });
+  console.log(`API server: ${colors.cyan}http://${STREAM_HOST}:${API_PORT}${API_PREFIX}${colors.reset}`);
+
+  // Validate existing terminal links on startup
+  const staleSessions = await linkRepo.validateAll(kittyRc);
+  if (staleSessions.length > 0) {
+    console.log(
+      `${colors.yellow}[LINKS]${colors.reset} Marked ${staleSessions.length} terminal links as stale`
+    );
+  }
+
+  console.log();
 
   watcher.on("session", async (event: SessionEvent) => {
     const { type, session } = event;
@@ -98,6 +137,8 @@ async function main(): Promise<void> {
     console.log();
     console.log(`${colors.dim}Shutting down...${colors.reset}`);
     watcher.stop();
+    apiServer.close();
+    closeDb();
     await streamServer.stop();
     process.exit(0);
   });

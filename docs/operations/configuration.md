@@ -16,14 +16,19 @@ Complete reference for all environment variables and tunable constants.
 |----------|---------|---------|
 | `STREAM_HOST` | `127.0.0.1` | HTTP server bind address |
 | `PORT` | `4450` | Stream server port |
+| `API_PORT` | `4451` | API server port for terminal control |
 | `MAX_AGE_HOURS` | `24` | Filter sessions older than this |
 | `GITHUB_TOKEN` | gh CLI auth | GitHub API for PR/CI status |
+| `KITTY_SOCKET` | `unix:/tmp/claude-cc-kitty` | Kitty remote control socket |
+| `KITTY_RC_PASSWORD` | (none) | Password for kitty remote control |
+| `DB_PATH` | `~/.claude-code-ui/data.db` | SQLite database path |
 
 ### Optional - UI
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `VITE_STREAM_URL` | `http://127.0.0.1:4450/sessions` | Daemon stream endpoint |
+| `VITE_API_URL` | `http://127.0.0.1:4451/api` | Terminal control API endpoint |
 
 ---
 
@@ -73,6 +78,16 @@ These constants are defined in `packages/daemon/src/config.ts` and affect daemon
 |----------|-------|---------|
 | `EXTERNAL_CALL_TIMEOUT_MS` | 30 seconds | Timeout for Anthropic API calls |
 | `GH_CLI_TIMEOUT_MS` | 15 seconds | Timeout for gh CLI operations |
+
+### Kitty Terminal Control
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `KITTY_SOCKET` | `unix:/tmp/claude-cc-kitty` | Kitty remote control socket path |
+| `KITTY_PASSWORD_ENV` | `KITTY_RC_PASSWORD` | Env var name for kitty password |
+| `KITTY_COMMAND_TIMEOUT_MS` | 5 seconds | Timeout for kitty commands |
+| `API_PORT` | `4451` | Port for terminal control API |
+| `API_PREFIX` | `/api` | URL prefix for API endpoints |
 
 ---
 

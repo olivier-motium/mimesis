@@ -3,6 +3,9 @@
  * All tunable constants and environment variables are defined here.
  */
 
+import path from "node:path";
+import os from "node:os";
+
 // =============================================================================
 // Stream Server Configuration
 // =============================================================================
@@ -108,3 +111,30 @@ export const EXTERNAL_CALL_TIMEOUT_MS = 30_000;
 
 /** Timeout for gh CLI calls (15 seconds) */
 export const GH_CLI_TIMEOUT_MS = 15_000;
+
+// =============================================================================
+// Kitty Remote Control Configuration
+// =============================================================================
+
+/** Socket path for kitty remote control */
+export const KITTY_SOCKET = process.env.KITTY_SOCKET ?? "unix:/tmp/claude-cc-kitty";
+
+/** Environment variable name for kitty password */
+export const KITTY_PASSWORD_ENV = "KITTY_RC_PASSWORD";
+
+/** Timeout for kitty commands (5 seconds) */
+export const KITTY_COMMAND_TIMEOUT_MS = 5_000;
+
+/** Port for the API server */
+export const API_PORT = parseInt(process.env.API_PORT ?? "4451", 10);
+
+/** API endpoint prefix */
+export const API_PREFIX = "/api";
+
+// =============================================================================
+// Database Configuration
+// =============================================================================
+
+/** Path to SQLite database */
+export const DB_PATH = process.env.DB_PATH ??
+  path.join(os.homedir(), ".claude-code-ui", "data.db");

@@ -1,5 +1,19 @@
-import { Card, Flex, Text, Code, Box, HoverCard, Badge } from "@radix-ui/themes";
+import { useState } from "react";
+import {
+  Card,
+  Flex,
+  Text,
+  Code,
+  Box,
+  HoverCard,
+  Badge,
+  DropdownMenu,
+  IconButton,
+} from "@radix-ui/themes";
+import { DotsVerticalIcon } from "@radix-ui/react-icons";
 import type { Session, CIStatus } from "../data/schema";
+import * as api from "../lib/api";
+import { SendTextDialog } from "./SendTextDialog";
 
 interface SessionCardProps {
   session: Session;
@@ -106,24 +120,148 @@ function getCIStatusColor(status: CIStatus): "green" | "red" | "yellow" | "gray"
   }
 }
 
+interface SessionActionsProps {
+  session: Session;
+  onSendText?: () => void;
+}
+
+/**
+ * Session action menu for terminal control
+ */
+function SessionActions({ session, onSendText }: SessionActionsProps) {
+  const [loading, setLoading] = useState(false);
+
+  const handleFocus = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setLoading(true);
+    try {
+      await api.focusSession(session.sessionId);
+    } catch (err) {
+      console.error("Focus failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOpen = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setLoading(true);
+    try {
+      await api.openSession(session.sessionId);
+    } catch (err) {
+      console.error("Open failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLink = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setLoading(true);
+    try {
+      await api.linkTerminal(session.sessionId);
+    } catch (err) {
+      console.error("Link failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUnlink = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setLoading(true);
+    try {
+      await api.unlinkTerminal(session.sessionId);
+    } catch (err) {
+      console.error("Unlink failed:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendText = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onSendText?.();
+  };
+
+  return (
+    <DropdownMenu.Root>
+      <DropdownMenu.Trigger>
+        <IconButton
+          variant="ghost"
+          size="1"
+          onClick={(e) => e.stopPropagation()}
+          disabled={loading}
+        >
+          <DotsVerticalIcon />
+        </IconButton>
+      </DropdownMenu.Trigger>
+      <DropdownMenu.Content>
+        {session.terminalLink ? (
+          <>
+            <DropdownMenu.Item onClick={handleFocus}>
+              Focus terminal
+            </DropdownMenu.Item>
+            <DropdownMenu.Item onClick={handleSendText}>
+              Send message...
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item color="red" onClick={handleUnlink}>
+              Unlink terminal
+            </DropdownMenu.Item>
+          </>
+        ) : (
+          <>
+            <DropdownMenu.Item onClick={handleOpen}>
+              Open in kitty
+            </DropdownMenu.Item>
+            <DropdownMenu.Item onClick={handleLink}>
+              Link existing terminal...
+            </DropdownMenu.Item>
+          </>
+        )}
+      </DropdownMenu.Content>
+    </DropdownMenu.Root>
+  );
+}
+
+interface SessionCardContentProps {
+  session: Session;
+  onSendText?: () => void;
+}
+
 /**
  * Main card body content
  */
-function SessionCardContent({ session }: SessionCardProps) {
+function SessionCardContent({ session, onSendText }: SessionCardContentProps) {
   const { pendingTool } = session;
   const dirPath = session.cwd.replace(/^\/Users\/[^/]+/, "~");
 
   return (
     <Card size="2" className={getCardClass(session)} style={{ cursor: "pointer" }}>
       <Flex direction="column" gap="2">
-        {/* Header: directory and time */}
+        {/* Header: directory, terminal status, time, and actions */}
         <Flex justify="between" align="center">
-          <Text size="1" color="gray" style={{ fontFamily: "var(--code-font-family)" }}>
-            {dirPath}
-          </Text>
-          <Text size="1" color="gray">
-            {formatTimeAgo(session.lastActivityAt)}
-          </Text>
+          <Flex align="center" gap="2">
+            <Text size="1" color="gray" style={{ fontFamily: "var(--code-font-family)" }}>
+              {dirPath}
+            </Text>
+            {session.terminalLink && (
+              <Badge
+                size="1"
+                color={session.terminalLink.stale ? "orange" : "green"}
+                variant="soft"
+              >
+                {session.terminalLink.stale ? "stale" : "linked"}
+              </Badge>
+            )}
+          </Flex>
+          <Flex align="center" gap="2">
+            <Text size="1" color="gray">
+              {formatTimeAgo(session.lastActivityAt)}
+            </Text>
+            <SessionActions session={session} onSendText={onSendText} />
+          </Flex>
         </Flex>
 
         {/* Main content: goal as primary text */}
@@ -272,14 +410,26 @@ function SessionCardHoverContent({ session }: SessionCardProps) {
 }
 
 export function SessionCard({ session }: SessionCardProps) {
+  const [sendTextOpen, setSendTextOpen] = useState(false);
+
   return (
-    <HoverCard.Root openDelay={300}>
-      <HoverCard.Trigger>
-        <SessionCardContent session={session} />
-      </HoverCard.Trigger>
-      <HoverCard.Content size="3" style={{ minWidth: "600px", minHeight: "400px" }}>
-        <SessionCardHoverContent session={session} />
-      </HoverCard.Content>
-    </HoverCard.Root>
+    <>
+      <HoverCard.Root openDelay={300}>
+        <HoverCard.Trigger>
+          <SessionCardContent
+            session={session}
+            onSendText={() => setSendTextOpen(true)}
+          />
+        </HoverCard.Trigger>
+        <HoverCard.Content size="3" style={{ minWidth: "600px", minHeight: "400px" }}>
+          <SessionCardHoverContent session={session} />
+        </HoverCard.Content>
+      </HoverCard.Root>
+      <SendTextDialog
+        sessionId={session.sessionId}
+        open={sendTextOpen}
+        onOpenChange={setSendTextOpen}
+      />
+    </>
   );
 }

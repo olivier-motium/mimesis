@@ -70,6 +70,20 @@ Use `execFile` with array args instead of `exec` with template strings:
 // Good: execFileAsync("gh", ["pr", "list", "--head", branch])
 ```
 
+### Kitty Terminal Control (Dual Port Architecture)
+Daemon runs two HTTP servers on different ports:
+- Port 4450: Durable Streams SSE (existing, one-way daemon→UI)
+- Port 4451: Hono API for terminal control (new, request/response)
+
+This separation was chosen because DurableStreamTestServer binds its own HTTP server, making port sharing impractical. The UI API client at `packages/ui/src/lib/api.ts` points to port 4451.
+
+SQLite (better-sqlite3) chosen over in-memory storage for:
+- Concurrent access from multiple UI clients
+- Data persistence across daemon restarts
+- Future extensibility (command history, preferences)
+
+Terminal links sync to UI via Durable Streams by including `terminalLink` field in Session schema updates.
+
 ## Known Issues
 
 ### Pre-existing Test Failures
