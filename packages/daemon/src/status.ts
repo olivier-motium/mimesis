@@ -8,8 +8,6 @@ import {
   machineStatusToResult,
 } from "./status-machine.js";
 
-const DEFAULT_IDLE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
-
 /**
  * Derive session status from log entries using XState state machine.
  *
@@ -19,17 +17,9 @@ const DEFAULT_IDLE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
  *   - hasPendingToolUse: true if waiting for tool approval
  * - "idle": No activity for idleThresholdMs
  */
-export function deriveStatus(
-  entries: LogEntry[],
-  _idleThresholdMs: number = DEFAULT_IDLE_THRESHOLD_MS,
-): StatusResult {
-  // Use the state machine for status derivation
+export function deriveStatus(entries: LogEntry[]): StatusResult {
   const { status: machineStatus, context } = deriveStatusFromMachine(entries);
-  const result = machineStatusToResult(machineStatus, context);
-
-  console.log(`[Status] Machine: state=${machineStatus}, hasPendingToolUse=${context.hasPendingToolUse}, messageCount=${context.messageCount}`);
-
-  return result;
+  return machineStatusToResult(machineStatus, context);
 }
 
 /**

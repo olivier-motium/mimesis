@@ -1,10 +1,9 @@
 import { Box, Flex, Heading, Text, ScrollArea } from "@radix-ui/themes";
 import { SessionCard } from "./SessionCard";
-import type { Session, SessionStatus } from "../data/schema";
+import type { Session } from "../data/schema";
 
 interface KanbanColumnProps {
   title: string;
-  status: SessionStatus | "needs-approval";
   sessions: Session[];
   color: "green" | "orange" | "yellow" | "gray";
 }
@@ -25,11 +24,18 @@ export function KanbanColumn({ title, sessions, color }: KanbanColumnProps) {
   };
 
   const countColorMap = {
-    green: "grass" as const,
-    orange: "orange" as const,
-    yellow: "amber" as const,
-    gray: "gray" as const,
-  };
+    green: "grass",
+    orange: "orange",
+    yellow: "amber",
+    gray: "gray",
+  } as const;
+
+  const borderColorMap = {
+    green: "grass",
+    orange: "orange",
+    yellow: "amber",
+    gray: "slate",
+  } as const;
 
   return (
     <Box
@@ -39,7 +45,7 @@ export function KanbanColumn({ title, sessions, color }: KanbanColumnProps) {
         maxWidth: 500,
         backgroundColor: colorMap[color],
         borderRadius: "var(--radius-4)",
-        border: `1px solid var(--${color === "gray" ? "slate" : color === "green" ? "grass" : color === "yellow" ? "amber" : "orange"}-6)`,
+        border: `1px solid var(--${borderColorMap[color]}-6)`,
       }}
       p="3"
     >

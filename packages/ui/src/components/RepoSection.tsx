@@ -48,25 +48,21 @@ export function RepoSection({ repoId, repoUrl, sessions, activityScore }: RepoSe
       <Flex gap="3" style={{ minHeight: 240 }}>
         <KanbanColumn
           title="Working"
-          status="working"
           sessions={working}
           color="green"
         />
         <KanbanColumn
           title="Needs Approval"
-          status="needs-approval"
           sessions={needsApproval}
           color="orange"
         />
         <KanbanColumn
           title="Waiting"
-          status="waiting"
           sessions={waiting}
           color="yellow"
         />
         <KanbanColumn
           title="Idle"
-          status="idle"
           sessions={idle}
           color="gray"
         />

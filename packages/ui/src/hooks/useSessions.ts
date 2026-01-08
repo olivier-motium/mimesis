@@ -1,6 +1,7 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { getSessionsDbSync } from "../data/sessionsDb";
 import type { Session } from "../data/schema";
+import { groupSessionsByRepo, type RepoGroup } from "../lib/sessionScoring";
 
 /**
  * Hook to get all sessions from the StreamDB.
@@ -29,63 +30,6 @@ export function useSessions() {
   };
 }
 
-// Activity score weights
-const STATUS_WEIGHTS: Record<Session["status"], number> = {
-  working: 100,
-  waiting: 50,
-  idle: 1,
-};
-
-const PENDING_TOOL_BONUS = 30;
-
-/**
- * Calculate activity score for a repo group
- */
-function calculateRepoActivityScore(sessions: Session[]): number {
-  const now = Date.now();
-
-  return sessions.reduce((score, session) => {
-    const ageMs = now - new Date(session.lastActivityAt).getTime();
-    const ageMinutes = ageMs / (1000 * 60);
-
-    let sessionScore = STATUS_WEIGHTS[session.status];
-    if (session.hasPendingToolUse) {
-      sessionScore += PENDING_TOOL_BONUS;
-    }
-
-    const decayFactor = Math.pow(0.5, ageMinutes / 30);
-    return score + sessionScore * decayFactor;
-  }, 0);
-}
-
-export interface RepoGroup {
-  repoId: string;
-  repoUrl: string | null;
-  sessions: Session[];
-  activityScore: number;
-}
-
-/**
- * Group sessions by repo, sorted by activity score
- */
-export function groupSessionsByRepo(sessions: Session[]): RepoGroup[] {
-  const groups = new Map<string, Session[]>();
-
-  for (const session of sessions) {
-    const key = session.gitRepoId ?? "Other";
-    const existing = groups.get(key) ?? [];
-    existing.push(session);
-    groups.set(key, existing);
-  }
-
-  const groupsWithScores = Array.from(groups.entries()).map(([key, sessions]) => ({
-    repoId: key,
-    repoUrl: key === "Other" ? null : `https://github.com/${key}`,
-    sessions,
-    activityScore: calculateRepoActivityScore(sessions),
-  }));
-
-  groupsWithScores.sort((a, b) => b.activityScore - a.activityScore);
-
-  return groupsWithScores;
-}
+// Re-export for convenience
+export { groupSessionsByRepo };
+export type { RepoGroup };

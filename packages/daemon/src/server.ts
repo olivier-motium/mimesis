@@ -199,8 +199,10 @@ function extractRecentOutput(entries: LogEntry[], maxItems = 8): RecentOutput[] 
   for (const entry of messageEntries) {
     if (entry.type === "assistant") {
       // Get first text block if any
-      const textBlock = entry.message.content.find((b) => b.type === "text" && b.text.trim());
-      if (textBlock && textBlock.type === "text") {
+      const textBlock = entry.message.content.find(
+        (b): b is { type: "text"; text: string } => b.type === "text" && b.text.trim() !== ""
+      );
+      if (textBlock) {
         output.push({
           role: "assistant",
           content: textBlock.text.slice(0, 500),
@@ -208,14 +210,14 @@ function extractRecentOutput(entries: LogEntry[], maxItems = 8): RecentOutput[] 
       }
 
       // Get tool uses
-      const toolUses = entry.message.content.filter((b) => b.type === "tool_use");
-      for (const tool of toolUses.slice(0, 2)) { // Max 2 tools per message
-        if (tool.type === "tool_use") {
-          output.push({
-            role: "tool",
-            content: formatToolUse(tool.name, tool.input as Record<string, unknown>),
-          });
-        }
+      const toolUses = entry.message.content.filter(
+        (b): b is { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } => b.type === "tool_use"
+      );
+      for (const tool of toolUses.slice(0, 2)) {
+        output.push({
+          role: "tool",
+          content: formatToolUse(tool.name, tool.input),
+        });
       }
     } else if (entry.type === "user") {
       // User prompts (string content, not tool results)

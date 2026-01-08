@@ -107,7 +107,7 @@ function getCIStatusColor(status: CIStatus): "green" | "red" | "yellow" | "gray"
 }
 
 export function SessionCard({ session }: SessionCardProps) {
-  const showPendingTool = session.hasPendingToolUse && session.pendingTool;
+  const { pendingTool } = session;
   // Show path from ~ (e.g., ~/programs/project)
   const dirPath = session.cwd.replace(/^\/Users\/[^/]+/, "~");
 
@@ -132,13 +132,13 @@ export function SessionCard({ session }: SessionCardProps) {
             </Text>
 
             {/* Secondary: current activity (pending tool or summary) */}
-            {showPendingTool ? (
+            {pendingTool ? (
               <Flex align="center" gap="2">
                 <Text size="1" color="gray">
-                  {toolIcons[session.pendingTool!.tool]}
+                  {toolIcons[pendingTool.tool]}
                 </Text>
                 <Code size="1" color="orange" variant="soft">
-                  {session.pendingTool!.tool}: {formatTarget(session.pendingTool!.target)}
+                  {pendingTool.tool}: {formatTarget(pendingTool.target)}
                 </Code>
               </Flex>
             ) : (
@@ -195,7 +195,7 @@ export function SessionCard({ session }: SessionCardProps) {
               overflow: "auto",
             }}
           >
-            {session.recentOutput?.length > 0 ? (
+            {session.recentOutput.length > 0 ? (
               session.recentOutput.map((output, i) => (
                 <Text
                   key={i}

@@ -166,9 +166,9 @@ function getWorkingSummary(session: SessionState): string {
   const { entries } = session;
   const lastAssistant = [...entries].reverse().find((e) => e.type === "assistant");
 
-  if (lastAssistant && lastAssistant.type === "assistant") {
+  if (lastAssistant) {
     const tools = lastAssistant.message.content
-      .filter((b) => b.type === "tool_use")
+      .filter((b): b is { type: "tool_use"; id: string; name: string; input: Record<string, unknown> } => b.type === "tool_use")
       .map((b) => b.name);
 
     if (tools.length > 0) {
@@ -265,11 +265,11 @@ export async function generateGoal(session: SessionState): Promise<string> {
       if (entry.type === "assistant") {
         const tools = entry.message.content.filter((b) => b.type === "tool_use");
         if (tools.length > 0) {
-          const toolNames = tools.map((t) => t.type === "tool_use" ? t.name : "").join(", ");
+          const toolNames = tools.map((t) => t.name).join(", ");
           context.push(`Tools used: ${toolNames}`);
         }
-        const textBlock = entry.message.content.find((b) => b.type === "text");
-        if (textBlock && textBlock.type === "text") {
+        const textBlock = entry.message.content.find((b): b is { type: "text"; text: string } => b.type === "text");
+        if (textBlock) {
           context.push(`Claude: ${textBlock.text.slice(0, 100)}`);
         }
       } else if (entry.type === "user" && typeof entry.message.content === "string") {

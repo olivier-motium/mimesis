@@ -1,4 +1,5 @@
 import type { SessionStatus } from "./types";
+import { groupSessionsByRepo } from "../lib/sessionScoring";
 
 export interface PendingTool {
   tool: "Edit" | "Write" | "Bash" | "Read" | "Grep" | "MultiEdit";
@@ -162,63 +163,5 @@ export const mockSessions: MockSession[] = [
   },
 ];
 
-// Activity score weights
-const STATUS_WEIGHTS: Record<SessionStatus, number> = {
-  working: 100,  // Highest priority - actively processing
-  waiting: 50,   // Needs attention
-  idle: 1,       // Low priority
-};
-
-const PENDING_TOOL_BONUS = 30; // Extra weight for sessions needing approval
-
-// Calculate activity score for a repo group
-function calculateRepoActivityScore(sessions: MockSession[]): number {
-  const now = Date.now();
-
-  return sessions.reduce((score, session) => {
-    const ageMs = now - new Date(session.lastActivityAt).getTime();
-    const ageMinutes = ageMs / (1000 * 60);
-
-    // Base score from status
-    let sessionScore = STATUS_WEIGHTS[session.status];
-
-    // Bonus for pending tool use (needs human attention)
-    if (session.hasPendingToolUse) {
-      sessionScore += PENDING_TOOL_BONUS;
-    }
-
-    // Decay factor: halve score every 30 minutes of inactivity
-    const decayFactor = Math.pow(0.5, ageMinutes / 30);
-
-    return score + sessionScore * decayFactor;
-  }, 0);
-}
-
-// Group sessions by repo, sorted by activity score
-export function groupSessionsByRepo(sessions: MockSession[]) {
-  const groups = new Map<string, MockSession[]>();
-
-  for (const session of sessions) {
-    const key = session.gitRepoId ?? "Other";
-    const existing = groups.get(key) ?? [];
-    existing.push(session);
-    groups.set(key, existing);
-  }
-
-  // Build groups with activity scores
-  const groupsWithScores = Array.from(groups.entries()).map(([key, sessions]) => ({
-    repoId: key,
-    repoUrl: key === "Other" ? null : `https://github.com/${key}`,
-    sessions,
-    activityScore: calculateRepoActivityScore(sessions),
-  }));
-
-  // Sort by activity score (highest first), "Other" always last
-  groupsWithScores.sort((a, b) => {
-    if (a.repoId === "Other") return 1;
-    if (b.repoId === "Other") return -1;
-    return b.activityScore - a.activityScore;
-  });
-
-  return groupsWithScores;
-}
+// Re-export groupSessionsByRepo for convenience
+export { groupSessionsByRepo };
