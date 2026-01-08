@@ -77,7 +77,7 @@ Displays sessions filtered by status.
 
 ### `SessionCard`
 
-Individual session card with details.
+Individual session card with details and terminal control actions.
 
 **Location:** `packages/ui/src/components/SessionCard.tsx`
 
@@ -87,6 +87,14 @@ Individual session card with details.
 - **Status indicator**: Color-coded badge
 - **PR badge**: If branch has open PR, shows number and CI status
 - **Tool icons**: Shows pending tool with icon
+- **Terminal link badge**: Shows "linked" (green) or "stale" (orange) when terminal is associated
+- **Action menu**: Dropdown menu (⋮) for terminal control
+
+**Action Menu Options:**
+| State | Options |
+|-------|---------|
+| No terminal linked | "Open in kitty", "Link existing terminal..." |
+| Terminal linked | "Focus terminal", "Send message...", "Unlink terminal" |
 
 **Tool Icons:**
 | Tool | Icon |
@@ -98,6 +106,43 @@ Individual session card with details.
 | Grep | Magnifying glass |
 | Glob | Folder |
 | Task | Robot |
+
+### `SendTextDialog`
+
+Modal dialog for sending text to a linked terminal.
+
+**Location:** `packages/ui/src/components/SendTextDialog.tsx`
+
+**Props:**
+- `sessionId: string` - Session to send text to
+- `open: boolean` - Dialog visibility state
+- `onOpenChange: (open: boolean) => void` - Visibility callback
+
+**Features:**
+- Text area for input
+- "Press Enter after sending" checkbox (submit mode)
+- Calls `api.sendText()` to send to linked kitty terminal
+
+---
+
+## API Client
+
+The UI includes an API client for terminal control operations.
+
+**Location:** `packages/ui/src/lib/api.ts`
+
+**Functions:**
+| Function | Purpose |
+|----------|---------|
+| `getKittyHealth()` | Check if kitty terminal is available |
+| `focusSession(sessionId)` | Focus linked terminal window |
+| `openSession(sessionId)` | Open/create terminal for session |
+| `linkTerminal(sessionId)` | Link existing terminal via picker |
+| `unlinkTerminal(sessionId)` | Remove terminal association |
+| `sendText(sessionId, text, submit)` | Send text to linked terminal |
+
+**Configuration:**
+- `VITE_API_URL` - Override the API endpoint (default: `http://127.0.0.1:4451/api`)
 
 ---
 
