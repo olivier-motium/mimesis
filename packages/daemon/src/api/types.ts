@@ -14,5 +14,6 @@ export interface RouterDependencies {
   streamServer: StreamServer;
   getSession: (id: string) => SessionState | undefined;
   getAllSessions?: () => Map<string, SessionState>;
+  deleteSession?: (id: string) => boolean;
   ptyManager?: PtyManager;
 }

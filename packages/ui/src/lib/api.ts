@@ -99,6 +99,13 @@ export async function unlinkTerminal(sessionId: string): Promise<ApiResponse> {
 }
 
 /**
+ * Delete a session permanently (removes JSONL file from disk).
+ */
+export async function deleteSession(sessionId: string): Promise<ApiResponse> {
+  return apiCall(`/sessions/${sessionId}`, { method: "DELETE" });
+}
+
+/**
  * Send text to a session's linked terminal.
  */
 export async function sendText(

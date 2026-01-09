@@ -342,3 +342,17 @@ Rebranded from "claude-code-ui" to "Mimesis".
 - New repo: `github.com/olivier-motium/mimesis` (not a fork)
 - Data directory: `~/.mimesis/` (was `~/.claude-code-ui/`)
 - Existing users: rename data dir or start fresh
+
+## Session Deletion Feature (Jan 2026)
+
+Added ability to permanently delete sessions from the UI via the actions dropdown menu.
+
+**Implementation:**
+- `DELETE /api/sessions/:id` endpoint in daemon
+- `watcher.deleteSession(sessionId)` method deletes JSONL file and emits delete event
+- UI actions menu has "Delete session" option (destructive styling)
+
+**Why permanent deletion:**
+- User requested ability to clean up duplicate/old sessions
+- No soft-delete needed - sessions can always be re-created by running Claude Code again
+- JSONL files are the source of truth, deleting the file is the clean approach

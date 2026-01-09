@@ -124,6 +124,7 @@ async function main(): Promise<void> {
       ptyManager,
       getSession: (id) => watcher.getSessions().get(id),
       getAllSessions: () => watcher.getSessions(),
+      deleteSession: (id) => watcher.deleteSession(id),
     })
   );
 

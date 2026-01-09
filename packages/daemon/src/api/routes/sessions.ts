@@ -213,5 +213,26 @@ export function createSessionRoutes(deps: RouterDependencies): Hono {
     return c.json({ success: true, target: "kitty", recovered: result.recovered });
   });
 
+  // Delete session permanently (removes JSONL file from disk)
+  router.delete("/sessions/:id", (c) => {
+    const sessionId = c.req.param("id");
+
+    if (!deps.deleteSession) {
+      return c.json({ error: "Delete not available" }, 501);
+    }
+
+    const deleted = deps.deleteSession(sessionId);
+
+    if (!deleted) {
+      return c.json({ error: "Session not found" }, 404);
+    }
+
+    // Also clean up any terminal link
+    linkRepo.delete(sessionId);
+
+    console.log(`[API] Session ${sessionId.slice(0, 8)} deleted permanently`);
+    return c.json({ success: true });
+  });
+
   return router;
 }

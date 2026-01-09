@@ -380,6 +380,7 @@ HTTP API for terminal control (Port 4451).
 | POST | `/api/sessions/:id/link-terminal` | Link existing terminal |
 | DELETE | `/api/sessions/:id/link-terminal` | Unlink terminal |
 | POST | `/api/sessions/:id/send-text` | Send text to terminal |
+| DELETE | `/api/sessions/:id` | Delete session permanently (removes JSONL file) |
 
 ### Request/Response Examples
 
@@ -423,6 +424,15 @@ curl -X POST http://127.0.0.1:4451/api/sessions/abc123/open
 curl -X POST http://127.0.0.1:4451/api/sessions/abc123/send-text \
   -H "Content-Type: application/json" \
   -d '{"text": "npm test", "submit": true}'
+```
+
+**Delete session permanently:**
+
+Removes the session JSONL file from disk and removes from the stream. This action cannot be undone.
+
+```bash
+curl -X DELETE http://127.0.0.1:4451/api/sessions/abc123
+# { "success": true }
 ```
 
 ---

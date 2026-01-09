@@ -80,6 +80,12 @@ export function SessionActions({ session, onSendText }: SessionActionsProps) {
     onSendText?.();
   };
 
+  // Delete session permanently
+  const handleDelete = createAsyncHandler(
+    () => api.deleteSession(session.sessionId),
+    "Delete"
+  );
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -131,6 +137,12 @@ export function SessionActions({ session, onSendText }: SessionActionsProps) {
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={handleSendText}>
           Send message...
+        </DropdownMenuItem>
+
+        {/* Danger zone */}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem variant="destructive" onClick={handleDelete}>
+          Delete session
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

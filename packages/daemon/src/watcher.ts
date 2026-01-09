@@ -1,4 +1,5 @@
 import { watch, type FSWatcher } from "chokidar";
+import { unlinkSync } from "node:fs";
 import { EventEmitter } from "node:events";
 import {
   tailJSONL,
@@ -129,6 +130,43 @@ export class SessionWatcher extends EventEmitter {
 
   getSessions(): Map<string, SessionState> {
     return this.sessions;
+  }
+
+  /**
+   * Delete a session permanently - removes from memory and deletes the JSONL file.
+   * Returns true if session was found and deleted, false if not found.
+   */
+  deleteSession(sessionId: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
+      return false;
+    }
+
+    try {
+      // Delete the JSONL file from disk
+      unlinkSync(session.filepath);
+    } catch (error) {
+      // File may already be deleted, continue with cleanup
+      console.warn(`[WATCHER] Could not delete file ${session.filepath}:`, error);
+    }
+
+    // Remove from memory
+    this.sessions.delete(sessionId);
+
+    // Clear any pending debounce timer for this file
+    const timer = this.debounceTimers.get(session.filepath);
+    if (timer) {
+      clearTimeout(timer);
+      this.debounceTimers.delete(session.filepath);
+    }
+
+    // Emit delete event so stream gets updated
+    this.emit("session", {
+      type: "deleted",
+      session,
+    } satisfies SessionEvent);
+
+    return true;
   }
 
   private debouncedHandleFile(filepath: string): void {
