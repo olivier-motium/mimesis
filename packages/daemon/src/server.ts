@@ -19,6 +19,7 @@ import {
   STREAM_HOST,
   STREAM_PORT,
   STREAM_PATH,
+  STREAM_DATA_DIR,
   getStreamUrl,
   MESSAGE_LOOKBACK_COUNT,
   RECENT_OUTPUT_MAX_ITEMS,
@@ -27,8 +28,7 @@ import {
 } from "./config/index.js";
 import { formatToolUse, extractToolTarget } from "./tools/index.js";
 import { TerminalLinkRepo } from "./db/terminal-link-repo.js";
-import path from "node:path";
-import os from "node:os";
+import { rmSync, mkdirSync } from "node:fs";
 
 export interface StreamServerOptions {
   port?: number;
@@ -39,6 +39,7 @@ export class StreamServer {
   private server: DurableStreamTestServer;
   private stream: DurableStream | null = null;
   private port: number;
+  private dataDir: string;
   private streamUrl: string;
   // Track sessions for status update callbacks
   private sessionCache = new Map<string, SessionState>();
@@ -48,17 +49,19 @@ export class StreamServer {
   private statusWatcher: StatusWatcher;
   // Flag to prevent race conditions during shutdown
   private stopping = false;
+  // Flag to pause publishing (for stream reset)
+  private paused = false;
 
   constructor(options: StreamServerOptions = {}) {
     this.linkRepo = new TerminalLinkRepo();
     this.statusWatcher = new StatusWatcher();
     this.port = options.port ?? STREAM_PORT;
-    const dataDir = options.dataDir ?? path.join(os.homedir(), ".mimesis", "streams");
+    this.dataDir = options.dataDir ?? STREAM_DATA_DIR;
 
     this.server = new DurableStreamTestServer({
       port: this.port,
       host: STREAM_HOST,
-      dataDir,
+      dataDir: this.dataDir,
     });
 
     this.streamUrl = getStreamUrl(STREAM_HOST, this.port);
@@ -101,6 +104,95 @@ export class StreamServer {
     this.statusWatcher.stop();
     await this.server.stop();
     this.stream = null;
+  }
+
+  /**
+   * Pause publishing (for stream reset operations).
+   */
+  pause(): void {
+    this.paused = true;
+    console.log("[STREAM] Publishing paused");
+  }
+
+  /**
+   * Resume publishing after pause.
+   */
+  resume(): void {
+    this.paused = false;
+    console.log("[STREAM] Publishing resumed");
+  }
+
+  /**
+   * Check if stream is paused.
+   */
+  isPaused(): boolean {
+    return this.paused;
+  }
+
+  /**
+   * Clear stream data directory (for corruption recovery).
+   * Does NOT stop the server - call pause() first if needed.
+   */
+  clearStreamData(): void {
+    console.log("[STREAM] Clearing stream data directory:", this.dataDir);
+    try {
+      rmSync(this.dataDir, { recursive: true, force: true });
+      mkdirSync(this.dataDir, { recursive: true });
+      console.log("[STREAM] Stream data cleared");
+    } catch (error) {
+      console.error("[STREAM] Failed to clear stream data:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Restart stream connection (for corruption recovery).
+   * Stops the server, clears data if requested, and restarts.
+   */
+  async restart(clearData = false): Promise<void> {
+    console.log("[STREAM] Restarting stream server (clearData:", clearData, ")");
+    this.paused = true;
+
+    // Stop the stream server
+    await this.server.stop();
+    this.stream = null;
+
+    // Clear data if requested
+    if (clearData) {
+      this.clearStreamData();
+    }
+
+    // Recreate and restart server
+    this.server = new DurableStreamTestServer({
+      port: this.port,
+      host: STREAM_HOST,
+      dataDir: this.dataDir,
+    });
+    await this.server.start();
+
+    // Reconnect to stream
+    try {
+      this.stream = await DurableStream.create({
+        url: this.streamUrl,
+        contentType: "application/json",
+      });
+    } catch (error: unknown) {
+      if ((error as { code?: string }).code === "CONFLICT_EXISTS") {
+        this.stream = await DurableStream.connect({ url: this.streamUrl });
+      } else {
+        throw error;
+      }
+    }
+
+    this.paused = false;
+    console.log("[STREAM] Stream server restarted");
+  }
+
+  /**
+   * Get cached sessions (for republishing after reset).
+   */
+  getCachedSessions(): Map<string, SessionState> {
+    return this.sessionCache;
   }
 
   getStreamUrl(): string {
@@ -175,7 +267,7 @@ export class StreamServer {
    * Convert SessionState to Session schema and publish to stream.
    */
   async publishSession(sessionState: SessionState, operation: "insert" | "update" | "delete"): Promise<void> {
-    if (this.stopping || !this.stream) return;
+    if (this.stopping || this.paused || !this.stream) return;
 
     // Cache session state for callbacks
     this.sessionCache.set(sessionState.sessionId, sessionState);
@@ -202,7 +294,7 @@ export class StreamServer {
    * Publish session with updated file status (called from status watcher callback).
    */
   async publishSessionWithFileStatus(sessionState: SessionState, fileStatus: FileStatus | null): Promise<void> {
-    if (this.stopping || !this.stream) return;
+    if (this.stopping || this.paused || !this.stream) return;
 
     const session = await this.buildSession(sessionState, { fileStatus });
     const event = sessionsStateSchema.sessions.update({ value: session });
@@ -213,7 +305,7 @@ export class StreamServer {
    * Publish terminal link update for a session.
    */
   async publishTerminalLinkUpdate(sessionId: string, terminalLink: TerminalLink | null): Promise<void> {
-    if (this.stopping || !this.stream) return;
+    if (this.stopping || this.paused || !this.stream) return;
 
     const sessionState = this.sessionCache.get(sessionId);
     if (!sessionState) {

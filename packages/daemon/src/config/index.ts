@@ -85,6 +85,7 @@ export {
 // Paths
 export {
   DB_PATH,
+  STREAM_DATA_DIR,
   STATUS_FILE_TTL_MS,
   STATUS_FILENAME,
   STATUS_DIR,

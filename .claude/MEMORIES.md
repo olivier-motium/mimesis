@@ -137,8 +137,27 @@ Kitty window IDs are ephemeral - they change on kitty restart or when other wind
 ### Entry Limit to Prevent Memory Leaks
 Sessions can have thousands of log entries over time. Without trimming, memory grows unbounded causing OOM kills (exit 137). Solution: `MAX_ENTRIES_PER_SESSION = 500` in config.ts, trimmed in watcher.ts. This is sufficient for status detection and summarization while preventing memory exhaustion.
 
-### StreamDB Corruption Recovery
-If durable-streams client shows `Symbol(liveQueryInternal)` errors, the stream data may be corrupted. Fix: backup and clear `~/.mimesis/streams/`, restart daemon. The stream will rebuild from session files.
+### StreamDB Corruption Recovery (Auto-Recovery Jan 2026)
+If durable-streams client shows `Symbol(liveQueryInternal)` errors, the stream data is corrupted. The system now automatically recovers:
+
+**Auto-recovery flow:**
+1. UI detects corruption error during `createStreamDB()` or `preload()`
+2. UI calls `POST /api/v1/stream/reset` to daemon
+3. Daemon pauses publishing, clears `~/.mimesis/streams/`, restarts stream server
+4. Daemon republishes all cached sessions
+5. UI retries connection (up to 3 attempts with exponential backoff)
+
+**Key files:**
+- `packages/ui/src/data/sessionsDb.ts` - Retry logic and corruption detection
+- `packages/daemon/src/api/routes/stream.ts` - Reset endpoint
+- `packages/daemon/src/server.ts` - `pause()`, `restart()`, `clearStreamData()` methods
+- `packages/ui/src/routes/__root.tsx` - Error boundary and fallback UI
+
+**Manual recovery (if auto-recovery fails):**
+```bash
+rm -rf ~/.mimesis/streams/
+# Restart daemon
+```
 
 ### File-Based Status System (Jan 2026)
 Alternative to AI summaries for session status. Claude Code writes status to `.claude/status.md` via hooks, daemon watches and streams to UI.
@@ -387,3 +406,26 @@ if stop_hook_active:
 - `~/.claude/hooks/stop-validator.py` - Added `check_status_file()` function
 - `~/.claude/hooks/status-working.py` - Strengthened language (MANDATORY, MUST)
 - `~/.claude/hooks/status-stop.py` - Strengthened language
+
+## Session Deduplication by CWD (Jan 2026)
+
+**Problem:** Multiple rows showed identical Goal/Summary but different ages.
+
+**Root cause:** `.claude/status.md` is per-project (cwd), not per-session. Claude Code creates new session files (e.g., via compact feature), but all sessions from the same project directory share ONE status.md file. This causes all sessions to appear identical in the UI.
+
+**Solution:** Deduplicate sessions by `cwd` in `useSessions.ts`:
+```typescript
+const sessionsByCwd = new Map<string, Session>();
+for (const session of sessionsWithStatus) {
+  const existing = sessionsByCwd.get(session.cwd);
+  if (!existing || session.lastActivityAt > existing.lastActivityAt) {
+    sessionsByCwd.set(session.cwd, session);
+  }
+}
+const sessions = Array.from(sessionsByCwd.values());
+```
+
+**Why this approach:**
+- Matches user mental model: one row per project
+- Most recent session is the "active" one
+- Older session files still exist but aren't shown (can be cleaned up with delete)

@@ -14,6 +14,10 @@ import { parsePositiveInt } from "./helpers.js";
 export const DB_PATH = process.env.DB_PATH ??
   path.join(os.homedir(), ".mimesis", "data.db");
 
+/** Path to Durable Streams data directory */
+export const STREAM_DATA_DIR = process.env.STREAM_DATA_DIR ??
+  path.join(os.homedir(), ".mimesis", "streams");
+
 // =============================================================================
 // File-Based Status Configuration
 // =============================================================================

@@ -614,6 +614,63 @@ body {
   border: 1px solid var(--nb-border);
 }
 
+/* Viewport Command Input */
+.fleet-viewport__input {
+  flex-shrink: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  background: var(--nb-sidebar);
+  border-top: 1px solid var(--nb-border);
+}
+
+.fleet-viewport__input-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--nb-black);
+  border: 1px solid var(--nb-border);
+  border-radius: 6px;
+}
+
+.fleet-viewport__input-wrapper:focus-within {
+  border-color: var(--nb-yellow);
+  box-shadow: 0 0 0 1px var(--nb-yellow);
+}
+
+.fleet-viewport__input-icon {
+  flex-shrink: 0;
+  color: var(--nb-text-muted);
+}
+
+.fleet-viewport__input-field {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--nb-text-bright);
+}
+
+.fleet-viewport__input-field::placeholder {
+  color: var(--nb-text-dim);
+}
+
+.fleet-viewport__input-hint {
+  flex-shrink: 0;
+  padding: 2px 6px;
+  background: var(--nb-border);
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--nb-text-muted);
+  letter-spacing: 0.05em;
+}
+
 /* Zone C: Tactical Intel (Right Sidebar) */
 .fleet-intel {
   grid-area: intel;
