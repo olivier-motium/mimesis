@@ -745,6 +745,120 @@ interface TerminalLink {
 
 ---
 
+## File-Based Status System (`status-watcher.ts`, `status-parser.ts`)
+
+Watches `.claude/status.md` files for deterministic session status updates written by Claude Code via hooks.
+
+### Overview
+
+Instead of deriving status from AI summaries, Claude Code writes its own status to `.claude/status.md` files. The daemon watches these files and streams updates to the UI.
+
+### StatusWatcher
+
+```typescript
+import { StatusWatcher } from "./status-watcher.js";
+
+const watcher = new StatusWatcher({ debounceMs: 100 });
+
+watcher.on("status", ({ cwd, status }) => {
+  console.log(`Status update for ${cwd}: ${status?.status}`);
+});
+
+watcher.watchProject("/path/to/project");
+const currentStatus = watcher.getStatus("/path/to/project");
+```
+
+**Methods:**
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `watchProject(cwd)` | `void` | Start watching a project's status file |
+| `unwatchProject(cwd)` | `void` | Stop watching a project |
+| `getStatus(cwd)` | `FileStatus \| null` | Get cached status (null if stale) |
+| `refreshStatus(cwd)` | `Promise<FileStatus \| null>` | Force re-read from disk |
+| `stop()` | `void` | Stop all watchers |
+
+**Events:**
+
+| Event | Payload | When |
+|-------|---------|------|
+| `status` | `{ cwd, status }` | Status file created/changed/deleted |
+| `error` | `Error` | Watch error |
+
+### Status File Format
+
+**Location:** `<project>/.claude/status.md`
+
+```markdown
+---
+status: working
+updated: 2026-01-09T14:30:00Z
+task: Implementing user authentication
+---
+
+## Summary
+Adding OAuth integration to the login flow.
+
+## Blockers
+None currently
+
+## Next Steps
+Complete token refresh logic
+```
+
+### Status Taxonomy
+
+| Status | Description | UI Mapping |
+|--------|-------------|------------|
+| `working` | Actively executing | working |
+| `waiting_for_approval` | Tool needs permission | waiting |
+| `waiting_for_input` | Needs user response | waiting |
+| `completed` | Task finished | idle |
+| `error` | Encountered error | idle |
+| `blocked` | Cannot proceed | idle |
+| `idle` | No active work | idle |
+
+### Parser Functions
+
+```typescript
+import { parseStatusFile, isStatusStale, mapToUiStatus } from "./status-parser.js";
+
+// Parse status file content
+const parsed = parseStatusFile(fileContent);
+// Returns: { frontmatter: { status, updated, task }, summary, blockers, nextSteps }
+
+// Check if status is stale (default 5 min TTL)
+const stale = isStatusStale(parsed.frontmatter.updated, STATUS_FILE_TTL_MS);
+
+// Map file status to UI status (7 → 3 states)
+const uiStatus = mapToUiStatus("waiting_for_approval"); // "waiting"
+```
+
+### Staleness Handling
+
+Status files are valid for **5 minutes** (`STATUS_FILE_TTL_MS`). After expiration:
+- `getStatus()` returns `null`
+- Falls back to XState-derived status from JSONL logs
+
+### Configuration
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `STATUS_FILE_TTL_MS` | 5 minutes | Status file validity period |
+| `STATUS_FILENAME` | `status.md` | Status file name |
+| `STATUS_DIR` | `.claude` | Directory containing status file |
+
+### Hook Integration
+
+Status files are written by Claude Code via hooks:
+
+1. **UserPromptSubmit hook** (`status-working.py`) - Sets status to "working"
+2. **Stop hook** (`status-stop.py`) - Sets completion status
+
+See the hook files at `~/.claude/hooks/` after installation.
+
+---
+
 ## Related Documentation
 
 - [Configuration Reference](../operations/configuration.md) - All daemon constants

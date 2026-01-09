@@ -59,6 +59,7 @@ External knowledge bases for related technologies:
 |---------|-------------|----------|
 | **Session Watcher** | Monitors `~/.claude/projects/` for JSONL changes | [README](../README.md#daemon) |
 | **Status Machine** | XState state machine for session status | [README](../README.md#session-status-state-machine) |
+| **File-Based Status** | Claude Code writes status to `.claude/status.md` | [Daemon API](api/daemon-api.md#file-based-status-system-status-watcherts-status-parserts) |
 | **Durable Streams** | Real-time state sync between daemon and UI | [CLAUDE.md](../CLAUDE.md#durable-streams-integration) |
 | **AI Summaries** | Claude-generated goals and activity summaries | [Summarizer](summarizer.md) |
 | **PR/CI Tracking** | GitHub PR status and CI polling | [Daemon API](api/daemon-api.md#github-pr-tracking-githubts) |
