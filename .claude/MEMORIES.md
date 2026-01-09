@@ -225,6 +225,25 @@ requestAnimationFrame(() => {
 });
 ```
 
+### PTY API Idempotency (Terminal Latency)
+
+The daemon's `POST /sessions/:id/pty` endpoint is **idempotent** - it returns existing PTY if found, or creates a new one. The UI was incorrectly calling `GET` first (which always failed for new sessions), then `POST`.
+
+**Wrong pattern (2 round-trips):**
+```typescript
+let ptyInfo = await getPty(sessionId);    // Always fails for new sessions
+if (!ptyInfo) {
+  ptyInfo = await createPty(sessionId);   // Second roundtrip
+}
+```
+
+**Correct pattern (1 round-trip):**
+```typescript
+const ptyInfo = await ensurePty(sessionId);  // Uses POST directly
+```
+
+This saves ~200-400ms per terminal load. The `ensurePty()` function in `api.ts` wraps this pattern.
+
 ### E2E Test Fixes (Jan 2026)
 
 Flaky tests in `tracking.test.ts` were fixed:
