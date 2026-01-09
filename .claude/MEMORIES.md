@@ -211,6 +211,20 @@ The `ws` WebSocketServer's `path` option only matches exact paths. Don't use `pa
 
 Daemon modules imported by UI (via schema.ts) must not use `process.env` or other Node-only globals. The config barrel export (`config/index.ts`) re-exports all config modules including `stream.ts` which uses `process.env`. Solution: import specific config files directly (e.g., `config/content.ts`) instead of the barrel export when the importing module may run in browser context.
 
+### xterm.js Renderer Initialization Timing
+
+`fitAddon.fit()` must NOT be called immediately after `terminal.open()`. The xterm renderer initializes asynchronously after DOM attachment. Calling `fit()` too early causes: `TypeError: can't access property "dimensions", this._renderer.value is undefined`.
+
+**Solution:** Wrap `fitAddon.fit()` in `requestAnimationFrame`:
+```typescript
+terminal.open(containerRef.current);
+requestAnimationFrame(() => {
+  if (terminalRef.current && fitAddonRef.current) {
+    fitAddonRef.current.fit();
+  }
+});
+```
+
 ### E2E Test Fixes (Jan 2026)
 
 Flaky tests in `tracking.test.ts` were fixed:

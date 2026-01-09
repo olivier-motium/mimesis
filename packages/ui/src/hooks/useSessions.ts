@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useLiveQuery } from "@tanstack/react-db";
 import { getSessionsDbSync } from "../data/sessionsDb";
 import type { Session } from "../types/schema";
@@ -39,29 +40,30 @@ export function useSessions() {
     };
   }
 
-  // Transform to array of sessions
-  // The query.data is a Map where values are the session objects directly
-  const allSessions: Session[] = query?.data
-    ? Array.from(query.data.values())
-    : [];
+  // Memoize expensive transformations - only recompute when data changes
+  const sessions = useMemo(() => {
+    if (!query?.data) return [];
 
-  // Filter to only sessions with status files (hook system installed)
-  // This hides old sessions from before the hook system was added
-  const sessionsWithStatus = allSessions.filter((session) => session.fileStatus !== null);
+    // Transform Map to array
+    const allSessions = Array.from(query.data.values()) as Session[];
 
-  // Deduplicate: keep only the most recent session per project (cwd)
-  // Multiple Claude Code sessions can exist for the same project directory
-  // (e.g., from compact feature creating new session files), but they all
-  // share the same .claude/status.md file. Show only the most recent.
-  const sessionsByCwd = new Map<string, Session>();
-  for (const session of sessionsWithStatus) {
-    const existing = sessionsByCwd.get(session.cwd);
-    if (!existing || session.lastActivityAt > existing.lastActivityAt) {
-      sessionsByCwd.set(session.cwd, session);
+    // Filter to only sessions with status files (hook system installed)
+    const sessionsWithStatus = allSessions.filter((s) => s.fileStatus !== null);
+
+    // Deduplicate: keep only the most recent session per project (cwd)
+    // Multiple Claude Code sessions can exist for the same project directory
+    // (e.g., from compact feature creating new session files), but they all
+    // share the same .claude/status.md file. Show only the most recent.
+    const sessionsByCwd = new Map<string, Session>();
+    for (const session of sessionsWithStatus) {
+      const existing = sessionsByCwd.get(session.cwd);
+      if (!existing || session.lastActivityAt > existing.lastActivityAt) {
+        sessionsByCwd.set(session.cwd, session);
+      }
     }
-  }
 
-  const sessions = Array.from(sessionsByCwd.values());
+    return Array.from(sessionsByCwd.values());
+  }, [query?.data]);
 
   return {
     sessions,

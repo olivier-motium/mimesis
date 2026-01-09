@@ -7,7 +7,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Terminal as TerminalIcon, Command, AlertCircle } from "lucide-react";
 import { Terminal } from "../terminal/Terminal";
-import { createPty, getPty, sendText, type PtyInfo } from "../../lib/api";
+import { ensurePty, sendText, type PtyInfo } from "../../lib/api";
 import { getEffectiveStatus } from "../../lib/sessionStatus";
 import { getGoalText, STATUS_LABELS } from "./constants";
 import type { ViewportProps } from "./types";
@@ -33,10 +33,8 @@ export function Viewport({ session, onSendCommand }: ViewportProps) {
     initializedSessionRef.current = sessionId;
 
     try {
-      let info = await getPty(sessionId);
-      if (!info) {
-        info = await createPty(sessionId);
-      }
+      // Single API call - daemon handles get-or-create
+      const info = await ensurePty(sessionId);
       setPtyInfo(info);
     } catch (err) {
       console.error("[Viewport] Failed to initialize PTY:", err);

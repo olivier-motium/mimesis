@@ -12,7 +12,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Terminal } from "../terminal/Terminal";
 import { SessionHeader } from "./SessionHeader";
-import { createPty, getPty, type PtyInfo } from "../../lib/api";
+import { ensurePty, type PtyInfo } from "../../lib/api";
 import type { Session } from "../../types/schema";
 
 interface TerminalDockProps {
@@ -52,13 +52,8 @@ export function TerminalDock({ session, onClose }: TerminalDockProps) {
     initializedSessionRef.current = sessionId;
 
     try {
-      // Check if PTY already exists
-      let ptyInfo = await getPty(sessionId);
-
-      // Create if doesn't exist
-      if (!ptyInfo) {
-        ptyInfo = await createPty(sessionId);
-      }
+      // Single API call - daemon handles get-or-create
+      const ptyInfo = await ensurePty(sessionId);
 
       setState({
         ptyInfo,

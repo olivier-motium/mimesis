@@ -157,6 +157,18 @@ export async function getPty(sessionId: string): Promise<PtyInfo | null> {
 }
 
 /**
+ * Ensure a PTY exists for a session (get or create in single call).
+ * This is the preferred method - eliminates the sequential GET then POST pattern.
+ * The daemon's POST endpoint is idempotent (returns existing PTY if found).
+ */
+export async function ensurePty(
+  sessionId: string,
+  options?: { cols?: number; rows?: number }
+): Promise<PtyInfo> {
+  return createPty(sessionId, options);
+}
+
+/**
  * Destroy a PTY session.
  */
 export async function destroyPty(sessionId: string): Promise<ApiResponse> {
