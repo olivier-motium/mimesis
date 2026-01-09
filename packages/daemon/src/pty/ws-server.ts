@@ -33,7 +33,8 @@ export function createPtyWsServer(options: PtyWsServerOptions): WebSocketServer 
   const wss = new WebSocketServer({
     host,
     port,
-    path: "/pty",
+    // Note: Don't use `path` option as it only matches exact paths.
+    // We handle path validation in the connection handler instead.
   });
 
   console.log(`[PTY WS] Server listening on ws://${host}:${port}/pty`);

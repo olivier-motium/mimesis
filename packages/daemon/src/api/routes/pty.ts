@@ -9,7 +9,36 @@
  */
 
 import { Hono } from "hono";
+import { execSync } from "node:child_process";
 import type { RouterDependencies } from "../types.js";
+
+/**
+ * Get the full path to the claude executable.
+ * Uses `which` to find the path at startup.
+ */
+function getClaudePath(): string {
+  try {
+    return execSync("which claude", { encoding: "utf-8" }).trim();
+  } catch {
+    // Fallback to common locations
+    const paths = [
+      "/opt/homebrew/bin/claude",
+      "/usr/local/bin/claude",
+      "/usr/bin/claude",
+    ];
+    for (const p of paths) {
+      try {
+        execSync(`test -x ${p}`);
+        return p;
+      } catch {
+        // Not found, continue
+      }
+    }
+    return "claude"; // Fall back to hoping it's in PATH
+  }
+}
+
+const CLAUDE_PATH = getClaudePath();
 
 /**
  * Create PTY-related routes.
@@ -60,7 +89,7 @@ export function createPtyRoutes(deps: RouterDependencies): Hono {
       const ptyInfo = await ptyManager!.createPty({
         sessionId,
         cwd: session.cwd,
-        command: ["claude", "--resume", sessionId, "--dangerously-skip-permissions"],
+        command: [CLAUDE_PATH, "--resume", sessionId, "--dangerously-skip-permissions"],
         cols,
         rows,
       });
