@@ -3,7 +3,7 @@
  * Handles the mapping from file-based status (7 values) to UI status (3 values).
  */
 
-import type { Session, FileStatusValue, SessionStatus } from "@claude-code-ui/daemon/schema";
+import type { Session, FileStatusValue, SessionStatus } from "../types/schema";
 
 /** TTL for file-based status (5 minutes) */
 const FILE_STATUS_TTL_MS = 5 * 60 * 1000;

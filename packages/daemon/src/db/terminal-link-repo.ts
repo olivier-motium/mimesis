@@ -6,6 +6,7 @@
 import { eq } from "drizzle-orm";
 import { getDb, schema } from "./index.js";
 import type { KittyRc } from "../kitty-rc.js";
+import { logSilentError } from "../utils/logger.js";
 
 export interface TerminalLink {
   sessionId: string;
@@ -137,8 +138,9 @@ export class TerminalLinkRepo {
           staleSessionIds.push(link.sessionId);
         }
       }
-    } catch {
-      // Kitty not available, mark all non-stale as stale
+    } catch (error) {
+      // Kitty not available - log for debugging and mark all non-stale as stale
+      logSilentError("validateAll: kitty ls failed", error);
       const links = this.getAll().filter((l) => !l.stale);
       for (const link of links) {
         this.markStale(link.sessionId);

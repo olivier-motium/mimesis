@@ -4,22 +4,10 @@
  */
 
 import { z } from "zod";
+import { FileStatusValueSchema, type FileStatusValue } from "./schema.js";
 
-// =============================================================================
-// Schema Definitions
-// =============================================================================
-
-/** Valid status values from file-based status */
-export const FileStatusValueSchema = z.enum([
-  "working",
-  "waiting_for_approval",
-  "waiting_for_input",
-  "completed",
-  "error",
-  "blocked",
-  "idle",
-]);
-export type FileStatusValue = z.infer<typeof FileStatusValueSchema>;
+// Re-export for consumers that import from this module
+export { FileStatusValueSchema, type FileStatusValue };
 
 /** Schema for parsed frontmatter */
 export const StatusFrontmatterSchema = z.object({

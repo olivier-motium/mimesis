@@ -18,7 +18,7 @@ import {
   PTY_IDLE_TIMEOUT_MS,
   PTY_IDLE_CHECK_INTERVAL_MS,
   getPtyWsUrl,
-} from "../config.js";
+} from "../config/index.js";
 import type {
   PtySession,
   CreatePtyOptions,
@@ -243,7 +243,7 @@ export class PtyManager {
       try {
         client.close(1000, "PTY session ended");
       } catch {
-        // Ignore close errors
+        // Expected: client socket may already be closed
       }
     }
     session.clients.clear();
@@ -253,7 +253,7 @@ export class PtyManager {
       try {
         proc.kill();
       } catch {
-        // Ignore kill errors (process may have already exited)
+        // Expected: process may have already exited
       }
     }
 

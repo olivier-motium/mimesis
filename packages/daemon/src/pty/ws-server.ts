@@ -11,7 +11,7 @@
 
 import { WebSocketServer, WebSocket } from "ws";
 import type { IncomingMessage } from "node:http";
-import { PTY_WS_HOST, PTY_WS_PORT } from "../config.js";
+import { PTY_WS_HOST, PTY_WS_PORT } from "../config/index.js";
 import type { PtyManager } from "./pty-manager.js";
 import { parseWsMessage, serializeWsMessage } from "./types.js";
 

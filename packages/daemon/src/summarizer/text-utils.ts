@@ -2,7 +2,7 @@
  * Text utility functions for summarization.
  */
 
-import { GOAL_TRUNCATE_LENGTH } from "../config.js";
+import { GOAL_TRUNCATE_LENGTH } from "../config/index.js";
 
 /**
  * Clean and truncate goal text

@@ -6,7 +6,7 @@ import { Flex, Text, Box, Badge, Separator } from "@radix-ui/themes";
 import { getRoleColor, getRolePrefix, getCIStatusIcon, getCIStatusColor } from "./utils";
 import { getEffectiveStatus } from "../../lib/sessionStatus";
 import type { SessionCardProps } from "./types";
-import type { RecentOutput, CIStatus } from "@claude-code-ui/daemon/schema";
+import type { RecentOutput, CIStatus } from "../../types/schema";
 
 interface CICheck {
   name: string;

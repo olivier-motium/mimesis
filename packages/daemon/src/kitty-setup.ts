@@ -7,7 +7,7 @@ import path from "node:path";
 import os from "node:os";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { KITTY_SOCKET } from "./config.js";
+import { KITTY_SOCKET } from "./config/index.js";
 import { getErrorMessage } from "./utils/type-guards.js";
 
 const execFileAsync = promisify(execFile);
@@ -66,6 +66,7 @@ export async function isKittyInstalled(): Promise<boolean> {
     await execFileAsync("which", ["kitten"]);
     return true;
   } catch {
+    // Expected: kitten not in PATH means kitty is not installed
     return false;
   }
 }
@@ -78,6 +79,7 @@ async function isKittyRunning(): Promise<boolean> {
     await execFileAsync("pgrep", ["-x", "kitty"]);
     return true;
   } catch {
+    // Expected: pgrep returns non-zero when no matching process found
     return false;
   }
 }
@@ -94,6 +96,7 @@ export async function isKittyReachable(): Promise<boolean> {
     });
     return true;
   } catch {
+    // Expected: socket may not exist or kitty may not be responding
     return false;
   }
 }
@@ -108,6 +111,7 @@ export async function hasClaudeCodeConfig(): Promise<boolean> {
     await fs.access(configPath);
     return true;
   } catch {
+    // Expected: config file doesn't exist yet
     return false;
   }
 }
@@ -153,7 +157,7 @@ async function addIncludeDirective(): Promise<boolean> {
   try {
     existingConfig = await fs.readFile(mainConfigPath, "utf-8");
   } catch {
-    // Config doesn't exist, create it
+    // Expected: kitty.conf doesn't exist yet, will be created
   }
 
   // Check if already included
@@ -212,12 +216,13 @@ async function reloadKittyConfig(): Promise<boolean> {
       try {
         process.kill(parseInt(pid, 10), "SIGUSR1");
       } catch {
-        // Process may have exited between pgrep and kill
+        // Expected: process may have exited between pgrep and kill
       }
     }
 
     return pids.length > 0;
   } catch {
+    // Expected: pgrep returns non-zero when no kitty processes found
     return false;
   }
 }
@@ -317,7 +322,7 @@ export async function getKittyStatus(): Promise<KittyStatusDetails> {
     await fs.access(socketPath);
     socketExists = true;
   } catch {
-    // Socket doesn't exist
+    // Expected: socket doesn't exist when kitty not running or not configured
   }
 
   return {

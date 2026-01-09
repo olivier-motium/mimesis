@@ -11,6 +11,7 @@
 import { Hono } from "hono";
 import { execSync } from "node:child_process";
 import type { RouterDependencies } from "../types.js";
+import { logSilentError } from "../../utils/logger.js";
 
 /**
  * Get the full path to the claude executable.
@@ -19,7 +20,8 @@ import type { RouterDependencies } from "../types.js";
 function getClaudePath(): string {
   try {
     return execSync("which claude", { encoding: "utf-8" }).trim();
-  } catch {
+  } catch (error) {
+    logSilentError("getClaudePath: which claude failed", error);
     // Fallback to common locations
     const paths = [
       "/opt/homebrew/bin/claude",
@@ -31,7 +33,7 @@ function getClaudePath(): string {
         execSync(`test -x ${p}`);
         return p;
       } catch {
-        // Not found, continue
+        // Expected: path doesn't exist, try next
       }
     }
     return "claude"; // Fall back to hoping it's in PATH
@@ -81,7 +83,7 @@ export function createPtyRoutes(deps: RouterDependencies): Hono {
       if (typeof body.cols === "number") cols = body.cols;
       if (typeof body.rows === "number") rows = body.rows;
     } catch {
-      // No body or invalid JSON - use defaults
+      // Expected: request may have no body or non-JSON body - use defaults
     }
 
     // Create PTY with claude --resume command

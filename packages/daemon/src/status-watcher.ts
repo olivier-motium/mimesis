@@ -9,7 +9,7 @@ import { readFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { parseStatusFile, isStatusStale, type ParsedStatus } from "./status-parser.js";
-import { STATUS_FILE_TTL_MS, STATUS_DIR, STATUS_FILENAME } from "./config.js";
+import { STATUS_FILE_TTL_MS, STATUS_DIR, STATUS_FILENAME } from "./config/index.js";
 import type { FileStatus } from "./schema.js";
 
 // =============================================================================
@@ -160,6 +160,7 @@ export class StatusWatcher extends EventEmitter {
       this.statusCache.set(cwd, fileStatus);
       return fileStatus;
     } catch {
+      // Expected: status file may not exist, be invalid YAML, or unreadable
       return null;
     }
   }

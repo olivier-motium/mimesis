@@ -2,7 +2,7 @@
  * Timeout utility for wrapping async operations with time limits.
  */
 
-import { EXTERNAL_CALL_TIMEOUT_MS } from "../config.js";
+import { EXTERNAL_CALL_TIMEOUT_MS } from "../config/index.js";
 
 export class TimeoutError extends Error {
   constructor(message: string, public readonly timeoutMs: number) {

@@ -9,7 +9,7 @@ import { mkdir, writeFile, rm, appendFile } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { SessionWatcher } from "./watcher.js";
-import { deriveStatus } from "./status.js";
+import { deriveStatus } from "./status-derivation.js";
 import { tailJSONL, extractMetadata } from "./parser.js";
 
 const TEST_DIR = path.join(os.homedir(), ".claude", "projects", "-test-e2e-session");

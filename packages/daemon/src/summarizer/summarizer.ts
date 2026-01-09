@@ -18,14 +18,12 @@ import {
   EARLY_ENTRIES_COUNT,
   SUMMARY_MAX_TOKENS,
   GOAL_MAX_TOKENS,
-} from "../config.js";
+} from "../config/index.js";
 import { withTimeout, TimeoutError } from "../utils/timeout.js";
 import { isError } from "../utils/type-guards.js";
 import {
-  evictStaleEntries,
+  SummarizerCache,
   generateContentHash,
-  type SummaryCacheEntry,
-  type GoalCacheEntry,
 } from "./cache.js";
 import { extractContext, extractEarlyContext, extractRecentGoalContext } from "./context-extraction.js";
 import { getWorkingSummary, getFallbackSummary } from "./summaries.js";
@@ -71,11 +69,28 @@ function queueAPICall(params: MessageCreateParamsNonStreaming): Promise<string> 
   });
 }
 
-// Cache summaries to avoid redundant API calls
-const summaryCache = new Map<string, SummaryCacheEntry>();
+// Summary cache: stores { summary, hash } - hash is used for invalidation
+interface SummaryCacheValue {
+  summary: string;
+  hash: string;
+}
 
-// Cache goals with entry count - regenerate if session has grown significantly
-const goalCache = new Map<string, GoalCacheEntry>();
+// Goal cache: stores { goal, entryCount } - entryCount is used for invalidation
+interface GoalCacheValue {
+  goal: string;
+  entryCount: number;
+}
+
+// Cache instances with TTL and LRU eviction
+const summaryCache = new SummarizerCache<SummaryCacheValue>(
+  SUMMARY_CACHE_MAX_SIZE,
+  SUMMARY_CACHE_TTL_MS
+);
+
+const goalCache = new SummarizerCache<GoalCacheValue>(
+  GOAL_CACHE_MAX_SIZE,
+  GOAL_CACHE_TTL_MS
+);
 
 /**
  * Generate an AI summary of the session's current state
@@ -92,15 +107,10 @@ export async function generateAISummary(session: SessionState): Promise<string> 
     return getWorkingSummary(session);
   }
 
-  // Evict stale entries before checking cache
-  evictStaleEntries(summaryCache, SUMMARY_CACHE_TTL_MS, SUMMARY_CACHE_MAX_SIZE);
-
-  // Check cache
+  // Check cache with hash-based invalidation
   const contentHash = generateContentHash(entries);
   const cached = summaryCache.get(sessionId);
   if (cached && cached.hash === contentHash) {
-    // Update timestamp on access (LRU behavior)
-    cached.timestamp = Date.now();
     return cached.summary;
   }
 
@@ -129,12 +139,8 @@ Summary:`,
 
     const result = summary || "Session active";
 
-    // Cache the result with timestamp
-    summaryCache.set(sessionId, {
-      summary: result,
-      hash: contentHash,
-      timestamp: Date.now(),
-    });
+    // Cache the result
+    summaryCache.set(sessionId, { summary: result, hash: contentHash });
 
     return result;
   } catch (error) {
@@ -154,14 +160,9 @@ Summary:`,
 export async function generateGoal(session: SessionState): Promise<string> {
   const { sessionId, originalPrompt, entries } = session;
 
-  // Evict stale entries
-  evictStaleEntries(goalCache, GOAL_CACHE_TTL_MS, GOAL_CACHE_MAX_SIZE);
-
   // Check cache - but regenerate if session has grown 5x since last generation
   const cached = goalCache.get(sessionId);
   if (cached && entries.length < cached.entryCount * 5) {
-    // Update timestamp on access (LRU behavior)
-    cached.timestamp = Date.now();
     return cached.goal;
   }
 
@@ -207,12 +208,8 @@ Goal:`,
 
     const goal = cleanGoalText(goalResponse || originalPrompt.slice(0, GOAL_TRUNCATE_LENGTH));
 
-    // Cache with current entry count and timestamp
-    goalCache.set(sessionId, {
-      goal,
-      entryCount: entries.length,
-      timestamp: Date.now(),
-    });
+    // Cache with current entry count
+    goalCache.set(sessionId, { goal, entryCount: entries.length });
 
     return goal;
   } catch (error) {

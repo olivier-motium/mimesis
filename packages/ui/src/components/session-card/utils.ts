@@ -2,7 +2,7 @@
  * Utility functions for SessionCard components
  */
 
-import type { Session, CIStatus } from "@claude-code-ui/daemon/schema";
+import type { Session, CIStatus } from "../../types/schema";
 import { getEffectiveStatus } from "../../lib/sessionStatus";
 
 export function getCardClass(session: Session): string {

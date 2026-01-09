@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 import { SessionWatcher, type SessionEvent, type SessionState } from "./watcher.js";
-import { formatStatus, getStatusKey } from "./status.js";
-import { RECENT_THRESHOLD_MS } from "./config.js";
+import { formatStatus, getStatusKey } from "./status-derivation.js";
+import { RECENT_THRESHOLD_MS } from "./config/index.js";
 import { colors } from "./utils/colors.js";
 
 // Parse CLI args
@@ -111,17 +111,119 @@ function shouldShowSession(session: SessionState): boolean {
   return true;
 }
 
-function logInitialSessions(sessions: Map<string, SessionState>): void {
-  // Filter sessions
-  const filteredSessions = Array.from(sessions.values()).filter(shouldShowSession);
+// ===========================================================================
+// Session Grouping Helpers
+// ===========================================================================
 
-  // Sort by last activity (most recent first)
-  filteredSessions.sort((a, b) => {
-    const aTime = new Date(a.status.lastActivityAt).getTime();
-    const bTime = new Date(b.status.lastActivityAt).getTime();
-    return bTime - aTime;
+const OTHER_REPO_KEY = "__other__";
+
+type SessionsByRepo = Map<string, SessionState[]>;
+type SessionsByCwd = Map<string, SessionState[]>;
+
+/**
+ * Group sessions by repository ID.
+ */
+function groupSessionsByRepo(sessions: SessionState[]): SessionsByRepo {
+  const byRepo = new Map<string, SessionState[]>();
+  for (const session of sessions) {
+    const key = session.gitRepoId ?? OTHER_REPO_KEY;
+    const existing = byRepo.get(key) ?? [];
+    existing.push(session);
+    byRepo.set(key, existing);
+  }
+  return byRepo;
+}
+
+/**
+ * Group sessions by working directory.
+ */
+function groupSessionsByCwd(sessions: SessionState[]): SessionsByCwd {
+  const byCwd = new Map<string, SessionState[]>();
+  for (const session of sessions) {
+    const existing = byCwd.get(session.cwd) ?? [];
+    existing.push(session);
+    byCwd.set(session.cwd, existing);
+  }
+  return byCwd;
+}
+
+/**
+ * Sort repo keys: GitHub repos first (alphabetically), then "Other".
+ */
+function sortRepoKeys(keys: string[]): string[] {
+  return keys.sort((a, b) => {
+    if (a === OTHER_REPO_KEY) return 1;
+    if (b === OTHER_REPO_KEY) return -1;
+    return a.localeCompare(b);
   });
+}
 
+// ===========================================================================
+// Session Printing Helpers
+// ===========================================================================
+
+/**
+ * Print a single session's details.
+ */
+function printSession(session: SessionState, indent: string): void {
+  const status = formatStatus(session.status);
+  const prompt = formatPrompt(session.originalPrompt);
+  const branch = session.gitBranch
+    ? ` ${colors.magenta}(${session.gitBranch})${colors.reset}`
+    : "";
+  const lastActivity = formatRelativeTime(session.status.lastActivityAt);
+
+  console.log(
+    `${indent}${colors.cyan}${session.sessionId.slice(0, 8)}${colors.reset}${branch} ${status}`
+  );
+  console.log(`${indent}  ${colors.dim}"${prompt}"${colors.reset}`);
+  console.log(`${indent}  ${colors.gray}${session.status.messageCount} msgs | ${lastActivity}${colors.reset}`);
+}
+
+/**
+ * Print the header for a repository section.
+ */
+function printRepoHeader(repoKey: string): void {
+  if (repoKey === OTHER_REPO_KEY) {
+    console.log(`${colors.bold}${colors.gray}Other (no GitHub repo)${colors.reset}`);
+  } else {
+    console.log(`${colors.bold}${colors.blue}${repoKey}${colors.reset}`);
+  }
+}
+
+/**
+ * Print all sessions in a repository section.
+ */
+function printRepoSection(repoSessions: SessionState[]): void {
+  const byCwd = groupSessionsByCwd(repoSessions);
+  const hasMultipleCwds = byCwd.size > 1;
+  const indent = hasMultipleCwds ? "    " : "  ";
+
+  for (const [cwd, cwdSessions] of byCwd) {
+    if (hasMultipleCwds) {
+      console.log(`  ${colors.dim}${formatCwd(cwd)}${colors.reset}`);
+    }
+    for (const session of cwdSessions) {
+      printSession(session, indent);
+    }
+  }
+}
+
+// ===========================================================================
+// Main Display Function
+// ===========================================================================
+
+function logInitialSessions(sessions: Map<string, SessionState>): void {
+  // Filter and sort sessions
+  const filteredSessions = Array.from(sessions.values())
+    .filter(shouldShowSession)
+    .sort((a, b) => {
+      const aTime = new Date(a.status.lastActivityAt).getTime();
+      const bTime = new Date(b.status.lastActivityAt).getTime();
+      return bTime - aTime;
+    });
+
+  // Print header
   console.log();
   const filterLabel = showOnlyActive ? "Active" : showOnlyRecent ? "Recent" : "All";
   console.log(`${colors.bold}=== ${filterLabel} Sessions (${filteredSessions.length}) ===${colors.reset}`);
@@ -132,65 +234,14 @@ function logInitialSessions(sessions: Map<string, SessionState>): void {
     return;
   }
 
-  // Group by GitHub repo (or "Other" for non-GitHub sessions)
-  const byRepo = new Map<string, SessionState[]>();
-  const OTHER_KEY = "__other__";
-
-  for (const session of filteredSessions) {
-    const key = session.gitRepoId ?? OTHER_KEY;
-    const existing = byRepo.get(key) ?? [];
-    existing.push(session);
-    byRepo.set(key, existing);
-  }
-
-  // Sort repos: GitHub repos first (alphabetically), then "Other"
-  const sortedKeys = Array.from(byRepo.keys()).sort((a, b) => {
-    if (a === OTHER_KEY) return 1;
-    if (b === OTHER_KEY) return -1;
-    return a.localeCompare(b);
-  });
+  // Group by repo and print each section
+  const byRepo = groupSessionsByRepo(filteredSessions);
+  const sortedKeys = sortRepoKeys(Array.from(byRepo.keys()));
 
   for (const repoKey of sortedKeys) {
     const repoSessions = byRepo.get(repoKey)!;
-
-    // Print repo header
-    if (repoKey === OTHER_KEY) {
-      console.log(`${colors.bold}${colors.gray}Other (no GitHub repo)${colors.reset}`);
-    } else {
-      console.log(`${colors.bold}${colors.blue}${repoKey}${colors.reset}`);
-    }
-
-    // Group sessions within repo by cwd (for repos with multiple worktrees)
-    const byCwd = new Map<string, SessionState[]>();
-    for (const session of repoSessions) {
-      const existing = byCwd.get(session.cwd) ?? [];
-      existing.push(session);
-      byCwd.set(session.cwd, existing);
-    }
-
-    for (const [cwd, cwdSessions] of byCwd) {
-      const cwdShort = formatCwd(cwd);
-      // Only show cwd if there are multiple directories for this repo
-      if (byCwd.size > 1) {
-        console.log(`  ${colors.dim}${cwdShort}${colors.reset}`);
-      }
-
-      for (const session of cwdSessions) {
-        const status = formatStatus(session.status);
-        const prompt = formatPrompt(session.originalPrompt);
-        const branch = session.gitBranch
-          ? ` ${colors.magenta}(${session.gitBranch})${colors.reset}`
-          : "";
-        const lastActivity = formatRelativeTime(session.status.lastActivityAt);
-        const indent = byCwd.size > 1 ? "    " : "  ";
-
-        console.log(
-          `${indent}${colors.cyan}${session.sessionId.slice(0, 8)}${colors.reset}${branch} ${status}`
-        );
-        console.log(`${indent}  ${colors.dim}"${prompt}"${colors.reset}`);
-        console.log(`${indent}  ${colors.gray}${session.status.messageCount} msgs | ${lastActivity}${colors.reset}`);
-      }
-    }
+    printRepoHeader(repoKey);
+    printRepoSection(repoSessions);
     console.log();
   }
 }

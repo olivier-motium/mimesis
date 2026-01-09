@@ -14,7 +14,7 @@ import {
   PR_CACHE_MAX_SIZE,
   PR_CACHE_ENTRY_TTL,
   GH_CLI_TIMEOUT_MS,
-} from "./config.js";
+} from "./config/index.js";
 import { withTimeout, TimeoutError } from "./utils/timeout.js";
 import { getErrorMessage } from "./utils/type-guards.js";
 

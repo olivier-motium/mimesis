@@ -6,10 +6,10 @@ import {
   extractSessionId,
   extractEncodedDir,
 } from "./parser.js";
-import { deriveStatus, statusChanged } from "./status.js";
+import { deriveStatus, statusChanged } from "./status-derivation.js";
 import { getGitInfoCached, type GitInfo } from "./git.js";
-import type { LogEntry, SessionMetadata, StatusResult } from "./types.js";
-import { MAX_ENTRIES_PER_SESSION } from "./config.js";
+import type { LogEntry, SessionMetadata, StatusResult, SessionStateInternal } from "./types.js";
+import { MAX_ENTRIES_PER_SESSION } from "./config/index.js";
 
 const CLAUDE_PROJECTS_DIR = `${process.env.HOME}/.claude/projects`;
 
@@ -60,21 +60,14 @@ function buildSessionState(params: {
   };
 }
 
-export interface SessionState {
-  sessionId: string;
-  filepath: string;
-  encodedDir: string;
-  cwd: string;
-  gitBranch: string | null;
-  originalPrompt: string;
-  startedAt: string;
-  status: StatusResult;
-  entries: LogEntry[];
-  bytePosition: number;
-  // GitHub repo info
-  gitRepoUrl: string | null;   // https://github.com/owner/repo
-  gitRepoId: string | null;    // owner/repo (for grouping)
-}
+/**
+ * SessionState includes all fields needed by the watcher.
+ * For consumers that only need public fields, use SessionStatePublic from types.js.
+ */
+export type SessionState = SessionStateInternal;
+
+// Re-export public interface for consumers that don't need internal fields
+export type { SessionStatePublic } from "./types.js";
 
 export interface SessionEvent {
   type: "created" | "updated" | "deleted";

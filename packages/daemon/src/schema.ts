@@ -108,3 +108,13 @@ export const sessionsStateSchema = createStateSchema({
     primaryKey: "sessionId",
   },
 });
+
+// Re-export tool registry for UI consumption
+export {
+  TOOL_REGISTRY,
+  TOOL_NAMES,
+  type ToolName,
+  type ToolConfig,
+  formatToolUse,
+  getToolIcon,
+} from "./tools/index.js";

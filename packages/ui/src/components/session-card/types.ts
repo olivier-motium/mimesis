@@ -2,7 +2,7 @@
  * Type definitions for SessionCard components
  */
 
-import type { Session } from "@claude-code-ui/daemon/schema";
+import type { Session } from "../../types/schema";
 
 export interface SessionCardProps {
   session: Session;

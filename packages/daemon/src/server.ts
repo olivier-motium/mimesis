@@ -27,9 +27,8 @@ import {
   RECENT_OUTPUT_MAX_ITEMS,
   CONTENT_PREVIEW_LENGTH,
   CONTENT_TRUNCATE_LENGTH,
-  COMMAND_TRUNCATE_LENGTH,
-  SHORT_CONTENT_LENGTH,
-} from "./config.js";
+} from "./config/index.js";
+import { formatToolUse, extractToolTarget } from "./tools/index.js";
 import { TerminalLinkRepo } from "./db/terminal-link-repo.js";
 import path from "node:path";
 import os from "node:os";
@@ -122,54 +121,56 @@ export class StreamServer {
     return this.streamUrl;
   }
 
+  // ===========================================================================
+  // Private: Session Building
+  // ===========================================================================
+
   /**
-   * Convert SessionState to Session schema and publish to stream
+   * Build a complete Session object from SessionState.
+   * Fetches AI summaries and lookups, with optional overrides for specific fields.
    */
-  async publishSession(sessionState: SessionState, operation: "insert" | "update" | "delete"): Promise<void> {
-    // Skip publishing during shutdown or if stream is not ready
-    if (this.stopping || !this.stream) {
-      return;
-    }
-
-    // Cache session state for PR update callbacks
-    this.sessionCache.set(sessionState.sessionId, sessionState);
-
-    // Start watching for status file in this project
-    this.statusWatcher.watchProject(sessionState.cwd);
-
-    // Generate AI goal and summary (goals are cached, summaries update more frequently)
+  private async buildSession(
+    sessionState: SessionState,
+    overrides: {
+      pr?: PRInfo | null;
+      fileStatus?: FileStatus | null;
+      terminalLink?: TerminalLink | null;
+    } = {}
+  ): Promise<Session> {
+    // Generate AI goal and summary (cached internally)
     const [goal, summary] = await Promise.all([
       generateGoal(sessionState),
       generateAISummary(sessionState),
     ]);
 
-    // Get cached PR info if available
-    const pr = sessionState.gitBranch
-      ? getCachedPR(sessionState.cwd, sessionState.gitBranch)
-      : null;
+    // Get PR: use override if provided, otherwise fetch from cache
+    const pr = overrides.pr !== undefined
+      ? overrides.pr
+      : sessionState.gitBranch
+        ? getCachedPR(sessionState.cwd, sessionState.gitBranch)
+        : null;
 
-    // Queue PR check if we have a branch (will update via callback)
-    if (sessionState.gitBranch) {
-      console.log(`[PR] Session ${sessionState.sessionId.slice(0, 8)} has branch: ${sessionState.gitBranch}`);
-      queuePRCheck(sessionState.cwd, sessionState.gitBranch, sessionState.sessionId);
+    // Get terminal link: use override if provided, otherwise fetch from DB
+    let terminalLink: TerminalLink | null;
+    if (overrides.terminalLink !== undefined) {
+      terminalLink = overrides.terminalLink;
     } else {
-      console.log(`[PR] Session ${sessionState.sessionId.slice(0, 8)} has no branch`);
+      const link = this.linkRepo.get(sessionState.sessionId);
+      terminalLink = link
+        ? {
+            kittyWindowId: link.kittyWindowId,
+            linkedAt: link.linkedAt,
+            stale: link.stale,
+          }
+        : null;
     }
 
-    // Get terminal link if it exists
-    const link = this.linkRepo.get(sessionState.sessionId);
-    const terminalLink = link
-      ? {
-          kittyWindowId: link.kittyWindowId,
-          linkedAt: link.linkedAt,
-          stale: link.stale,
-        }
-      : null;
+    // Get file status: use override if provided, otherwise fetch from watcher
+    const fileStatus = overrides.fileStatus !== undefined
+      ? overrides.fileStatus
+      : this.statusWatcher.getStatus(sessionState.cwd);
 
-    // Get file-based status if available
-    const fileStatus = this.statusWatcher.getStatus(sessionState.cwd);
-
-    const session: Session = {
+    return {
       sessionId: sessionState.sessionId,
       cwd: sessionState.cwd,
       gitBranch: sessionState.gitBranch,
@@ -189,8 +190,32 @@ export class StreamServer {
       fileStatus,
       embeddedPty: null,
     };
+  }
 
-    // Create the event using the schema helpers
+  // ===========================================================================
+  // Public: Session Publishing
+  // ===========================================================================
+
+  /**
+   * Convert SessionState to Session schema and publish to stream.
+   */
+  async publishSession(sessionState: SessionState, operation: "insert" | "update" | "delete"): Promise<void> {
+    if (this.stopping || !this.stream) return;
+
+    // Cache session state for callbacks
+    this.sessionCache.set(sessionState.sessionId, sessionState);
+    this.statusWatcher.watchProject(sessionState.cwd);
+
+    // Queue PR check if we have a branch (will update via callback)
+    if (sessionState.gitBranch) {
+      console.log(`[PR] Session ${sessionState.sessionId.slice(0, 8)} has branch: ${sessionState.gitBranch}`);
+      queuePRCheck(sessionState.cwd, sessionState.gitBranch, sessionState.sessionId);
+    } else {
+      console.log(`[PR] Session ${sessionState.sessionId.slice(0, 8)} has no branch`);
+    }
+
+    const session = await this.buildSession(sessionState);
+
     let event;
     if (operation === "insert") {
       event = sessionsStateSchema.sessions.insert({ value: session });
@@ -207,124 +232,32 @@ export class StreamServer {
   }
 
   /**
-   * Publish session with updated PR info (called from PR update callback)
+   * Publish session with updated PR info (called from PR update callback).
    */
   async publishSessionWithPR(sessionState: SessionState, pr: PRInfo | null): Promise<void> {
-    // Skip publishing during shutdown or if stream is not ready
-    if (this.stopping || !this.stream) {
-      return;
-    }
+    if (this.stopping || !this.stream) return;
 
-    // Generate AI goal and summary
-    const [goal, summary] = await Promise.all([
-      generateGoal(sessionState),
-      generateAISummary(sessionState),
-    ]);
-
-    // Get terminal link if it exists
-    const link = this.linkRepo.get(sessionState.sessionId);
-    const terminalLink = link
-      ? {
-          kittyWindowId: link.kittyWindowId,
-          linkedAt: link.linkedAt,
-          stale: link.stale,
-        }
-      : null;
-
-    // Get file-based status if available
-    const fileStatus = this.statusWatcher.getStatus(sessionState.cwd);
-
-    const session: Session = {
-      sessionId: sessionState.sessionId,
-      cwd: sessionState.cwd,
-      gitBranch: sessionState.gitBranch,
-      gitRepoUrl: sessionState.gitRepoUrl,
-      gitRepoId: sessionState.gitRepoId,
-      originalPrompt: sessionState.originalPrompt,
-      status: sessionState.status.status,
-      lastActivityAt: sessionState.status.lastActivityAt,
-      messageCount: sessionState.status.messageCount,
-      hasPendingToolUse: sessionState.status.hasPendingToolUse,
-      pendingTool: extractPendingTool(sessionState),
-      goal,
-      summary,
-      recentOutput: extractRecentOutput(sessionState.entries),
-      pr,
-      terminalLink,
-      fileStatus,
-      embeddedPty: null,
-    };
-
+    const session = await this.buildSession(sessionState, { pr });
     const event = sessionsStateSchema.sessions.update({ value: session });
     await this.stream.append(event);
   }
 
   /**
-   * Publish session with updated file status (called from status watcher callback)
+   * Publish session with updated file status (called from status watcher callback).
    */
   async publishSessionWithFileStatus(sessionState: SessionState, fileStatus: FileStatus | null): Promise<void> {
-    // Skip publishing during shutdown or if stream is not ready
-    if (this.stopping || !this.stream) {
-      return;
-    }
+    if (this.stopping || !this.stream) return;
 
-    // Generate AI goal and summary
-    const [goal, summary] = await Promise.all([
-      generateGoal(sessionState),
-      generateAISummary(sessionState),
-    ]);
-
-    // Get terminal link if it exists
-    const link = this.linkRepo.get(sessionState.sessionId);
-    const terminalLink = link
-      ? {
-          kittyWindowId: link.kittyWindowId,
-          linkedAt: link.linkedAt,
-          stale: link.stale,
-        }
-      : null;
-
-    // Get cached PR info if available
-    const pr = sessionState.gitBranch
-      ? getCachedPR(sessionState.cwd, sessionState.gitBranch)
-      : null;
-
-    const session: Session = {
-      sessionId: sessionState.sessionId,
-      cwd: sessionState.cwd,
-      gitBranch: sessionState.gitBranch,
-      gitRepoUrl: sessionState.gitRepoUrl,
-      gitRepoId: sessionState.gitRepoId,
-      originalPrompt: sessionState.originalPrompt,
-      status: sessionState.status.status,
-      lastActivityAt: sessionState.status.lastActivityAt,
-      messageCount: sessionState.status.messageCount,
-      hasPendingToolUse: sessionState.status.hasPendingToolUse,
-      pendingTool: extractPendingTool(sessionState),
-      goal,
-      summary,
-      recentOutput: extractRecentOutput(sessionState.entries),
-      pr,
-      terminalLink,
-      fileStatus,
-      embeddedPty: null,
-    };
-
+    const session = await this.buildSession(sessionState, { fileStatus });
     const event = sessionsStateSchema.sessions.update({ value: session });
     await this.stream.append(event);
   }
 
   /**
-   * Publish terminal link update for a session
+   * Publish terminal link update for a session.
    */
-  async publishTerminalLinkUpdate(
-    sessionId: string,
-    terminalLink: TerminalLink | null
-  ): Promise<void> {
-    // Skip publishing during shutdown or if stream is not ready
-    if (this.stopping || !this.stream) {
-      return;
-    }
+  async publishTerminalLinkUpdate(sessionId: string, terminalLink: TerminalLink | null): Promise<void> {
+    if (this.stopping || !this.stream) return;
 
     const sessionState = this.sessionCache.get(sessionId);
     if (!sessionState) {
@@ -332,41 +265,7 @@ export class StreamServer {
       return;
     }
 
-    // Generate AI goal and summary
-    const [goal, summary] = await Promise.all([
-      generateGoal(sessionState),
-      generateAISummary(sessionState),
-    ]);
-
-    // Get cached PR info if available
-    const pr = sessionState.gitBranch
-      ? getCachedPR(sessionState.cwd, sessionState.gitBranch)
-      : null;
-
-    // Get file-based status if available
-    const fileStatus = this.statusWatcher.getStatus(sessionState.cwd);
-
-    const session: Session = {
-      sessionId: sessionState.sessionId,
-      cwd: sessionState.cwd,
-      gitBranch: sessionState.gitBranch,
-      gitRepoUrl: sessionState.gitRepoUrl,
-      gitRepoId: sessionState.gitRepoId,
-      originalPrompt: sessionState.originalPrompt,
-      status: sessionState.status.status,
-      lastActivityAt: sessionState.status.lastActivityAt,
-      messageCount: sessionState.status.messageCount,
-      hasPendingToolUse: sessionState.status.hasPendingToolUse,
-      pendingTool: extractPendingTool(sessionState),
-      goal,
-      summary,
-      recentOutput: extractRecentOutput(sessionState.entries),
-      pr,
-      terminalLink,
-      fileStatus,
-      embeddedPty: null,
-    };
-
+    const session = await this.buildSession(sessionState, { terminalLink });
     const event = sessionsStateSchema.sessions.update({ value: session });
     await this.stream.append(event);
   }
@@ -423,40 +322,8 @@ function extractRecentOutput(entries: LogEntry[], maxItems = RECENT_OUTPUT_MAX_I
 }
 
 /**
- * Format tool use for display
- */
-function formatToolUse(tool: string, input: Record<string, unknown>): string {
-  switch (tool) {
-    case "Read":
-      return `📖 Reading ${shortenPath(input.file_path as string)}`;
-    case "Edit":
-      return `✏️ Editing ${shortenPath(input.file_path as string)}`;
-    case "Write":
-      return `📝 Writing ${shortenPath(input.file_path as string)}`;
-    case "Bash":
-      return `▶️ Running: ${(input.command as string)?.slice(0, COMMAND_TRUNCATE_LENGTH)}`;
-    case "Grep":
-      return `🔍 Searching for "${input.pattern}"`;
-    case "Glob":
-      return `📁 Finding files: ${input.pattern}`;
-    case "Task":
-      return `🤖 Spawning agent: ${(input.description as string) || "task"}`;
-    default:
-      return `🔧 ${tool}`;
-  }
-}
-
-/**
- * Shorten file path for display
- */
-function shortenPath(filepath: string | undefined): string {
-  if (!filepath) return "file";
-  const parts = filepath.split("/");
-  return parts.length > 2 ? `.../${parts.slice(-2).join("/")}` : filepath;
-}
-
-/**
- * Extract pending tool info from session state
+ * Extract pending tool info from session state.
+ * Uses the tool registry for target extraction.
  */
 function extractPendingTool(session: SessionState): Session["pendingTool"] {
   if (!session.status.hasPendingToolUse) {
@@ -471,20 +338,8 @@ function extractPendingTool(session: SessionState): Session["pendingTool"] {
       for (const block of entry.message.content) {
         if (block.type === "tool_use") {
           const tool = block.name;
-          // Extract target based on tool type
-          let target = "";
           const input = block.input as Record<string, unknown>;
-
-          if (tool === "Edit" || tool === "Read" || tool === "Write") {
-            target = (input.file_path as string) ?? "";
-          } else if (tool === "Bash") {
-            target = (input.command as string) ?? "";
-          } else if (tool === "Grep" || tool === "Glob") {
-            target = (input.pattern as string) ?? "";
-          } else {
-            target = JSON.stringify(input).slice(0, SHORT_CONTENT_LENGTH);
-          }
-
+          const target = extractToolTarget(tool, input);
           return { tool, target };
         }
       }

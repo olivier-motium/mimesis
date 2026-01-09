@@ -42,15 +42,5 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/**
- * Get error message from an unknown caught value
- */
-export function getErrorMessage(error: unknown): string {
-  if (isError(error)) {
-    return error.message;
-  }
-  if (typeof error === "string") {
-    return error;
-  }
-  return String(error);
-}
+// Re-export getErrorMessage from errors.ts for backward compatibility
+export { getErrorMessage } from "./errors.js";

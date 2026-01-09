@@ -18,6 +18,25 @@ export function SessionActions({ session, onSendText }: SessionActionsProps) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
+  /**
+   * Factory for async action handlers.
+   * Wraps an async action with stopPropagation, loading state, and error logging.
+   */
+  const createAsyncHandler = (
+    action: () => Promise<void>,
+    actionName: string
+  ) => async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setLoading(true);
+    try {
+      await action();
+    } catch (error) {
+      console.error(`${actionName} failed:`, error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Open embedded terminal (primary action)
   const handleOpenTerminal = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -27,57 +46,23 @@ export function SessionActions({ session, onSendText }: SessionActionsProps) {
     });
   };
 
-  // Kitty: Focus linked terminal
-  const handleKittyFocus = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setLoading(true);
-    try {
-      await api.focusSession(session.sessionId);
-    } catch (error) {
-      console.error("Focus failed:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Kitty: Open in new tab
-  const handleKittyOpen = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setLoading(true);
-    try {
-      await api.openSession(session.sessionId);
-    } catch (error) {
-      console.error("Open failed:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Kitty: Link existing terminal
-  const handleKittyLink = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setLoading(true);
-    try {
-      await api.linkTerminal(session.sessionId);
-    } catch (error) {
-      console.error("Link failed:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Kitty: Unlink terminal
-  const handleKittyUnlink = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setLoading(true);
-    try {
-      await api.unlinkTerminal(session.sessionId);
-    } catch (error) {
-      console.error("Unlink failed:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Kitty actions
+  const handleKittyFocus = createAsyncHandler(
+    () => api.focusSession(session.sessionId),
+    "Focus"
+  );
+  const handleKittyOpen = createAsyncHandler(
+    () => api.openSession(session.sessionId),
+    "Open"
+  );
+  const handleKittyLink = createAsyncHandler(
+    () => api.linkTerminal(session.sessionId),
+    "Link"
+  );
+  const handleKittyUnlink = createAsyncHandler(
+    () => api.unlinkTerminal(session.sessionId),
+    "Unlink"
+  );
 
   // Send text (works for both embedded and kitty)
   const handleSendText = (e: React.MouseEvent) => {

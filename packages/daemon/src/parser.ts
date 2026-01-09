@@ -4,7 +4,7 @@ import type {
   SessionMetadata,
   UserEntry,
 } from "./types.js";
-import { CONTENT_TRUNCATE_LENGTH } from "./config.js";
+import { CONTENT_TRUNCATE_LENGTH } from "./config/index.js";
 
 export interface TailResult {
   entries: LogEntry[];

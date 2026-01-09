@@ -12,7 +12,7 @@ import {
   SHORT_USER_CONTENT_LENGTH,
   EARLY_ENTRIES_COUNT,
   RECENT_ENTRIES_COUNT,
-} from "../config.js";
+} from "../config/index.js";
 
 /**
  * Extract context for summarization

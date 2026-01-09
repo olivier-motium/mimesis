@@ -148,3 +148,33 @@ export interface StatusResult {
   messageCount: number;
 }
 
+// ===========================================================================
+// Session State Interfaces
+// ===========================================================================
+
+/**
+ * Public session state fields that external consumers need.
+ * Use this type when only public data is required (summarizers, formatters, etc.)
+ */
+export interface SessionStatePublic {
+  sessionId: string;
+  cwd: string;
+  entries: LogEntry[];
+  originalPrompt: string;
+  startedAt: string;
+  status: StatusResult;
+  gitBranch: string | null;
+  gitRepoUrl: string | null;  // https://github.com/owner/repo
+  gitRepoId: string | null;   // owner/repo (for grouping)
+}
+
+/**
+ * Internal session state with additional fields for the watcher.
+ * Used only within the watcher module for file tracking.
+ */
+export interface SessionStateInternal extends SessionStatePublic {
+  filepath: string;
+  encodedDir: string;
+  bytePosition: number;
+}
+

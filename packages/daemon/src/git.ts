@@ -21,6 +21,7 @@ async function findGitDir(startPath: string): Promise<string | null> {
       await access(gitPath, constants.F_OK);
       return gitPath;
     } catch {
+      // Expected: .git doesn't exist at this level, continue walking up
       currentPath = dirname(currentPath);
     }
   }
@@ -82,6 +83,7 @@ async function getCurrentBranch(gitDir: string): Promise<string | null> {
     // Detached HEAD - return null or the short SHA
     return null;
   } catch {
+    // Expected: HEAD file may not exist or be unreadable
     return null;
   }
 }
@@ -118,6 +120,7 @@ async function getOriginUrl(gitDir: string): Promise<string | null> {
 
     return null;
   } catch {
+    // Expected: git config file may not exist (new repo without remotes)
     return null;
   }
 }

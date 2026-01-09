@@ -9,7 +9,7 @@ import {
   KITTY_SOCKET,
   KITTY_PASSWORD_ENV,
   KITTY_COMMAND_TIMEOUT_MS,
-} from "./config.js";
+} from "./config/index.js";
 import { withTimeout } from "./utils/timeout.js";
 
 const execFileAsync = promisify(execFile);

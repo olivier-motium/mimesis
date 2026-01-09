@@ -6,7 +6,7 @@ import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import path from "node:path";
 import fs from "node:fs";
-import { DB_PATH } from "../config.js";
+import { DB_PATH } from "../config/index.js";
 import * as schema from "./schema.js";
 
 let db: ReturnType<typeof drizzle<typeof schema>> | null = null;

@@ -7,7 +7,7 @@
 
 import { setup, createActor } from "xstate";
 import type { LogEntry, ToolUseBlock } from "./types.js";
-import { IDLE_TIMEOUT_MS, APPROVAL_TIMEOUT_MS, STALE_TIMEOUT_MS } from "./config.js";
+import { IDLE_TIMEOUT_MS, APPROVAL_TIMEOUT_MS, STALE_TIMEOUT_MS } from "./config/index.js";
 import { isUserEntry, isAssistantEntry, isSystemEntry } from "./utils/type-guards.js";
 
 // Context holds computed state from log entries
