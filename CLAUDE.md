@@ -149,7 +149,7 @@ The JSONL files contain discriminated union entries (`type` field):
 
 - Use shadcn/ui components from `src/components/ui/` for standard UI elements
 - Style with Tailwind utilities using the `cn()` helper for conditional classes
-- Use CSS custom properties from Nano Banana Pro theme (`:root` variables in `index.css`)
+- Use CSS custom properties from Mimesis theme (`:root` variables in `index.css`)
 - For code/monospace content, use the `font-mono` Tailwind class or `Code` component
 
 ## Important Patterns

@@ -1,6 +1,6 @@
 # UI Components
 
-The React UI is built with TanStack Router, shadcn/ui (Radix primitives + Tailwind CSS v4), TanStack Table, and custom Nano Banana Pro styling.
+The React UI is built with TanStack Router, shadcn/ui (Radix primitives + Tailwind CSS v4), TanStack Table, and custom Mimesis styling.
 
 ## Component Hierarchy (Fleet Command)
 
@@ -233,7 +233,7 @@ RTS-style shortcuts for muscle-memory interaction.
 
 ---
 
-## Styling (Nano Banana Pro Theme)
+## Styling (Mimesis Theme)
 
 Custom CSS variables for the dark operator console aesthetic.
 
