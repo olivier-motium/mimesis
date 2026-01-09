@@ -10,7 +10,6 @@ export { Roster } from "./Roster";
 export { RosterItem } from "./RosterItem";
 export { Viewport } from "./Viewport";
 export { TacticalIntel } from "./TacticalIntel";
-export { EventTicker } from "./EventTicker";
 
 export * from "./types";
 export * from "./constants";

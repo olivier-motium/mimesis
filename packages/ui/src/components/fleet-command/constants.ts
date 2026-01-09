@@ -26,16 +26,6 @@ export function formatTimeAgo(isoString: string): string {
   return "just now";
 }
 
-/** Format time for ticker (HH:MM:SS) */
-export function formatTickerTime(date: Date): string {
-  return date.toLocaleTimeString("en-US", {
-    hour12: false,
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
-
 /** Get agent name from session */
 export function getAgentName(session: { gitBranch: string | null; sessionId: string }): string {
   if (session.gitBranch) {

@@ -74,13 +74,7 @@ export function Terminal({
     // Store refs before async operations
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
-
-    // Defer fit() to next frame - renderer needs time to initialize after open()
-    requestAnimationFrame(() => {
-      if (terminalRef.current && fitAddonRef.current) {
-        fitAddonRef.current.fit();
-      }
-    });
+    // Initial fit() will be triggered by ResizeObserver when container has dimensions
 
     return () => {
       terminal.dispose();
@@ -181,6 +175,7 @@ export function Terminal({
   }, [handleResize]);
 
   // Resize when container size changes (for layout changes)
+  // This also handles initial fit() when container gets dimensions
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -189,6 +184,13 @@ export function Terminal({
     });
 
     resizeObserver.observe(containerRef.current);
+
+    // Trigger initial fit - ResizeObserver doesn't fire on initial observation
+    // Use RAF to ensure terminal renderer is initialized first
+    requestAnimationFrame(() => {
+      handleResize();
+    });
+
     return () => resizeObserver.disconnect();
   }, [handleResize]);
 

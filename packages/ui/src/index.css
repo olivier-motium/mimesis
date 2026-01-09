@@ -82,20 +82,18 @@ body {
     "header header header"
     "filters filters filters"
     "roster table intel"
-    "dock dock dock"
-    "ticker ticker ticker";
+    "dock dock dock";
   grid-template-columns: 220px 1fr 280px;
-  grid-template-rows: 48px 40px 1fr 280px 28px;
+  grid-template-rows: 48px 40px 1fr 280px;
 }
 
 /* Focus Mode: Terminal center, mini roster */
 .fleet-command--focus {
   grid-template-areas:
     "header header header"
-    "roster viewport intel"
-    "ticker ticker ticker";
+    "roster viewport intel";
   grid-template-columns: 180px 1fr 280px;
-  grid-template-rows: 48px 1fr 28px;
+  grid-template-rows: 48px 1fr;
 }
 
 /* StatusStrip filter bar */
@@ -746,71 +744,6 @@ body {
   border: 2px dashed var(--nb-border);
   border-radius: 50%;
   opacity: 0.4;
-}
-
-/* Zone D: Event Ticker (Bottom Bar) */
-.fleet-ticker {
-  grid-area: ticker;
-  display: flex;
-  align-items: center;
-  padding: 0 8px;
-  background: var(--nb-terminal);
-  border-top: 1px solid var(--nb-border);
-  font-size: 10px;
-  overflow: hidden;
-  gap: 16px;
-}
-
-.fleet-ticker__label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--nb-yellow-dim);
-  font-weight: 700;
-  flex-shrink: 0;
-}
-
-.fleet-ticker__label-icon {
-  width: 10px;
-  height: 10px;
-}
-
-.fleet-ticker__events {
-  display: flex;
-  gap: 32px;
-  color: var(--nb-text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.fleet-ticker__event {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.fleet-ticker__event-time {
-  color: var(--nb-text-muted);
-}
-
-.fleet-ticker__event-agent {
-  font-weight: 600;
-}
-
-.fleet-ticker__event-agent--working {
-  color: var(--nb-green);
-}
-
-.fleet-ticker__event-agent--waiting {
-  color: var(--nb-yellow);
-}
-
-.fleet-ticker__event-agent--error {
-  color: var(--nb-red);
-}
-
-.fleet-ticker__event-message {
-  color: var(--nb-text-dim);
 }
 
 /* Terminal dock styles */

@@ -48,21 +48,9 @@ export function useSessions() {
     const allSessions = Array.from(query.data.values()) as Session[];
 
     // Filter to only sessions with status files (hook system installed)
-    const sessionsWithStatus = allSessions.filter((s) => s.fileStatus !== null);
-
-    // Deduplicate: keep only the most recent session per project (cwd)
-    // Multiple Claude Code sessions can exist for the same project directory
-    // (e.g., from compact feature creating new session files), but they all
-    // share the same .claude/status.md file. Show only the most recent.
-    const sessionsByCwd = new Map<string, Session>();
-    for (const session of sessionsWithStatus) {
-      const existing = sessionsByCwd.get(session.cwd);
-      if (!existing || session.lastActivityAt > existing.lastActivityAt) {
-        sessionsByCwd.set(session.cwd, session);
-      }
-    }
-
-    return Array.from(sessionsByCwd.values());
+    // Each session now has its own status file (status.<sessionId>.md),
+    // so multiple sessions in the same project are handled correctly
+    return allSessions.filter((s) => s.fileStatus !== null);
   }, [query?.data]);
 
   return {

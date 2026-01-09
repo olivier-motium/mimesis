@@ -11,62 +11,19 @@
  * - Center: OpsTable (ops) or Terminal (focus)
  * - Right: Tactical Intel
  * - Bottom: TerminalDock (ops only)
- * - Footer: Event Ticker
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { CommandBar } from "./CommandBar";
 import { Roster } from "./Roster";
 import { Viewport } from "./Viewport";
 import { TacticalIntel } from "./TacticalIntel";
-import { EventTicker } from "./EventTicker";
 import { DataTable, columns } from "../data-table";
 import { TerminalDock } from "../terminal-dock/TerminalDock";
 import { StatusStrip } from "../StatusStrip";
-import { getEffectiveStatus } from "../../lib/sessionStatus";
-import { getAgentName } from "./constants";
 import { countSessionsByStatus } from "../ops-table/utils";
-import type { FleetCommandProps, AgentEvent, ViewMode } from "./types";
+import type { FleetCommandProps, ViewMode } from "./types";
 import type { StatusFilter } from "../ops-table/types";
-import type { Session } from "../../types/schema";
-
-/** Generate event from status change */
-function generateStatusEvent(
-  session: Session,
-  prevStatus: string | null
-): AgentEvent | null {
-  const { status, fileStatusValue } = getEffectiveStatus(session);
-
-  if (prevStatus === status) return null;
-
-  let message = "";
-  let type: AgentEvent["type"] = "status_change";
-
-  if (fileStatusValue === "error") {
-    type = "error";
-    message = "encountered an error";
-  } else if (status === "waiting") {
-    type = "waiting";
-    message = "requires input";
-  } else if (status === "working" && prevStatus === "idle") {
-    type = "started";
-    message = "started working";
-  } else if (status === "idle" && prevStatus === "working") {
-    type = "completed";
-    message = "finished task";
-  } else {
-    return null;
-  }
-
-  return {
-    id: `${session.sessionId}-${Date.now()}`,
-    timestamp: new Date(),
-    sessionId: session.sessionId,
-    sessionName: getAgentName(session),
-    type,
-    message,
-  };
-}
 
 export function FleetCommand({ sessions }: FleetCommandProps) {
   // View mode: ops (table center) or focus (terminal center)
@@ -74,31 +31,6 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("all");
-  const [events, setEvents] = useState<AgentEvent[]>([]);
-
-  // Track previous session statuses for event detection
-  const prevStatusesRef = useRef<Map<string, string>>(new Map());
-
-  // Detect status changes and generate events
-  useEffect(() => {
-    const newEvents: AgentEvent[] = [];
-
-    sessions.forEach((session) => {
-      const { status } = getEffectiveStatus(session);
-      const prevStatus = prevStatusesRef.current.get(session.sessionId) ?? null;
-
-      const event = generateStatusEvent(session, prevStatus);
-      if (event) {
-        newEvents.push(event);
-      }
-
-      prevStatusesRef.current.set(session.sessionId, status);
-    });
-
-    if (newEvents.length > 0) {
-      setEvents((prev) => [...newEvents, ...prev].slice(0, 50));
-    }
-  }, [sessions]);
 
   // Count sessions by status for StatusStrip
   const statusCounts = useMemo(
@@ -302,9 +234,6 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
           )}
         </div>
       )}
-
-      {/* Footer: Event Ticker */}
-      <EventTicker events={events} />
     </div>
   );
 }

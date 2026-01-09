@@ -7,25 +7,6 @@ import type { Session } from "../../types/schema";
 /** View mode for the Fleet Command layout */
 export type ViewMode = "ops" | "focus";
 
-/** Event types for the ticker */
-export type AgentEventType =
-  | "status_change"
-  | "error"
-  | "tool_result"
-  | "waiting"
-  | "started"
-  | "completed";
-
-/** An event in the ticker */
-export interface AgentEvent {
-  id: string;
-  timestamp: Date;
-  sessionId: string;
-  sessionName: string;
-  type: AgentEventType;
-  message: string;
-}
-
 /** Plan step from file status */
 export interface PlanStep {
   done: boolean;
@@ -64,11 +45,6 @@ export interface ViewportProps {
 /** Props for TacticalIntel */
 export interface TacticalIntelProps {
   session: Session | null;
-}
-
-/** Props for EventTicker */
-export interface EventTickerProps {
-  events: AgentEvent[];
 }
 
 /** Props for CommandBar */
