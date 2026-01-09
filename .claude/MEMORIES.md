@@ -265,6 +265,23 @@ Flaky tests in `tracking.test.ts` were fixed:
 
 **Status:** 70 tests pass, 2 skipped. Consistent across multiple runs.
 
+**Test Directory Isolation (Jan 2026):**
+Tests in `tracking.test.ts` originally wrote to `~/.claude/projects/-test-e2e-session/`, which caused test artifacts to appear as real sessions in the Mimesis dashboard (mission text "Initial", CWD "/Users/test/project").
+
+**Fix:** Changed TEST_DIR to use `os.tmpdir()` and made `SessionWatcher` configurable with a `projectsDir` option:
+```typescript
+// Old (leaked artifacts):
+const TEST_DIR = path.join(os.homedir(), ".claude", "projects", "-test-e2e-session");
+const watcher = new SessionWatcher({ debounceMs: 50 });
+
+// New (isolated):
+const PROJECTS_DIR = path.join(os.tmpdir(), "mimesis-test");
+const TEST_DIR = path.join(PROJECTS_DIR, "-test-e2e-session");
+const watcher = new SessionWatcher({ debounceMs: 50, projectsDir: PROJECTS_DIR });
+```
+
+If test artifacts still appear after this fix, also clear the Durable Streams cache: `rm -rf ~/.mimesis/streams/`
+
 ## QA Audit (Jan 2026)
 
 Full audit in `~/.claude/plans/calm-hatching-toucan.md`. Key technical debt areas:

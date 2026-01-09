@@ -12,7 +12,9 @@ import { SessionWatcher } from "./watcher.js";
 import { deriveStatus } from "./status-derivation.js";
 import { tailJSONL, extractMetadata } from "./parser.js";
 
-const TEST_DIR = path.join(os.homedir(), ".claude", "projects", "-test-e2e-session");
+// Use tmpdir instead of ~/.claude/projects to avoid test artifacts appearing in the dashboard
+const PROJECTS_DIR = path.join(os.tmpdir(), "mimesis-test");
+const TEST_DIR = path.join(PROJECTS_DIR, "-test-e2e-session");
 
 // Generate unique session ID for each test run to avoid parallel test interference
 function getTestSessionId() {
@@ -268,7 +270,7 @@ describe("Session Tracking", () => {
 
   describe("SessionWatcher", () => {
     it("should detect new session files", async () => {
-      const watcher = new SessionWatcher({ debounceMs: 50 });
+      const watcher = new SessionWatcher({ debounceMs: 50, projectsDir: PROJECTS_DIR });
 
       // Use event-based waiting - filter strictly by our test session ID
       const eventPromise = new Promise<{ type: string; sessionId: string }>((resolve, reject) => {
@@ -304,7 +306,7 @@ describe("Session Tracking", () => {
       const entry1 = createUserEntry("Initial");
       await writeFile(TEST_LOG_FILE, entry1);
 
-      const watcher = new SessionWatcher({ debounceMs: 50 });
+      const watcher = new SessionWatcher({ debounceMs: 50, projectsDir: PROJECTS_DIR });
 
       // Use event-based waiting - filter by our session
       const createdPromise = new Promise<{ type: string; status: string }>((resolve, reject) => {
@@ -332,7 +334,7 @@ describe("Session Tracking", () => {
     // is insufficient when other sessions exist. The core watcher functionality is covered
     // by "should detect new session files" and "should detect session updates" tests.
     it.skip("should track message count changes", async () => {
-      const watcher = new SessionWatcher({ debounceMs: 50 });
+      const watcher = new SessionWatcher({ debounceMs: 50, projectsDir: PROJECTS_DIR });
 
       // Capture values at test start to avoid parallel test interference
       const currentTestSessionId = TEST_SESSION_ID;

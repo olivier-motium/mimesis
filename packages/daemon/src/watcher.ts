@@ -12,7 +12,7 @@ import { getGitInfoCached, type GitInfo } from "./git.js";
 import type { LogEntry, SessionMetadata, StatusResult, SessionStateInternal } from "./types.js";
 import { MAX_ENTRIES_PER_SESSION } from "./config/index.js";
 
-const CLAUDE_PROJECTS_DIR = `${process.env.HOME}/.claude/projects`;
+const DEFAULT_PROJECTS_DIR = `${process.env.HOME}/.claude/projects`;
 
 /**
  * Resolve git info for a session - reuses cached info for existing sessions.
@@ -81,16 +81,18 @@ export class SessionWatcher extends EventEmitter {
   private sessions = new Map<string, SessionState>();
   private debounceTimers = new Map<string, NodeJS.Timeout>();
   private debounceMs: number;
+  private projectsDir: string;
 
-  constructor(options: { debounceMs?: number } = {}) {
+  constructor(options: { debounceMs?: number; projectsDir?: string } = {}) {
     super();
     this.debounceMs = options.debounceMs ?? 200;
+    this.projectsDir = options.projectsDir ?? DEFAULT_PROJECTS_DIR;
   }
 
   async start(): Promise<void> {
     // Use directory watching instead of glob - chokidar has issues with
     // directories that start with dashes when using glob patterns
-    this.watcher = watch(CLAUDE_PROJECTS_DIR, {
+    this.watcher = watch(this.projectsDir, {
       ignored: /agent-.*\.jsonl$/,  // Ignore agent sub-session files
       persistent: true,
       ignoreInitial: false,
