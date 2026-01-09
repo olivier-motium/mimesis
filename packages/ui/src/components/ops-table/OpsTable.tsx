@@ -45,33 +45,32 @@ export function OpsTable({
   }
 
   return (
-    <Box style={{ flex: 1, minHeight: 0 }}>
+    <Box className="ops-table-container" style={{ flex: 1, minHeight: 0 }}>
       {/* Table header */}
       <Box
+        className="ops-table-header"
         style={{
           padding: "var(--space-2) var(--space-3)",
-          borderBottom: "1px solid var(--gray-a6)",
-          backgroundColor: "var(--gray-a2)",
         }}
       >
         <Flex align="center" gap="3">
           <Box style={{ width: "24px" }}>
-            <Text size="1" color="gray" weight="medium">●</Text>
+            <Text size="1" color="gray">●</Text>
           </Box>
           <Box style={{ flex: 1 }}>
-            <Text size="1" color="gray" weight="medium">Goal</Text>
+            <Text size="1" color="gray">Goal</Text>
           </Box>
           <Box style={{ width: "100px" }}>
-            <Text size="1" color="gray" weight="medium">Branch</Text>
+            <Text size="1" color="gray">Branch</Text>
           </Box>
           <Box style={{ width: "80px" }}>
-            <Text size="1" color="gray" weight="medium">Tool</Text>
+            <Text size="1" color="gray">Tool</Text>
           </Box>
           <Box style={{ width: "50px", textAlign: "right" }}>
-            <Text size="1" color="gray" weight="medium">Age</Text>
+            <Text size="1" color="gray">Age</Text>
           </Box>
           <Box style={{ width: "80px" }}>
-            <Text size="1" color="gray" weight="medium">Repo</Text>
+            <Text size="1" color="gray">Repo</Text>
           </Box>
           <Box style={{ width: "32px" }} />
         </Flex>

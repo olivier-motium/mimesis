@@ -37,21 +37,29 @@ export function StatusStrip({ counts, activeFilter, onFilterChange }: StatusStri
 
   return (
     <Flex gap="2" align="center" wrap="wrap">
-      {badges.map(({ filter, label, count, color }) => (
-        <Badge
-          key={filter}
-          color={color}
-          variant={activeFilter === filter ? "solid" : "soft"}
-          size="1"
-          style={{
-            cursor: "pointer",
-            transition: "all 0.15s ease",
-          }}
-          onClick={() => onFilterChange(filter)}
-        >
-          {label}: {count}
-        </Badge>
-      ))}
+      {badges.map(({ filter, label, count, color }) => {
+        // "Needs Input" badge pulses when there are sessions waiting
+        const needsAttention = filter === "waiting" && count > 0 && activeFilter !== "waiting";
+
+        return (
+          <Badge
+            key={filter}
+            color={color}
+            variant={activeFilter === filter ? "solid" : "soft"}
+            size="2"
+            highContrast={activeFilter === filter || needsAttention}
+            className={needsAttention ? "needs-attention-badge" : undefined}
+            style={{
+              cursor: "pointer",
+              transition: "all 0.2s ease",
+              fontWeight: activeFilter === filter || needsAttention ? 600 : 500,
+            }}
+            onClick={() => onFilterChange(filter)}
+          >
+            {label}: {count}
+          </Badge>
+        );
+      })}
     </Flex>
   );
 }

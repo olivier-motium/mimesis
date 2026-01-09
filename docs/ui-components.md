@@ -1,413 +1,304 @@
 # UI Components
 
-The React UI is built with TanStack Router and Radix UI Themes.
+The React UI is built with TanStack Router, Radix UI Themes, and custom Nano Banana Pro styling.
 
-## Component Hierarchy (Command Center)
+## Component Hierarchy (Fleet Command)
 
 ```
 __root.tsx (Radix Theme provider)
-└── index.tsx (Command Center)
-    ├── StatusStrip (filter badges by status)
-    ├── OpsTable (dense session list)
-    │   └── OpsTableRow (individual session)
-    └── TerminalDock (persistent terminal panel)
-        ├── SessionHeader (session info bar)
-        └── Terminal (xterm.js instance)
+└── index.tsx (Fleet Command Page)
+    └── FleetCommand (4-zone operator console)
+        ├── CommandBar (top header)
+        ├── Roster (Zone A - left sidebar)
+        │   └── RosterItem (individual agent)
+        ├── Viewport (Zone B - center terminal)
+        │   └── Terminal (xterm.js instance)
+        ├── TacticalIntel (Zone C - right sidebar)
+        │   ├── ExecutionPlan
+        │   └── ArtifactsList
+        └── EventTicker (Zone D - bottom bar)
 ```
 
-> **Design Philosophy:** The UI follows a "Mission Control" pattern inspired by RTS games - the terminal is the primary instrument, always visible, with a dense ops table for quick session switching via click or keyboard.
+> **Design Philosophy:** The UI follows a "Fleet Command" pattern inspired by RTS games (StarCraft, Civ). Agents are "units" to be monitored, not "tasks" to be moved. The terminal is always visible, and clicking an agent instantly tunes the viewport to their frequency.
 
 ---
 
-## Core Components
+## Core Layout
 
-### `__root.tsx`
+### 4-Zone Grid
 
-Root layout that wraps the app in Radix UI Theme provider.
+The Fleet Command uses a CSS Grid layout with 4 static zones:
 
-**Location:** `packages/ui/src/routes/__root.tsx`
-
-**Responsibilities:**
-- Radix Theme configuration
-- Global styles
-- Router outlet
-
-### `index.tsx` (Command Center)
-
-Main dashboard view that displays all sessions with persistent terminal.
-
-**Location:** `packages/ui/src/routes/index.tsx`
-
-**Responsibilities:**
-- Fetches sessions via `useSessions()` hook
-- Manages selected session state
-- Manages status filter state
-- Integrates keyboard navigation
-- Renders StatusStrip, OpsTable, and TerminalDock
-
-**Layout:**
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ StatusStrip: [All: N] [Working: N] [Needs Input: N] ...     │
-├─────────────────────────────────────────────────────────────┤
-│ OpsTable (scrollable)                                       │
-│ ┌─────────────────────────────────────────────────────────┐│
-│ │ Status │ Goal │ Branch │ Tool │ Activity │ Repo │ ⋮     ││
-│ ├─────────────────────────────────────────────────────────┤│
-│ │ ● work │ Fix auth bug │ feat-1 │ Edit │ 2m ago │ app │  ││
-│ │ ○ wait │ Add tests... │ main   │ Bash │ 5m ago │ lib │  ││
-│ └─────────────────────────────────────────────────────────┘│
-├─────────────────────────────────────────────────────────────┤
-│ TerminalDock (persistent)                                   │
-│ ┌─────────────────────────────────────────────────────────┐│
-│ │ [Session: Fix auth bug] [feat-1] [● Working] [×]        ││
-│ ├─────────────────────────────────────────────────────────┤│
-│ │ > claude --resume abc123                                ││
-│ │ Working on authentication module...                     ││
-│ └─────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│ COMMAND BAR: [NANO // BANANA // PRO] [ONLINE] [AGENTS: 3/5]   [v2] │
+├──────────────┬─────────────────────────────────────┬────────────────┤
+│ ROSTER       │ VIEWPORT                            │ TACTICAL INTEL │
+│ (Zone A)     │ (Zone B)                            │ (Zone C)       │
+│              │                                     │                │
+│ [agent-1] ●  │ ┌─ HUD ─────────────────────────┐  │ EXECUTION PLAN │
+│ [agent-2] ○  │ │ Goal: Refactor JWT refresh... │  │ ☑ Analyze flow │
+│ [agent-3] ○  │ └───────────────────────────────┘  │ ☐ Update API   │
+│              │                                     │                │
+│              │ > Terminal output here...           │ ARTIFACTS      │
+│              │ > Working on auth module...         │ src/auth.ts    │
+│              │                                     │ tests/auth.ts  │
+│              │ ┌─ Command Input ──────────────┐   │                │
+│              │ │ Send command to agent...     │   │                │
+│              │ └──────────────────────────────┘   │                │
+├──────────────┴─────────────────────────────────────┴────────────────┤
+│ TICKER: [13:14:02] agent-1 started working | [13:14:05] agent-2... │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**Grid Configuration:**
+```css
+grid-template-areas:
+  "header header header"
+  "roster viewport intel"
+  "ticker ticker ticker";
+grid-template-columns: 288px 1fr 320px;
+grid-template-rows: 48px 1fr 28px;
 ```
 
 ---
 
-## Ops Table Module
+## Fleet Command Module
 
-Dense, scannable session list replacing the previous Kanban cards.
-
-**Location:** `packages/ui/src/components/ops-table/`
+**Location:** `packages/ui/src/components/fleet-command/`
 
 | File | Purpose |
 |------|---------|
-| `OpsTable.tsx` | Main table component with header and body |
-| `OpsTableRow.tsx` | Individual row with all session columns |
+| `FleetCommand.tsx` | Main container with 4-zone layout |
+| `CommandBar.tsx` | Top header with logo and status |
+| `Roster.tsx` | Left sidebar agent list |
+| `RosterItem.tsx` | Individual agent row |
+| `Viewport.tsx` | Center terminal with HUD |
+| `TacticalIntel.tsx` | Right sidebar with plan/artifacts |
+| `EventTicker.tsx` | Bottom event stream |
 | `types.ts` | TypeScript interfaces |
-| `utils.ts` | Filtering, sorting, counting utilities |
-| `constants.ts` | Tool icons and visual constants |
+| `constants.ts` | Utilities and formatters |
 | `index.ts` | Barrel exports |
 
-### `OpsTable`
+---
+
+## Zone A: The Roster
+
+High-density vertical list of active agents ("Control Group").
+
+### `Roster`
 
 **Props:**
 - `sessions: Session[]` - All sessions
-- `selectedSessionId: string | null` - Currently selected session
-- `onSelectSession: (sessionId: string | null) => void` - Selection callback
-- `filter: StatusFilter` - Current filter
-- `onFilterChange: (filter: StatusFilter) => void` - Filter callback
+- `selectedSessionId: string | null` - Currently selected
+- `onSelectSession: (id: string) => void` - Selection callback
+- `searchQuery: string` - Filter query
+- `onSearchChange: (query: string) => void` - Search callback
 
 **Features:**
-- Fixed header with sortable column labels
-- Scrollable body
-- Applies filtering and sorting before display
-- Highlights selected row
+- Search/filter input
+- Session list with status indicators
+- Yellow accent bar on selected item
 
-### `OpsTableRow`
-
-**Columns:**
-| Column | Source | Width |
-|--------|--------|-------|
-| Status | `getEffectiveStatus(session).status` | 40px icon |
-| Goal | `session.goal \|\| session.originalPrompt` | flex |
-| Branch | `session.gitBranch` + PR badge | 120px |
-| Tool | `session.pendingTool?.tool` | 60px icon |
-| Activity | `formatTimeAgo(session.lastActivityAt)` | 80px |
-| Repo | `session.gitRepoId` | 100px |
-| Actions | dropdown menu | 40px |
-
-**Status Icons:**
-| Status | Icon | Color |
-|--------|------|-------|
-| working | ● (filled) | Green |
-| waiting | ○ (hollow) | Orange |
-| idle | ◐ (half) | Gray |
-
-**Tool Icons:**
-| Tool | Icon |
-|------|------|
-| Edit | Pencil |
-| Write | Document |
-| Read | Book |
-| Bash | Terminal |
-| Grep | Magnifying glass |
-| Glob | Folder |
-| Task | Robot |
-
-### Utility Functions
-
-**`filterSessions(sessions, filter)`** - Filters by status or special categories (stale, error)
-
-**`sortSessions(sessions)`** - Sorts by:
-1. Attention priority (errors → waiting → working → idle)
-2. Last activity time (most recent first)
-
-**`countSessionsByStatus(sessions)`** - Returns counts for StatusStrip badges
-
-**`isSessionStale(session)`** - True if working but no activity for >10 minutes
-
-**`formatTimeAgo(timestamp)`** - Human-readable relative time (e.g., "2m ago")
-
----
-
-## Status Strip
-
-Clickable filter badges showing session counts by status.
-
-**Location:** `packages/ui/src/components/StatusStrip.tsx`
-
-**Props:**
-- `counts: StatusCounts` - Session counts per status
-- `activeFilter: StatusFilter` - Currently active filter
-- `onFilterChange: (filter: StatusFilter) => void` - Filter callback
-
-**Badge Types:**
-| Badge | Filter | Color |
-|-------|--------|-------|
-| All | `"all"` | Gray |
-| Working | `"working"` | Green |
-| Needs Input | `"waiting"` | Orange |
-| Idle | `"idle"` | Gray |
-| Errors | `"error"` | Red |
-| Stale | `"stale"` | Amber |
-
-**Keyboard Shortcuts:**
-| Key | Action |
-|-----|--------|
-| `A` | Filter: all |
-| `W` | Filter: working |
-| `I` | Filter: needs input (waiting) |
-| `E` | Filter: errors |
-| `S` | Filter: stale |
-
----
-
-## Terminal Dock Module
-
-Persistent terminal panel that stays mounted while sessions switch.
-
-**Location:** `packages/ui/src/components/terminal-dock/`
-
-| File | Purpose |
-|------|---------|
-| `TerminalDock.tsx` | Main dock component managing PTY lifecycle |
-| `SessionHeader.tsx` | Session info bar with close button |
-| `index.ts` | Barrel exports |
-
-### `TerminalDock`
-
-**Props:**
-- `session: Session` - Currently selected session
-- `onClose: () => void` - Close dock callback
-
-**Behavior:**
-1. Initializes PTY connection via `usePtySession()` hook
-2. Passes PTY config to Terminal component
-3. Shows loading state while PTY initializes
-4. Displays error state if PTY fails
-
-### `SessionHeader`
-
-**Props:**
-- `session: Session` - Session to display
-- `isConnected: boolean` - WebSocket connection state
-- `onClose: () => void` - Close button callback
+### `RosterItem`
 
 **Displays:**
-- Session goal (truncated)
-- Git branch badge
-- Status badge with color
-- Connection indicator (green dot)
-- Close button (×)
+- Agent name (branch or session ID)
+- Status icon (working/waiting/idle/error)
+- Git branch
+- Last activity time
+
+**Status Colors:**
+| Status | Color |
+|--------|-------|
+| working | Green (`#10b981`) |
+| waiting | Yellow (`#eab308`) |
+| idle | Gray (`#3f3f46`) |
+| error | Red (`#ef4444`) |
+
+---
+
+## Zone B: The Viewport
+
+Persistent terminal that "tunes" to the selected agent.
+
+### `Viewport`
+
+**Props:**
+- `session: Session | null` - Selected session
+- `onSendCommand: (text: string) => void` - Command callback
+
+**Components:**
+1. **HUD Overlay** - Shows goal and status badge with gradient fade
+2. **Terminal** - xterm.js instance connected to PTY
+3. **Command Input** - Text input for sending commands
+
+**PTY Lifecycle:**
+1. When session changes → check for existing PTY
+2. If none exists → create via `createPty(sessionId)`
+3. Connect Terminal component to WebSocket
+4. Commands sent via `sendText()` API
+
+### Empty State
+
+When no session selected:
+```
+┌────────────────────────┐
+│         📺            │
+│   No agent selected   │
+│   Click an agent to   │
+│       connect         │
+└────────────────────────┘
+```
+
+---
+
+## Zone C: Tactical Intel
+
+Shows "why" (the plan) and "where" (artifacts) for the selected agent.
+
+### `TacticalIntel`
+
+**Sections:**
+1. **Execution Plan** - Step-by-step task list with checkmarks
+2. **Modified Artifacts** - List of files being worked on
+
+**Plan Data Sources:**
+- `session.fileStatus?.nextSteps` (if available)
+- Fallback: synthesize from `session.goal` and `session.summary`
+
+**Artifact Extraction:**
+- `session.pendingTool?.target` (current tool target)
+- File paths parsed from `session.recentOutput`
+
+---
+
+## Zone D: The Event Ticker
+
+Global event bus for cross-agent awareness.
+
+### `EventTicker`
+
+**Props:**
+- `events: AgentEvent[]` - Recent events (max 50)
+
+**Event Types:**
+| Type | Color | Example |
+|------|-------|---------|
+| `started` | Green | "started working" |
+| `completed` | Green | "finished task" |
+| `waiting` | Yellow | "requires input" |
+| `error` | Red | "encountered an error" |
+
+**Format:** `[HH:MM:SS] agent-name message`
+
+**Event Detection:**
+- Compare previous session status to current
+- Emit events for meaningful state changes
+- Skip uninteresting transitions
+
+---
+
+## Command Bar
+
+Top header with branding and status.
+
+### `CommandBar`
+
+**Props:**
+- `sessionCount: number` - Total sessions
+- `workingCount: number` - Active sessions
+
+**Displays:**
+- Logo: "NANO // BANANA // PRO"
+- Online indicator (green pulsing dot)
+- Agent count: "AGENTS: X/Y Active"
+- Version badge
 
 ---
 
 ## Keyboard Navigation
 
-RTS-style keyboard shortcuts for muscle-memory interaction.
-
-**Location:** `packages/ui/src/hooks/useKeyboardNavigation.ts`
+RTS-style shortcuts for muscle-memory interaction.
 
 **Keybindings:**
 | Key | Action |
 |-----|--------|
-| `↑` / `↓` | Move selection in Ops Table |
-| `Enter` | Select first session if none selected |
-| `Escape` | Deselect / close terminal dock |
-| `A` | Filter: all |
-| `W` | Filter: working |
-| `I` | Filter: needs input |
-| `E` | Filter: errors |
-| `S` | Filter: stale |
+| `↑` / `↓` | Navigate Roster |
+| `Escape` | Deselect agent |
 
 **Implementation:**
-- Global `keydown` listener via `useEffect`
+- Global `keydown` listener in `FleetCommand`
 - Skipped when focus is in input/textarea
-- Operates on filtered/sorted session list
 
 ---
 
-## Session Actions
+## Styling (Nano Banana Pro Theme)
 
-Dropdown menu for terminal control operations.
+Custom CSS variables for the dark operator console aesthetic.
 
-**Location:** `packages/ui/src/components/session-card/SessionActions.tsx`
+**Location:** `packages/ui/src/index.css` (Fleet Command section)
 
-> **Note:** This component is reused from the old card system; location may move to `ops-table/` in future cleanup.
+### Color Palette
 
-**Options:**
-| State | Options |
+```css
+:root {
+  --nb-black: #09090b;       /* Deep OLED black */
+  --nb-black-light: #0c0c0e; /* Elevated surfaces */
+  --nb-terminal: #050505;    /* Terminal background */
+  --nb-sidebar: #0a0a0c;     /* Sidebar background */
+  --nb-yellow: #eab308;      /* Banana yellow accent */
+  --nb-green: #10b981;       /* Working status */
+  --nb-orange: #f59e0b;      /* Warning */
+  --nb-red: #ef4444;         /* Error */
+  --nb-border: #27272a;      /* Borders */
+  --nb-text: #a1a1aa;        /* Primary text */
+  --nb-text-bright: #fafafa; /* Bright text */
+  --nb-text-dim: #52525b;    /* Dim text */
+  --nb-text-muted: #3f3f46;  /* Muted text */
+}
+```
+
+### Key CSS Classes
+
+| Class | Purpose |
 |-------|---------|
-| No terminal linked | "Open in kitty", "Link existing terminal..." |
-| Terminal linked | "Focus terminal", "Send message...", "Unlink terminal" |
-
----
-
-## SendTextDialog
-
-Modal dialog for sending text to a linked terminal.
-
-**Location:** `packages/ui/src/components/SendTextDialog.tsx`
-
-**Props:**
-- `sessionId: string` - Session to send text to
-- `open: boolean` - Dialog visibility state
-- `onOpenChange: (open: boolean) => void` - Visibility callback
-
-**Features:**
-- Text area for input
-- "Press Enter after sending" checkbox (submit mode)
-- Calls `api.sendText()` to send to linked kitty terminal
-
----
-
-## API Client
-
-The UI includes an API client for terminal control operations.
-
-**Location:** `packages/ui/src/lib/api.ts`
-
-**Functions:**
-| Function | Purpose |
-|----------|---------|
-| `getKittyHealth()` | Check if kitty terminal is available |
-| `focusSession(sessionId)` | Focus linked terminal window |
-| `openSession(sessionId)` | Open/create terminal for session |
-| `linkTerminal(sessionId)` | Link existing terminal via picker |
-| `unlinkTerminal(sessionId)` | Remove terminal association |
-| `sendText(sessionId, text, submit)` | Send text to linked terminal |
-
-**Configuration:**
-- `VITE_API_URL` - Override the API endpoint (default: `http://127.0.0.1:4451/api`)
+| `.fleet-command` | Main grid container |
+| `.fleet-command-bar` | Top header |
+| `.fleet-roster` | Left sidebar |
+| `.fleet-roster-item` | Agent row |
+| `.fleet-roster-item--selected` | Selected state |
+| `.fleet-viewport` | Center terminal area |
+| `.fleet-viewport__hud` | Gradient HUD overlay |
+| `.fleet-intel` | Right sidebar |
+| `.fleet-ticker` | Bottom event bar |
 
 ---
 
 ## Data Layer
 
-The UI uses **Durable Streams** (`@durable-streams/state`) for real-time session synchronization:
-
-- `createStreamDB()` creates the reactive state container
-- Subscribes to SSE endpoint at `VITE_STREAM_URL` (default: `http://127.0.0.1:4450/sessions`)
-- Provides `useSessions()` hook for React components
+Same as before - uses Durable Streams for real-time sync.
 
 ### `useSessions` Hook
-
-React hook for subscribing to session updates.
 
 **Location:** `packages/ui/src/hooks/useSessions.ts`
 
 **Usage:**
 ```tsx
-import { useSessions } from '../hooks/useSessions';
-
-function MyComponent() {
-  const { sessions, isLoading } = useSessions();
-  // sessions: Session[]
-
-  return (
-    <OpsTable
-      sessions={sessions}
-      selectedSessionId={selectedId}
-      onSelectSession={setSelectedId}
-      filter={filter}
-      onFilterChange={setFilter}
-    />
-  );
+function FleetCommandPage() {
+  const { sessions } = useSessions();
+  return <FleetCommand sessions={sessions} />;
 }
 ```
 
-**Behavior:**
-- Connects to Durable Streams via SSE
-- Automatically reconnects on disconnect
-- Updates trigger re-renders via React's reactive state
-
-### `sessionsDb`
-
-Singleton StreamDB connection.
-
-**Location:** `packages/ui/src/data/sessionsDb.ts`
-
-**Functions:**
-- `getSessionsDb()` - Async getter, initializes connection
-- `getSessionsDbSync()` - Sync getter (throws if not initialized)
-- `closeSessionsDb()` - Closes connection
-
-**Configuration:**
-- `VITE_STREAM_URL` - Override the daemon endpoint (default: `http://127.0.0.1:4450/sessions`)
-
 ---
 
-## Session Status Utilities
+## Legacy Components (Deprecated)
 
-The UI includes utilities for determining effective session status from file-based or XState-derived sources.
+The following components from the old OpsTable/Command Center design are still in the codebase but no longer used:
 
-**Location:** `packages/ui/src/lib/sessionStatus.ts`
+- `components/ops-table/` - Replaced by Roster
+- `components/StatusStrip.tsx` - Replaced by CommandBar
+- `components/terminal-dock/` - Replaced by Viewport
 
-### `getEffectiveStatus(session)`
-
-Returns the effective status for display and filtering.
-
-**Returns:**
-```typescript
-interface EffectiveStatus {
-  status: "working" | "waiting" | "idle";  // For display
-  fileStatusValue: FileStatusValue | null;  // Original 7-value status if fresh
-  isFileStatusFresh: boolean;               // Whether file status is being used
-}
-```
-
-**Status Mapping (7 file statuses → 3 UI statuses):**
-| File Status | UI Status |
-|-------------|-----------|
-| `working` | Working |
-| `waiting_for_approval` | Waiting (with pending tool) |
-| `waiting_for_input` | Waiting |
-| `completed`, `error`, `blocked`, `idle` | Idle |
-
-### `isFileStatusStale(updated, ttlMs)`
-
-Checks if file status timestamp is older than TTL (default: 5 minutes).
-
-### `getStatusBadgeType(session)`
-
-Returns badge type for completed/error/blocked states, or null.
-
----
-
-## Styling Guidelines
-
-From `packages/ui/CLAUDE.md`:
-
-1. **Always use Radix UI components** - Never use plain HTML elements with custom styles
-2. **Let Radix handle typography** - Don't set `fontSize` or `lineHeight` manually
-3. **Use Radix style props** - `size`, `color`, `variant` instead of inline styles
-4. **Code content** - Use the `Code` component for monospace text
-
-### Custom CSS Classes
-
-The Command Center uses custom CSS classes in `index.css`:
-
-| Class | Purpose |
-|-------|---------|
-| `.ops-table-row` | Base row styling with hover effects |
-| `.ops-table-row.selected` | Selected row highlight |
-| `.status-working` | Green status indicator |
-| `.status-waiting` | Orange status indicator |
-| `.status-idle` | Gray status indicator |
+These may be removed in a future cleanup.
