@@ -1,16 +1,15 @@
 ---
 status: completed
-updated: 2026-01-09T22:50:00+00:00
-task: Investigated Claude usage API endpoints
+updated: 2026-01-09T22:55:00+00:00
+task: Claude usage analysis - data validation
 ---
 
 ## Summary
 
-Tested `api.anthropic.com/api/oauth/usage` - endpoint exists but rejects all auth methods (OAuth, cookies, API keys).
+Validated ccusage monthly data against usage_final.md - numbers align within 2-3%:
+- Input: 5.3M tokens
+- Output: 250K tokens
+- Cache reads: 3.7B tokens
+- API cost equivalent: ~$2,865
 
-**Found actual usage endpoint:** `claude.ai/api/organizations/{uuid}/usage`
-- Works with browser session cookies
-- Returns utilization percentages (five_hour, seven_day, seven_day_sonnet)
-- Also: `/api/organizations/{uuid}/rate_limits` for rate limit tier info
-
-The unofficial `api.anthropic.com` endpoint appears reserved for future OAuth support or internal use only.
+Confirmed Factory Pro ($20/mo) would handle this workload vs current $400/mo (2× Claude Max).
