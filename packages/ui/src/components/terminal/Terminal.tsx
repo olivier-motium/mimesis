@@ -70,10 +70,17 @@ export function Terminal({
     terminal.loadAddon(webLinksAddon);
 
     terminal.open(containerRef.current);
-    fitAddon.fit();
 
+    // Store refs before async operations
     terminalRef.current = terminal;
     fitAddonRef.current = fitAddon;
+
+    // Defer fit() to next frame - renderer needs time to initialize after open()
+    requestAnimationFrame(() => {
+      if (terminalRef.current && fitAddonRef.current) {
+        fitAddonRef.current.fit();
+      }
+    });
 
     return () => {
       terminal.dispose();
@@ -151,16 +158,20 @@ export function Terminal({
 
     if (!terminal || !fitAddon) return;
 
-    fitAddon.fit();
-    const { cols, rows } = terminal;
+    // Defer fit() to next frame for safety (renderer may not be ready)
+    requestAnimationFrame(() => {
+      if (!terminalRef.current || !fitAddonRef.current) return;
+      fitAddonRef.current.fit();
+      const { cols, rows } = terminalRef.current;
 
-    // Notify server
-    if (ws?.readyState === WebSocket.OPEN) {
-      const msg: WsMessage = { type: "resize", cols, rows };
-      ws.send(JSON.stringify(msg));
-    }
+      // Notify server
+      if (ws?.readyState === WebSocket.OPEN) {
+        const msg: WsMessage = { type: "resize", cols, rows };
+        ws.send(JSON.stringify(msg));
+      }
 
-    onResize?.(cols, rows);
+      onResize?.(cols, rows);
+    });
   }, [onResize]);
 
   // Resize on window resize

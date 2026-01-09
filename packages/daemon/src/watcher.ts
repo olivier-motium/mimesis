@@ -267,6 +267,11 @@ export class SessionWatcher extends EventEmitter {
         } satisfies SessionEvent);
       }
     } catch (error) {
+      // ENOENT = file was deleted between event firing and read attempt
+      // This is expected during rapid file changes (e.g., tests cleanup)
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+        return; // File gone, nothing to do
+      }
       this.emit("error", error);
     }
   }
