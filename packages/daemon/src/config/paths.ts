@@ -22,11 +22,14 @@ export const STREAM_DATA_DIR = process.env.STREAM_DATA_DIR ??
 // File-Based Status Configuration
 // =============================================================================
 
-/** TTL for file-based status (5 minutes, same as IDLE_TIMEOUT_MS) */
+/** TTL for file-based status (5 minutes) - determines when status.md content is considered stale */
 export const STATUS_FILE_TTL_MS = 5 * 60 * 1000;
 
-/** Filename for project status file */
+/** Filename for legacy project-level status file */
 export const STATUS_FILENAME = "status.md";
+
+/** Pattern for session-specific status files: status.<sessionId>.md */
+export const STATUS_FILE_PATTERN = /^status\.(.+)\.md$/;
 
 /** Directory containing status file */
 export const STATUS_DIR = ".claude";

@@ -183,7 +183,11 @@ curl http://localhost:5173
 ### Daemon won't start
 
 1. Check Node.js version: `node --version` (need 22.13.1+)
-2. Check port: `lsof -i :4450`
+2. Port conflicts are handled automatically:
+   - Daemon pings existing health endpoint at startup
+   - If healthy daemon exists, exits gracefully with message
+   - If stale process detected, automatically kills and restarts
+3. Manual cleanup if needed: `lsof -i :4450 | grep LISTEN | awk '{print $2}' | xargs kill`
 
 ### Sessions not appearing
 

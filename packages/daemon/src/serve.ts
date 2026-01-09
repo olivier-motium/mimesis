@@ -8,6 +8,8 @@ import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
+import { createConnection } from "node:net";
+import { execSync } from "node:child_process";
 
 // Load .env from project root (handles both src and dist execution)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -53,6 +55,97 @@ function isRecentSession(session: SessionState): boolean {
   return Date.now() - lastActivity < MAX_AGE_MS;
 }
 
+/**
+ * Check if a port is in use by attempting to connect
+ */
+async function isPortInUse(port: number, host: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = createConnection({ port, host });
+    socket.setTimeout(1000);
+    socket.on("connect", () => {
+      socket.destroy();
+      resolve(true);
+    });
+    socket.on("error", () => {
+      socket.destroy();
+      resolve(false);
+    });
+    socket.on("timeout", () => {
+      socket.destroy();
+      resolve(false);
+    });
+  });
+}
+
+/**
+ * Kill process using a specific port (macOS/Linux)
+ */
+function killProcessOnPort(port: number): boolean {
+  try {
+    // Find PID using lsof
+    const result = execSync(`lsof -t -i:${port}`, { encoding: "utf-8" }).trim();
+    if (result) {
+      const pids = result.split("\n");
+      for (const pid of pids) {
+        try {
+          execSync(`kill -9 ${pid}`);
+          console.log(`${colors.yellow}[STARTUP]${colors.reset} Killed stale process (PID ${pid}) on port ${port}`);
+        } catch {
+          // Process might have already exited
+        }
+      }
+      return true;
+    }
+  } catch {
+    // No process found or lsof not available
+  }
+  return false;
+}
+
+/**
+ * Ensure port is available, handling stale processes
+ */
+async function ensurePortAvailable(port: number, host: string): Promise<void> {
+  if (await isPortInUse(port, host)) {
+    console.log(`${colors.yellow}[STARTUP]${colors.reset} Port ${port} is in use, checking if daemon is healthy...`);
+
+    // Try to ping existing daemon's API health endpoint
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2000);
+      const response = await fetch(`http://${host}:${API_PORT}/api/v1/health`, {
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeout));
+
+      if (response.ok) {
+        console.log(`${colors.green}[STARTUP]${colors.reset} Daemon already running and healthy - exiting`);
+        console.log(`${colors.dim}To restart, kill the existing daemon first: lsof -i :${port} | grep LISTEN | awk '{print $2}' | xargs kill${colors.reset}`);
+        process.exit(0);
+      }
+    } catch {
+      // Daemon not responding, likely stale
+    }
+
+    // Try to kill stale process
+    console.log(`${colors.yellow}[STARTUP]${colors.reset} Daemon not responding, attempting to clear stale process...`);
+    if (killProcessOnPort(port)) {
+      // Wait a moment for port to be released
+      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      // Verify port is now free
+      if (await isPortInUse(port, host)) {
+        console.error(`${colors.red}[STARTUP]${colors.reset} Port ${port} still in use after cleanup attempt`);
+        console.error(`${colors.dim}Try manually: lsof -i :${port} | grep LISTEN | awk '{print $2}' | xargs kill -9${colors.reset}`);
+        process.exit(1);
+      }
+    } else {
+      console.error(`${colors.red}[STARTUP]${colors.reset} Unable to clear port ${port}`);
+      console.error(`${colors.dim}Try manually: lsof -i :${port} | grep LISTEN | awk '{print $2}' | xargs kill -9${colors.reset}`);
+      process.exit(1);
+    }
+  }
+}
+
 async function main(): Promise<void> {
   // Global error handlers to prevent silent crashes
   process.on('unhandledRejection', (reason) => {
@@ -68,6 +161,11 @@ async function main(): Promise<void> {
   console.log(`${colors.bold}Claude Code Session Daemon${colors.reset}`);
   console.log(`${colors.dim}Showing sessions from last ${MAX_AGE_HOURS} hours${colors.reset}`);
   console.log();
+
+  // Ensure ports are available before starting servers
+  await ensurePortAvailable(STREAM_PORT, STREAM_HOST);
+  await ensurePortAvailable(API_PORT, STREAM_HOST);
+  await ensurePortAvailable(PTY_WS_PORT, PTY_WS_HOST);
 
   // Start the durable streams server
   const streamServer = new StreamServer({ port: STREAM_PORT });

@@ -13,6 +13,7 @@ import {
   type FileStatus,
 } from "./schema.js";
 import { StatusWatcher } from "./status-watcher.js";
+import { CompactionWatcher, type CompactionEvent } from "./compaction-watcher.js";
 import type { SessionState } from "./watcher.js";
 import type { LogEntry } from "./types.js";
 import {
@@ -43,10 +44,14 @@ export class StreamServer {
   private streamUrl: string;
   // Track sessions for status update callbacks
   private sessionCache = new Map<string, SessionState>();
+  // Track session creation times for compaction comparison
+  private sessionCreatedAt = new Map<string, string>();
   // Terminal link repository for lookups
   private linkRepo: TerminalLinkRepo;
   // Status watcher for .claude/status.md files
   private statusWatcher: StatusWatcher;
+  // Compaction watcher for session supersession
+  private compactionWatcher: CompactionWatcher;
   // Flag to prevent race conditions during shutdown
   private stopping = false;
   // Flag to pause publishing (for stream reset)
@@ -55,6 +60,7 @@ export class StreamServer {
   constructor(options: StreamServerOptions = {}) {
     this.linkRepo = new TerminalLinkRepo();
     this.statusWatcher = new StatusWatcher();
+    this.compactionWatcher = new CompactionWatcher();
     this.port = options.port ?? STREAM_PORT;
     this.dataDir = options.dataDir ?? STREAM_DATA_DIR;
 
@@ -67,14 +73,30 @@ export class StreamServer {
     this.streamUrl = getStreamUrl(STREAM_HOST, this.port);
 
     // Handle status file updates
-    this.statusWatcher.on("status", async ({ cwd, status }) => {
-      // Find sessions with this cwd and republish
-      for (const [sessionId, sessionState] of this.sessionCache) {
-        if (sessionState.cwd === cwd) {
-          console.log(`[STATUS] Status update for ${sessionId.slice(0, 8)}: ${status?.status ?? "null"}`);
+    this.statusWatcher.on("status", async ({ sessionId, cwd, status }) => {
+      // Session-specific files have the actual sessionId
+      // Legacy files have "legacy:<cwd>" as sessionId, need to match by cwd
+      if (sessionId.startsWith("legacy:")) {
+        // Legacy file - match all sessions with this cwd
+        for (const [cachedSessionId, sessionState] of this.sessionCache) {
+          if (sessionState.cwd === cwd) {
+            console.log(`[STATUS] Legacy status update for ${cachedSessionId.slice(0, 8)}: ${status?.status ?? "null"}`);
+            await this.publishSessionWithFileStatus(sessionState, status);
+          }
+        }
+      } else {
+        // Session-specific file - direct match
+        const sessionState = this.sessionCache.get(sessionId);
+        if (sessionState) {
+          console.log(`[STATUS] Session status update for ${sessionId.slice(0, 8)}: ${status?.status ?? "null"}`);
           await this.publishSessionWithFileStatus(sessionState, status);
         }
       }
+    });
+
+    // Handle compaction events - mark older sessions as superseded
+    this.compactionWatcher.on("compaction", async (event: CompactionEvent) => {
+      await this.handleCompaction(event);
     });
   }
 
@@ -102,6 +124,7 @@ export class StreamServer {
   async stop(): Promise<void> {
     this.stopping = true;  // Prevent new publishes during shutdown
     this.statusWatcher.stop();
+    this.compactionWatcher.stop();
     await this.server.stop();
     this.stream = null;
   }
@@ -238,6 +261,9 @@ export class StreamServer {
         : null;
     }
 
+    // Get createdAt from cache or use lastActivityAt as fallback
+    const createdAt = this.sessionCreatedAt.get(sessionState.sessionId) ?? sessionState.status.lastActivityAt;
+
     return {
       sessionId: sessionState.sessionId,
       cwd: sessionState.cwd,
@@ -246,6 +272,7 @@ export class StreamServer {
       gitRepoId: sessionState.gitRepoId,
       originalPrompt: sessionState.originalPrompt,
       status: sessionState.status.status,
+      createdAt,
       lastActivityAt: sessionState.status.lastActivityAt,
       messageCount: sessionState.status.messageCount,
       hasPendingToolUse: sessionState.status.hasPendingToolUse,
@@ -256,6 +283,10 @@ export class StreamServer {
       terminalLink,
       fileStatus,
       embeddedPty: null,
+      // Supersession fields - defaults, will be updated by handleCompaction
+      superseded: false,
+      supersededBy: null,
+      supersededAt: null,
     };
   }
 
@@ -271,7 +302,15 @@ export class StreamServer {
 
     // Cache session state for callbacks
     this.sessionCache.set(sessionState.sessionId, sessionState);
+
+    // Track createdAt on first insert
+    if (operation === "insert" && !this.sessionCreatedAt.has(sessionState.sessionId)) {
+      this.sessionCreatedAt.set(sessionState.sessionId, new Date().toISOString());
+    }
+
+    // Start watching for status and compaction markers
     this.statusWatcher.watchProject(sessionState.cwd);
+    this.compactionWatcher.watchProject(sessionState.cwd);
 
     const session = await this.buildSession(sessionState);
 
@@ -316,6 +355,48 @@ export class StreamServer {
     const session = await this.buildSession(sessionState, { terminalLink });
     const event = sessionsStateSchema.sessions.update({ value: session });
     await this.stream.append(event);
+  }
+
+  // ===========================================================================
+  // Private: Compaction Handling
+  // ===========================================================================
+
+  /**
+   * Handle compaction event - mark older sessions in the same cwd as superseded.
+   * Called when a compaction marker file is detected.
+   */
+  private async handleCompaction(event: CompactionEvent): Promise<void> {
+    if (this.stopping || this.paused || !this.stream) return;
+
+    const { newSessionId, cwd, compactedAt } = event;
+    const compactedAtTime = new Date(compactedAt).getTime();
+
+    console.log(`[COMPACTION] Session ${newSessionId.slice(0, 8)} compacted at ${compactedAt}`);
+
+    // Find all sessions with same cwd that are OLDER than this compaction
+    for (const [sessionId, sessionState] of this.sessionCache) {
+      if (sessionState.cwd === cwd && sessionId !== newSessionId) {
+        // Get session creation time
+        const sessionCreatedAt = this.sessionCreatedAt.get(sessionId);
+        if (!sessionCreatedAt) continue;
+
+        const sessionCreatedTime = new Date(sessionCreatedAt).getTime();
+
+        // Only supersede sessions that were created BEFORE the compaction
+        if (sessionCreatedTime < compactedAtTime) {
+          console.log(`[COMPACTION] Superseding session ${sessionId.slice(0, 8)} (created before compaction)`);
+
+          // Build session with supersession fields
+          const session = await this.buildSession(sessionState);
+          session.superseded = true;
+          session.supersededBy = newSessionId;
+          session.supersededAt = compactedAt;
+
+          const updateEvent = sessionsStateSchema.sessions.update({ value: session });
+          await this.stream.append(updateEvent);
+        }
+      }
+    }
   }
 }
 

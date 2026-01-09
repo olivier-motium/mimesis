@@ -2,8 +2,8 @@
  * Timeout constants (milliseconds).
  */
 
-/** Time before a session is considered idle (5 minutes) */
-export const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+/** Time before a session is considered idle (10 minutes) */
+export const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 
 /** Time to wait before detecting pending tool approval (5 seconds) */
 export const APPROVAL_TIMEOUT_MS = 5 * 1000;

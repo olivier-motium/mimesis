@@ -67,6 +67,7 @@ export const SessionSchema = z.object({
   gitRepoId: z.string().nullable(),
   originalPrompt: z.string(),
   status: SessionStatusSchema,
+  createdAt: z.string(), // ISO timestamp - when session was first discovered
   lastActivityAt: z.string(), // ISO timestamp
   messageCount: z.number(),
   hasPendingToolUse: z.boolean(),
@@ -77,6 +78,10 @@ export const SessionSchema = z.object({
   terminalLink: TerminalLinkSchema.nullable(), // Linked kitty terminal window
   embeddedPty: EmbeddedPtySchema.nullable(), // Embedded PTY terminal
   fileStatus: FileStatusSchema.nullable(), // File-based status from .claude/status.md
+  // Supersession tracking (for compaction)
+  superseded: z.boolean(), // Whether this session has been superseded by a compacted session
+  supersededBy: z.string().nullable(), // Session ID that superseded this one
+  supersededAt: z.string().nullable(), // ISO timestamp when supersession occurred
 });
 export type Session = z.infer<typeof SessionSchema>;
 

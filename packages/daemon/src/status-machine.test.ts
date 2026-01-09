@@ -334,9 +334,9 @@ describe("deriveStatusFromMachine", () => {
   });
 
   describe("timeout transitions", () => {
-    it("should transition to idle after IDLE_TIMEOUT (5 minutes)", () => {
+    it("should transition to idle after IDLE_TIMEOUT (10 minutes)", () => {
       const now = Date.now();
-      const oldTimestamp = new Date(now - 6 * 60 * 1000).toISOString(); // 6 minutes ago
+      const oldTimestamp = new Date(now - 11 * 60 * 1000).toISOString(); // 11 minutes ago
       Date.now = () => now;
 
       const entries = [

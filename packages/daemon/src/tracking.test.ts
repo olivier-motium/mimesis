@@ -231,9 +231,9 @@ describe("Session Tracking", () => {
     });
 
     it("should detect idle status after timeout", async () => {
-      // Create a complete sequence from 10 minutes ago
+      // Create a complete sequence from 11 minutes ago (past 10-minute idle threshold)
       // Machine needs proper transitions: user → working → assistant → turn_end → waiting_for_input → idle
-      const oldTime = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      const oldTime = new Date(Date.now() - 11 * 60 * 1000).toISOString();
       const entry1 = createUserEntry("Do something", oldTime);
       const entry2 = createAssistantEntry("Done!", oldTime);
       const entry3 = createSystemEntry("turn_duration", oldTime);
@@ -242,7 +242,7 @@ describe("Session Tracking", () => {
       const { entries } = await tailJSONL(TEST_LOG_FILE, 0);
       const status = deriveStatus(entries);
 
-      // After 10 minutes of inactivity, should be idle
+      // After 11 minutes of inactivity (past 10-minute threshold), should be idle
       expect(status.status).toBe("idle");
     });
 

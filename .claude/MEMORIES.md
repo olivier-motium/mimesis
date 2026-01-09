@@ -454,25 +454,88 @@ if stop_hook_active:
 - `~/.claude/hooks/status-working.py` - Strengthened language (MANDATORY, MUST)
 - `~/.claude/hooks/status-stop.py` - Strengthened language
 
-## Session Deduplication by CWD (Jan 2026)
+## Session-Based Status Files (Jan 2026)
 
-**Problem:** Multiple rows showed identical Goal/Summary but different ages.
+**Problem:** Multiple Claude Code agents working in the same repo overwrote each other's `.claude/status.md` file, causing status collisions and incorrect UI display.
 
-**Root cause:** `.claude/status.md` is per-project (cwd), not per-session. Claude Code creates new session files (e.g., via compact feature), but all sessions from the same project directory share ONE status.md file. This causes all sessions to appear identical in the UI.
+**Root cause:** Original design used project-based status files (one per `cwd`), not session-based. All sessions from same directory shared ONE status.md.
 
-**Solution:** Deduplicate sessions by `cwd` in `useSessions.ts`:
-```typescript
-const sessionsByCwd = new Map<string, Session>();
-for (const session of sessionsWithStatus) {
-  const existing = sessionsByCwd.get(session.cwd);
-  if (!existing || session.lastActivityAt > existing.lastActivityAt) {
-    sessionsByCwd.set(session.cwd, session);
-  }
-}
-const sessions = Array.from(sessionsByCwd.values());
+**Solution:** Session-specific status files: `status.<sessionId>.md` instead of `status.md`.
+
+**Implementation:**
+1. **Hooks** - `status-working.py` and `status-stop.py` now extract `session_id` from stdin JSON and write to `status.<sessionId>.md`
+2. **Daemon** - `status-watcher.ts` watches for `status.*.md` pattern, extracts sessionId from filename
+3. **Server** - Matches status events directly by sessionId (no cwd lookup)
+4. **UI** - Removed cwd deduplication workaround since each session now has its own status file
+
+**Key discovery:** Hooks already receive `session_id` in stdin JSON - they just weren't using it.
+
+**Backward compatibility:** Legacy `status.md` files still work:
+- StatusWatcher checks both patterns
+- Legacy files emit events with `sessionId: "legacy:<cwd>"`
+- Server broadcasts legacy updates to all sessions with matching cwd
+
+**Files modified:**
+- `~/.claude/hooks/status-working.py` - Uses session_id in path
+- `~/.claude/hooks/status-stop.py` - Uses session_id in path
+- `~/.claude/hooks/stop-validator.py` - Checks session-specific file first
+- `packages/daemon/src/status-watcher.ts` - Watches `status.*.md`, caches by sessionId
+- `packages/daemon/src/server.ts` - Matches by sessionId directly
+- `packages/ui/src/hooks/useSessions.ts` - Removed cwd deduplication
+
+**Status file pattern:**
+```
+# Session-specific (preferred)
+.claude/status.<sessionId>.md
+
+# Legacy (fallback)
+.claude/status.md
 ```
 
-**Why this approach:**
-- Matches user mental model: one row per project
-- Most recent session is the "active" one
-- Older session files still exist but aren't shown (can be cleaned up with delete)
+## Session Compaction Handling (Jan 2026)
+
+**Problem:** When Claude Code compacts a session (via `/compact` or auto-compact at ~95% context), it creates a NEW session file. Both old and new sessions appeared in UI, causing duplicate session listings.
+
+**Solution:** Hook-based compaction detection with session supersession.
+
+**Architecture:**
+```
+SessionStart hook (compact matcher) fires
+            ↓
+Hook writes marker file: .claude/compacted.<newSessionId>.marker
+            ↓
+CompactionWatcher detects marker file
+            ↓
+Daemon marks all OLDER sessions with same cwd as superseded
+            ↓
+UI filters out superseded sessions
+```
+
+**Key discovery:** Claude Code's SessionStart hook supports matchers: `startup`, `resume`, `clear`, `compact`. The `compact` matcher fires for the NEW session after compaction, providing the detection point.
+
+**Implementation:**
+1. **Idle timeout** - Increased from 5 to 10 minutes (`IDLE_TIMEOUT_MS`)
+2. **Hook** - `~/.claude/hooks/session-compact.py` writes marker files when `source: "compact"`
+3. **Settings** - `~/.claude/settings.json` registers SessionStart hook with `"matcher": "compact"`
+4. **CompactionWatcher** - New module watches for `compacted.*.marker` files
+5. **Schema** - Added `createdAt`, `superseded`, `supersededBy`, `supersededAt` fields to Session
+6. **Server** - Handles compaction events, marks older sessions as superseded
+7. **UI** - Filters out sessions where `superseded: true`
+
+**Files created/modified:**
+- `~/.claude/hooks/session-compact.py` - New hook for compaction detection
+- `~/.claude/settings.json` - Added compact matcher hook
+- `packages/daemon/src/compaction-watcher.ts` - New module
+- `packages/daemon/src/config/timeouts.ts` - IDLE_TIMEOUT_MS now 10 minutes
+- `packages/daemon/src/schema.ts` - Added supersession fields
+- `packages/daemon/src/server.ts` - Added CompactionWatcher integration
+- `packages/ui/src/hooks/useSessions.ts` - Filter superseded sessions
+
+**Marker file format:**
+```json
+{
+  "newSessionId": "abc123",
+  "cwd": "/path/to/project",
+  "compactedAt": "2026-01-09T18:00:00.000Z"
+}
+```
