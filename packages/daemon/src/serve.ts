@@ -203,22 +203,13 @@ async function main(): Promise<void> {
     }
   });
 
-  // Start watching
+  // Start watching - watcher emits "created" events for existing sessions
+  // which are published via the event listener above (no duplicate loop needed)
   await watcher.start();
 
-  // Publish initial sessions (filtered to recent only)
   const allSessions = watcher.getSessions();
   const recentSessions = Array.from(allSessions.values()).filter(isRecentSession);
-
-  console.log(`${colors.dim}Found ${recentSessions.length} recent sessions (of ${allSessions.size} total), publishing...${colors.reset}`);
-
-  for (const session of recentSessions) {
-    try {
-      await streamServer.publishSession(session, "insert");
-    } catch (error) {
-      console.error(`${colors.yellow}[ERROR]${colors.reset} Failed to publish initial session:`, getErrorMessage(error));
-    }
-  }
+  console.log(`${colors.dim}Found ${recentSessions.length} recent sessions (of ${allSessions.size} total)${colors.reset}`);
 
   console.log();
   console.log(`${colors.green}✓${colors.reset} Ready - watching for changes`);
