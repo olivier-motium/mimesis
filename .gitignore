@@ -1,3 +1,6 @@
 .env
 node_modules
 dist/
+
+# Runtime status file (written by hooks, watched by daemon)
+.claude/status.md
