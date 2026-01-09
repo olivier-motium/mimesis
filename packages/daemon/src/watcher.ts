@@ -205,13 +205,16 @@ export class SessionWatcher extends EventEmitter {
         bytePosition: newPosition,
       });
 
+      // Re-check if session was added by concurrent call (race condition guard)
+      const currentSession = this.sessions.get(sessionId);
+      const isNew = !currentSession;
+
       // Store session
       this.sessions.set(sessionId, session);
 
       // Emit event
-      const isNew = !existingSession;
       const hasStatusChange = statusChanged(previousStatus, status);
-      const hasNewMessages = existingSession && status.messageCount > existingSession.status.messageCount;
+      const hasNewMessages = currentSession && status.messageCount > currentSession.status.messageCount;
 
       if (isNew) {
         this.emit("session", {
