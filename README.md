@@ -1,4 +1,4 @@
-# Claude Code Session Tracker
+# Mimesis
 
 A real-time dashboard for monitoring Claude Code sessions across multiple projects. See what Claude is working on, which sessions need approval, and control sessions directly from the UI.
 
@@ -6,7 +6,7 @@ A real-time dashboard for monitoring Claude Code sessions across multiple projec
 
 - **Real-time updates** via Durable Streams
 - **Kanban board** showing sessions by status (Working, Needs Approval, Waiting, Idle)
-- **AI-powered summaries** of session activity using Claude Sonnet
+- **Hook-based status** from `.claude/status.md` files
 - **PR & CI tracking** - see associated PRs and their CI status
 - **Multi-repo support** - sessions grouped by GitHub repository
 - **Kitty terminal integration** - open sessions in terminal, send commands, focus windows
@@ -27,7 +27,7 @@ https://github.com/user-attachments/assets/877a43af-25f9-4751-88eb-24e7bbda68da
                                      ▼
                         ┌─────────────────────────────┐
                         │   SQLite + Kitty Terminal   │
-                        │   ~/.claude-code-ui/        │
+                        │   ~/.mimesis/               │
                         └─────────────────────────────┘
 ```
 
@@ -36,7 +36,7 @@ https://github.com/user-attachments/assets/877a43af-25f9-4751-88eb-24e7bbda68da
 Watches `~/.claude/projects/` for session log changes and:
 - Parses JSONL log files incrementally
 - Derives session status using XState state machine
-- Generates AI summaries via Claude Sonnet API
+- Reads status from `.claude/status.md` hook files
 - Detects git branches and polls for PR/CI status
 - Publishes state updates to Durable Streams
 - Provides REST API for terminal control
@@ -72,7 +72,7 @@ The dashboard integrates with [kitty terminal](https://sw.kovidgoyal.net/kitty/)
 2. **Session linking**: When you click "Open in Kitty":
    - Creates a new tab with `--var cc_session_id=<sessionId>`
    - Runs `claude --resume <sessionId> --dangerously-skip-permissions`
-   - Stores the link in SQLite at `~/.claude-code-ui/data.db`
+   - Stores the link in SQLite at `~/.mimesis/data.db`
 
 3. **Link recovery**: Kitty window IDs are ephemeral (change on restart). The daemon recovers links using:
    - Stored window ID (fast path)
@@ -162,9 +162,6 @@ pnpm dev    # Start UI dev server
 ## Environment Variables
 
 ```bash
-# Required for AI summaries
-export ANTHROPIC_API_KEY=sk-ant-...
-
 # Optional: GitHub PR/CI status (uses gh CLI auth if not set)
 export GITHUB_TOKEN=ghp_...
 ```
@@ -174,8 +171,8 @@ export GITHUB_TOKEN=ghp_...
 | Path | Description |
 |------|-------------|
 | `~/.claude/projects/` | Claude Code session logs (JSONL) |
-| `~/.claude-code-ui/data.db` | SQLite database (terminal links, history) |
-| `~/.claude-code-ui/streams/` | Durable Streams persistence |
+| `~/.mimesis/data.db` | SQLite database (terminal links, history) |
+| `~/.mimesis/streams/` | Durable Streams persistence |
 | `~/.config/kitty/claude-code.conf` | Kitty remote control config |
 
 ## Documentation

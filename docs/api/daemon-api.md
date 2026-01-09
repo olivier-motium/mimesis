@@ -309,7 +309,7 @@ The daemon:
 4. Creates `macos-launch-services-cmdline` for GUI launches (macOS only)
 5. Sends SIGUSR1 to reload running kitty instances
 
-For manual setup: `pnpm --filter @claude-code-ui/daemon setup:kitty`
+For manual setup: `pnpm --filter @mimesis/daemon setup:kitty`
 
 ### Generated Config Files
 

@@ -1,5 +1,5 @@
 {
-  "name": "@claude-code-ui/daemon",
+  "name": "@mimesis/daemon",
   "version": "1.0.0",
   "type": "module",
   "exports": {

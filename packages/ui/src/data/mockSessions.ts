@@ -29,7 +29,7 @@ export const mockSessions: MockSession[] = [
   // Working sessions
   {
     sessionId: "abc123-def456-789",
-    cwd: "/Users/kyle/code/claude-code-ui",
+    cwd: "/Users/kyle/code/mimesis",
     gitBranch: "main",
     originalPrompt: "Scaffold the UI with Vite and TanStack Router",
     status: "working",
@@ -38,8 +38,8 @@ export const mockSessions: MockSession[] = [
     hasPendingToolUse: false,
     pendingTool: null,
     summary: "Writing SessionCard component",
-    gitRepoUrl: "https://github.com/KyleAMathews/claude-code-ui",
-    gitRepoId: "KyleAMathews/claude-code-ui",
+    gitRepoUrl: "https://github.com/KyleAMathews/mimesis",
+    gitRepoId: "KyleAMathews/mimesis",
   },
   {
     sessionId: "xyz789-abc123-456",
@@ -73,7 +73,7 @@ export const mockSessions: MockSession[] = [
   },
   {
     sessionId: "wait789-input-123",
-    cwd: "/Users/kyle/code/claude-code-ui",
+    cwd: "/Users/kyle/code/mimesis",
     gitBranch: "feat/kanban",
     originalPrompt: "Create the Kanban board component with drag and drop",
     status: "waiting",
@@ -82,8 +82,8 @@ export const mockSessions: MockSession[] = [
     hasPendingToolUse: true,
     pendingTool: { tool: "Bash", target: "pnpm add @dnd-kit/core" },
     summary: "Adding drag-drop library",
-    gitRepoUrl: "https://github.com/KyleAMathews/claude-code-ui",
-    gitRepoId: "KyleAMathews/claude-code-ui",
+    gitRepoUrl: "https://github.com/KyleAMathews/mimesis",
+    gitRepoId: "KyleAMathews/mimesis",
   },
 
   // Waiting - waiting for user input
@@ -105,7 +105,7 @@ export const mockSessions: MockSession[] = [
   // Idle sessions
   {
     sessionId: "idle123-old-456",
-    cwd: "/Users/kyle/code/claude-code-ui",
+    cwd: "/Users/kyle/code/mimesis",
     gitBranch: "experiment/old",
     originalPrompt: "Experiment with different state management approaches",
     status: "idle",
@@ -114,8 +114,8 @@ export const mockSessions: MockSession[] = [
     hasPendingToolUse: false,
     pendingTool: null,
     summary: "Compared Zustand vs Jotai, recommended Zustand",
-    gitRepoUrl: "https://github.com/KyleAMathews/claude-code-ui",
-    gitRepoId: "KyleAMathews/claude-code-ui",
+    gitRepoUrl: "https://github.com/KyleAMathews/mimesis",
+    gitRepoId: "KyleAMathews/mimesis",
   },
   {
     sessionId: "idle789-done-123",

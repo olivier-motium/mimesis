@@ -14,7 +14,7 @@ export type {
   RecentOutput,
   TerminalLink,
   EmbeddedPty,
-} from "@claude-code-ui/daemon/schema";
+} from "@mimesis/daemon/schema";
 
 // Runtime schemas needed for StreamDB initialization
-export { sessionsStateSchema } from "@claude-code-ui/daemon/schema";
+export { sessionsStateSchema } from "@mimesis/daemon/schema";

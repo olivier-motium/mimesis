@@ -1,6 +1,6 @@
 # Getting Started
 
-Get up and running with Claude Code Session Tracker in under 5 minutes.
+Get up and running with Mimesis in under 5 minutes.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ Get up and running with Claude Code Session Tracker in under 5 minutes.
 
 ```bash
 git clone <repo-url>
-cd claude-code-ui
+cd mimesis
 pnpm install
 ```
 
@@ -74,7 +74,7 @@ After setup, you can:
 - Link existing terminals to sessions
 - Send text directly to linked terminals
 
-For manual setup: `pnpm --filter @claude-code-ui/daemon setup:kitty`
+For manual setup: `pnpm --filter @mimesis/daemon setup:kitty`
 
 ## Running Separately
 

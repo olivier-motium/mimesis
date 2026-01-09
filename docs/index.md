@@ -1,4 +1,4 @@
-# Claude Code Session Tracker Documentation
+# Mimesis Documentation
 
 Real-time monitoring dashboard for Claude Code sessions.
 
@@ -66,7 +66,7 @@ External knowledge bases for related technologies:
 ## Project Structure
 
 ```
-claude-code-ui/
+mimesis/
 ├── packages/
 │   ├── daemon/     # Node.js file watcher + stream server
 │   └── ui/         # React dashboard

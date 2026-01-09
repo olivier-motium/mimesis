@@ -1,4 +1,4 @@
-# Claude Code Session Tracker - Technical Specification
+# Mimesis - Technical Specification
 
 Detailed technical reference for Claude Code session log format and parsing.
 
@@ -774,7 +774,7 @@ async function backfillExistingSessions(): Promise<void> {
 ## 7. File Structure
 
 ```
-claude-code-ui/
+mimesis/
 ├── packages/
 │   ├── daemon/
 │   │   ├── src/

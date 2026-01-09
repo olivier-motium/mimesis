@@ -16,7 +16,7 @@ const execFileAsync = promisify(execFile);
 const CLAUDE_CODE_CONF = "claude-code.conf";
 
 /** Comment marker for include directive */
-const INCLUDE_COMMENT = "# Claude Code Session Tracker - kitty integration";
+const INCLUDE_COMMENT = "# Mimesis - kitty integration";
 
 /** Result of kitty setup operation */
 export interface KittySetupResult {
@@ -127,9 +127,9 @@ async function createClaudeCodeConfig(): Promise<void> {
   await fs.mkdir(configDir, { recursive: true });
 
   const socketPath = KITTY_SOCKET.replace("unix:", "");
-  const config = `# Claude Code Session Tracker - Kitty Integration
+  const config = `# Mimesis - Kitty Integration
 # This file is auto-generated. Safe to delete if you want to disable integration.
-# See: https://github.com/olivier-motium/claude-code-ui
+# See: https://github.com/olivier-motium/mimesis
 
 # Enable remote control via socket only (secure, no passwords)
 allow_remote_control socket-only

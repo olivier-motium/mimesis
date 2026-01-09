@@ -16,7 +16,7 @@ Complete reference for all environment variables and tunable constants.
 | `MAX_AGE_HOURS` | `24` | Filter sessions older than this |
 | `KITTY_SOCKET` | `unix:/tmp/claude-cc-kitty` | Kitty remote control socket |
 | `KITTY_RC_PASSWORD` | (none) | Password for kitty remote control |
-| `DB_PATH` | `~/.claude-code-ui/data.db` | SQLite database path |
+| `DB_PATH` | `~/.mimesis/data.db` | SQLite database path |
 
 ### Optional - UI
 

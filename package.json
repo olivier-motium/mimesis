@@ -1,15 +1,15 @@
 {
-  "name": "claude-code-ui",
+  "name": "mimesis",
   "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "concurrently -n daemon,ui -c blue,green \"pnpm serve\" \"pnpm dev\"",
-    "dev": "pnpm --filter @claude-code-ui/ui dev",
-    "serve": "pnpm --filter @claude-code-ui/daemon serve",
-    "watch": "pnpm --filter @claude-code-ui/daemon watch",
-    "watch:recent": "pnpm --filter @claude-code-ui/daemon watch:recent",
-    "watch:active": "pnpm --filter @claude-code-ui/daemon watch:active"
+    "dev": "pnpm --filter @mimesis/ui dev",
+    "serve": "pnpm --filter @mimesis/daemon serve",
+    "watch": "pnpm --filter @mimesis/daemon watch",
+    "watch:recent": "pnpm --filter @mimesis/daemon watch:recent",
+    "watch:active": "pnpm --filter @mimesis/daemon watch:active"
   },
   "engines": {
     "node": ">=20.19.0"

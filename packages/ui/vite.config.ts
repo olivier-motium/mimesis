@@ -8,7 +8,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": resolve(__dirname, "./src"),
-      "@claude-code-ui/daemon/schema": resolve(__dirname, "../daemon/src/schema.ts"),
+      "@mimesis/daemon/schema": resolve(__dirname, "../daemon/src/schema.ts"),
     },
   },
   plugins: [

@@ -44,7 +44,7 @@ The meta index contains a **Document Map** showing exactly when to read each doc
 
 ## Project Overview
 
-Claude Code Session Tracker - A real-time dashboard for monitoring Claude Code sessions across multiple projects. Watches `~/.claude/projects/` for session log changes, derives status, and streams updates to a React UI via Durable Streams. Goals and summaries come from file-based status (`.claude/status.md`) written by Claude Code hooks.
+Mimesis - A real-time dashboard for monitoring Claude Code sessions across multiple projects. Watches `~/.claude/projects/` for session log changes, derives status, and streams updates to a React UI via Durable Streams. Goals and summaries come from file-based status (`.claude/status.md`) written by Claude Code hooks.
 
 ## Development Commands
 
@@ -95,16 +95,17 @@ cd packages/daemon && pnpm build       # TypeScript compile
 - **`server.ts`** - Durable Streams server wrapper. Publishes `Session` state to stream.
 - **`status-watcher.ts`** - Watches `.claude/status.md` files for goal/summary from hooks
 - **`git.ts`** - Git repo info extraction (branch, remote URL)
-- **`schema.ts`** - Zod schemas for session state, exported via `@claude-code-ui/daemon/schema`
+- **`schema.ts`** - Zod schemas for session state, exported via `@mimesis/daemon/schema`
 
 ### UI (`packages/ui`)
 
 - **TanStack Router** for routing with file-based routes in `src/routes/`
-- **Radix UI Themes** for all components (never use plain HTML with custom styles)
+- **shadcn/ui + Tailwind CSS v4** for components (Radix primitives + Tailwind utilities)
+- **TanStack Table** for DataTable component
 - **TanStack DB** for reactive local state from Durable Streams
 - **`src/data/sessionsDb.ts`** - Singleton StreamDB connection to daemon
 - **`src/hooks/useSessions.ts`** - React hook for session data
-- **`src/components/`** - KanbanColumn, RepoSection, SessionCard
+- **`src/components/`** - Fleet Command (Roster, Viewport, TacticalIntel, EventTicker), DataTable
 
 ## Key Data Types
 
@@ -146,10 +147,10 @@ The JSONL files contain discriminated union entries (`type` field):
 
 ## UI Guidelines
 
-- Always use Radix UI components - never use plain HTML elements with custom styles
-- Let Radix and capsize handle typography sizing - don't set fontSize or lineHeight manually
-- Use Radix's style props (size, color, variant, etc.) instead of inline styles
-- For code/monospace content, use the `Code` component
+- Use shadcn/ui components from `src/components/ui/` for standard UI elements
+- Style with Tailwind utilities using the `cn()` helper for conditional classes
+- Use CSS custom properties from Nano Banana Pro theme (`:root` variables in `index.css`)
+- For code/monospace content, use the `font-mono` Tailwind class or `Code` component
 
 ## Important Patterns
 
@@ -161,7 +162,7 @@ The daemon tracks byte positions per file to avoid re-reading entire logs. On fi
 
 - Daemon runs server on port 4450 at `/sessions` endpoint
 - UI connects via `@durable-streams/client` with SSE for live updates
-- Schema exported from `@claude-code-ui/daemon/schema` for type safety
+- Schema exported from `@mimesis/daemon/schema` for type safety
 
 ### Status Detection
 
@@ -170,7 +171,7 @@ Uses XState for deterministic state transitions. The machine processes all log e
 ## File Locations
 
 - Claude session logs: `~/.claude/projects/<encoded-dir>/<session-id>.jsonl`
-- Daemon stream data: `~/.claude-code-ui/streams/`
+- Daemon stream data: `~/.mimesis/streams/`
 - Encoded directory format: `/Users/foo/bar` → `-Users-foo-bar`
 
 ## Tech Stack
@@ -184,6 +185,7 @@ Uses XState for deterministic state transitions. The machine processes all log e
 | Streaming | @durable-streams/* |
 | UI Framework | React 19 |
 | Routing | TanStack Router |
-| UI Components | Radix UI Themes |
+| UI Components | shadcn/ui + Tailwind CSS v4 |
+| Tables | TanStack Table v8 |
 | Validation | Zod |
 | Build | Vite |

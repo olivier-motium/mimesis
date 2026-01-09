@@ -12,7 +12,7 @@ import { parsePositiveInt } from "./helpers.js";
 
 /** Path to SQLite database */
 export const DB_PATH = process.env.DB_PATH ??
-  path.join(os.homedir(), ".claude-code-ui", "data.db");
+  path.join(os.homedir(), ".mimesis", "data.db");
 
 // =============================================================================
 // File-Based Status Configuration

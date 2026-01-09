@@ -101,27 +101,27 @@ export function DataTable({
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card/50 backdrop-blur-sm">
-      <Table>
-        <TableHeader className="bg-muted/50">
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id} className="border-b border-border hover:bg-transparent">
-              {headerGroup.headers.map((header) => (
-                <TableHead
-                  key={header.id}
-                  style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}
-                  className="text-xs font-medium text-muted-foreground"
-                >
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          <ScrollArea className="h-[calc(100vh-400px)]">
+    <div className="rounded-lg border border-border bg-card/50 backdrop-blur-sm overflow-hidden">
+      <ScrollArea className="h-[calc(100vh-400px)]">
+        <Table>
+          <TableHeader className="bg-muted/50 sticky top-0 z-10">
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id} className="border-b border-border hover:bg-transparent">
+                {headerGroup.headers.map((header) => (
+                  <TableHead
+                    key={header.id}
+                    style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}
+                    className="text-xs font-medium text-muted-foreground"
+                  >
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
             {table.getRowModel().rows.map((row) => {
               const isSelected = selectedId === row.id
               return (
@@ -148,9 +148,9 @@ export function DataTable({
                 </TableRow>
               )
             })}
-          </ScrollArea>
-        </TableBody>
-      </Table>
+          </TableBody>
+        </Table>
+      </ScrollArea>
     </div>
   )
 }

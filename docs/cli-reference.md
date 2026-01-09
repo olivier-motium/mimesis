@@ -90,7 +90,7 @@ Sessions are displayed grouped by working directory with color-coded status:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `ANTHROPIC_API_KEY` | Yes | Claude API key for AI summaries |
+| `ANTHROPIC_API_KEY` | No | Claude API key (optional) |
 | `GITHUB_TOKEN` | No | GitHub API for PR status (uses `gh` CLI auth if not set) |
 
 ---
@@ -125,7 +125,7 @@ The daemon uses SQLite (via Drizzle ORM) for persistent storage.
 ### Generate Migrations
 
 ```bash
-pnpm --filter @claude-code-ui/daemon db:generate
+pnpm --filter @mimesis/daemon db:generate
 ```
 
 Creates Drizzle ORM schema migrations from `src/db/schema.ts` changes.
@@ -133,7 +133,7 @@ Creates Drizzle ORM schema migrations from `src/db/schema.ts` changes.
 ### Apply Migrations
 
 ```bash
-pnpm --filter @claude-code-ui/daemon db:migrate
+pnpm --filter @mimesis/daemon db:migrate
 ```
 
 Applies pending migrations to the SQLite database.
@@ -141,12 +141,12 @@ Applies pending migrations to the SQLite database.
 ### Database Studio
 
 ```bash
-pnpm --filter @claude-code-ui/daemon db:studio
+pnpm --filter @mimesis/daemon db:studio
 ```
 
 Opens Drizzle Studio GUI for database inspection and editing.
 
-**Database location:** `~/.claude-code-ui/db.sqlite`
+**Database location:** `~/.mimesis/db.sqlite`
 
 ---
 
@@ -159,7 +159,7 @@ Kitty terminal remote control is automatically configured when the daemon starts
 ### Manual Setup
 
 ```bash
-pnpm --filter @claude-code-ui/daemon setup:kitty
+pnpm --filter @mimesis/daemon setup:kitty
 ```
 
 Manually run the kitty setup process if automatic setup failed.

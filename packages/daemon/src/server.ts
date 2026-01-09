@@ -53,7 +53,7 @@ export class StreamServer {
     this.linkRepo = new TerminalLinkRepo();
     this.statusWatcher = new StatusWatcher();
     this.port = options.port ?? STREAM_PORT;
-    const dataDir = options.dataDir ?? path.join(os.homedir(), ".claude-code-ui", "streams");
+    const dataDir = options.dataDir ?? path.join(os.homedir(), ".mimesis", "streams");
 
     this.server = new DurableStreamTestServer({
       port: this.port,

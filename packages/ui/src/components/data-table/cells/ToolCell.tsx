@@ -3,7 +3,7 @@
  */
 
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import type { PendingTool } from "@claude-code-ui/daemon/schema"
+import type { PendingTool } from "@mimesis/daemon/schema"
 
 interface ToolCellProps {
   pendingTool: PendingTool | null

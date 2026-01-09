@@ -1,6 +1,6 @@
 # Deployment Guide
 
-How to run Claude Code Session Tracker in production.
+How to run Mimesis in production.
 
 ## Prerequisites
 
@@ -54,11 +54,11 @@ pnpm dev    # UI on port 5173
 npm install -g pm2
 
 # Start daemon
-pm2 start pnpm --name "claude-code-daemon" -- serve
+pm2 start pnpm --name "mimesis-daemon" -- serve
 
 # Start UI (if serving built assets)
 cd packages/ui && pnpm build
-pm2 start pnpm --name "claude-code-ui" -- preview
+pm2 start pnpm --name "mimesis-ui" -- preview
 
 # Save configuration
 pm2 save
@@ -67,7 +67,7 @@ pm2 startup
 
 ### Option 2: macOS launchd
 
-Create `~/Library/LaunchAgents/com.claude-code-ui.daemon.plist`:
+Create `~/Library/LaunchAgents/com.mimesis.daemon.plist`:
 
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
@@ -75,43 +75,43 @@ Create `~/Library/LaunchAgents/com.claude-code-ui.daemon.plist`:
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>com.claude-code-ui.daemon</string>
+  <string>com.mimesis.daemon</string>
   <key>ProgramArguments</key>
   <array>
     <string>/opt/homebrew/bin/pnpm</string>
     <string>serve</string>
   </array>
   <key>WorkingDirectory</key>
-  <string>/path/to/claude-code-ui</string>
+  <string>/path/to/mimesis</string>
   <key>RunAtLoad</key>
   <true/>
   <key>KeepAlive</key>
   <true/>
   <key>StandardOutPath</key>
-  <string>/tmp/claude-code-ui.log</string>
+  <string>/tmp/mimesis.log</string>
   <key>StandardErrorPath</key>
-  <string>/tmp/claude-code-ui.error.log</string>
+  <string>/tmp/mimesis.error.log</string>
 </dict>
 </plist>
 ```
 
 Load with:
 ```bash
-launchctl load ~/Library/LaunchAgents/com.claude-code-ui.daemon.plist
+launchctl load ~/Library/LaunchAgents/com.mimesis.daemon.plist
 ```
 
 ### Option 3: Linux systemd
 
-Create `/etc/systemd/user/claude-code-ui.service`:
+Create `/etc/systemd/user/mimesis.service`:
 
 ```ini
 [Unit]
-Description=Claude Code Session Tracker Daemon
+Description=Mimesis Daemon
 After=network.target
 
 [Service]
 Type=simple
-WorkingDirectory=/path/to/claude-code-ui
+WorkingDirectory=/path/to/mimesis
 ExecStart=/usr/bin/pnpm serve
 Restart=always
 RestartSec=10
@@ -122,8 +122,8 @@ WantedBy=default.target
 
 Enable with:
 ```bash
-systemctl --user enable claude-code-ui
-systemctl --user start claude-code-ui
+systemctl --user enable mimesis
+systemctl --user start mimesis
 ```
 
 ---
@@ -133,7 +133,7 @@ systemctl --user start claude-code-ui
 | Path | Purpose | Managed By |
 |------|---------|------------|
 | `~/.claude/projects/` | Session log files | Claude Code (read-only) |
-| `~/.claude-code-ui/streams/` | Durable Streams persistence | Daemon |
+| `~/.mimesis/streams/` | Durable Streams persistence | Daemon |
 
 ### Log Retention
 
