@@ -120,3 +120,80 @@ body {
   border-left: 3px solid #f97316; /* orange */
   background: linear-gradient(135deg, rgba(249, 115, 22, 0.05) 0%, transparent 50%);
 }
+
+/* ===========================================
+   OPS TABLE STYLES - Command Center Layout
+   =========================================== */
+
+.ops-table-row {
+  transition: background-color 0.15s ease;
+}
+
+.ops-table-row:hover {
+  background-color: var(--gray-a3);
+}
+
+.ops-table-row.selected {
+  background-color: var(--accent-a4);
+}
+
+/* Status indicators for ops table rows */
+.ops-table-row.status-working {
+  border-left: 3px solid #22c55e;
+}
+
+.ops-table-row.status-needs-approval {
+  border-left: 3px solid #f97316;
+  background: linear-gradient(90deg, rgba(249, 115, 22, 0.08) 0%, transparent 20%);
+}
+
+.ops-table-row.status-stale {
+  border-left: 3px solid #eab308;
+  background: linear-gradient(90deg, rgba(234, 179, 8, 0.08) 0%, transparent 20%);
+}
+
+.ops-table-row.status-error {
+  border-left: 3px solid #ef4444;
+  background: linear-gradient(90deg, rgba(239, 68, 68, 0.08) 0%, transparent 20%);
+}
+
+.ops-table-row.status-blocked {
+  border-left: 3px solid #f97316;
+}
+
+/* Subtle pulse for working rows */
+@keyframes ops-pulse {
+  0%, 100% {
+    background-color: transparent;
+  }
+  50% {
+    background-color: rgba(34, 197, 94, 0.05);
+  }
+}
+
+.ops-table-row.status-working:not(.selected) {
+  animation: ops-pulse 3s ease-in-out infinite;
+}
+
+/* Keyboard navigation focus styles */
+.ops-table-row:focus-visible {
+  outline: 2px solid var(--accent-9);
+  outline-offset: -2px;
+}
+
+/* Terminal dock styles */
+.terminal-dock {
+  border: 1px solid var(--gray-a6);
+  border-radius: var(--radius-3);
+  overflow: hidden;
+}
+
+.terminal-dock-header {
+  padding: var(--space-2) var(--space-3);
+  background: var(--gray-a2);
+  border-bottom: 1px solid var(--gray-a6);
+}
+
+.terminal-dock-body {
+  background: var(--gray-1);
+}

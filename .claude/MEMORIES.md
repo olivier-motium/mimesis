@@ -211,3 +211,60 @@ Full audit in `~/.claude/plans/calm-hatching-toucan.md`. Key technical debt area
 4. **Empty catches**: 18 empty catch blocks swallow errors silently (kitty-setup.ts, git.ts, pty.ts)
 
 Technical debt score: MANAGEABLE. No circular dependencies. Codebase is healthy with specific improvement areas.
+
+## Command Center UI Redesign (Jan 2026)
+
+Full plan in `~/.claude/plans/zany-popping-dusk.md`.
+
+### Problem Statement
+Kanban boards are optimized for tracking work items, but we need to monitor live execution. Cards waste space, hide the terminal behind clicks, and don't scale beyond ~10 concurrent sessions. The terminal should be the primary instrument, not a detail view.
+
+### Design Philosophy
+Transform from "Kanban board" to "Mission Control" inspired by RTS games (StarCraft, Civ):
+- **Persistent Terminal Dock** - always visible, selection-driven
+- **Ops Table** - dense scannable list replacing cards
+- **Keyboard-first** - muscle memory over mouse clicking
+- **Attention system** - surface what needs intervention
+
+### Key Decisions
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Scale | 5-10 sessions | No virtualization needed, standard table |
+| Backwards compat | Replace entirely | Clean slate, delete Kanban components |
+| Terminal model | Selection-driven | Click row → terminal swaps, one at a time |
+| Repo grouping | Flat list only | Repo as sortable column, no collapsible sections |
+
+### New Components
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `OpsTable` | `components/ops-table/` | Dense session table with filtering/sorting |
+| `OpsTableRow` | `components/ops-table/` | Individual session row with all columns |
+| `StatusStrip` | `components/StatusStrip.tsx` | Clickable filter badges by status |
+| `TerminalDock` | `components/terminal-dock/` | Persistent terminal panel |
+| `SessionHeader` | `components/terminal-dock/` | Session info bar for dock |
+| `useKeyboardNavigation` | `hooks/useKeyboardNavigation.ts` | RTS-style keyboard shortcuts |
+
+### Deleted Components (Replaced)
+- `RepoSection.tsx` - Replaced by flat Ops Table
+- `KanbanColumn.tsx` - Replaced by Ops Table
+- `SessionCard.tsx` - Replaced by OpsTableRow
+- `SessionCardContent.tsx` - Replaced by OpsTableRow
+- `SessionCardHoverContent.tsx` - Replaced by TerminalDock
+
+### Keyboard Shortcuts
+| Key | Action |
+|-----|--------|
+| `↑/↓` | Navigate table rows |
+| `Enter` | Select first session |
+| `Escape` | Deselect / close terminal |
+| `A` | Filter: all |
+| `W` | Filter: working |
+| `I` | Filter: needs input |
+| `E` | Filter: errors |
+| `S` | Filter: stale |
+
+### Selection Model
+Selection is lifted to `index.tsx` layout:
+- `selectedSessionId` state controls both table highlighting and terminal display
+- Click row → `setSelectedSessionId(session.sessionId)`
+- Terminal swaps session without remounting (PTY lifecycle managed per session)

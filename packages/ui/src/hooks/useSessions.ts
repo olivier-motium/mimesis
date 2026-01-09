@@ -1,7 +1,6 @@
 import { useLiveQuery } from "@tanstack/react-db";
 import { getSessionsDbSync } from "../data/sessionsDb";
 import type { Session } from "../types/schema";
-import { groupSessionsByRepo, type RepoGroup } from "../lib/sessionScoring";
 
 /**
  * Hook to get all sessions from the StreamDB.
@@ -29,7 +28,3 @@ export function useSessions() {
     isLoading: query?.isLoading ?? false,
   };
 }
-
-// Re-export for convenience
-export { groupSessionsByRepo };
-export type { RepoGroup };
