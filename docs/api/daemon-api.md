@@ -65,107 +65,6 @@ Both are normalized to `owner/repo` for `repoId`.
 - No shell commands - pure filesystem operations
 - Cache is per-directory, persists for daemon lifetime
 
----
-
-## AI Summarization (`summarizer/`)
-
-Generates session goals and summaries using Claude API. The summarizer is split into modular files:
-
-| File | Purpose |
-|------|---------|
-| `summarizer.ts` | Main entry point, API calls |
-| `context-extraction.ts` | Extract context from entries |
-| `summaries.ts` | Working/fallback summary logic |
-| `cache.ts` | LRU cache with TTL eviction |
-| `text-utils.ts` | Text cleaning utilities |
-
-### Public Functions
-
-#### `generateGoal(session: SessionState): Promise<string>`
-
-Generates a 5-10 word high-level goal from session context.
-
-```typescript
-import { generateGoal } from "./summarizer/index.js";
-
-const goal = await generateGoal(session);
-// Returns: "Build UI for monitoring sessions"
-```
-
-**Caching behavior:**
-- Results cached per session
-- Regenerates if session grows 5x since last generation
-- For sessions < 5 entries, returns cleaned original prompt
-
-#### `generateAISummary(session: SessionState): Promise<string>`
-
-Generates a short summary of current session state.
-
-```typescript
-import { generateAISummary } from "./summarizer.js";
-
-const summary = await generateAISummary(session);
-// Returns: "Editing config.ts" or "Waiting for approval"
-```
-
-**Quick summaries (no API call):**
-- Sessions < 3 entries: "Just started"
-- Working sessions: Tool-based summary (e.g., "Editing file.ts")
-- Cached if content hash matches
-
-#### `clearSummaryCache(sessionId: string): void`
-
-Clear the summary cache for a specific session.
-
-### Model Configuration
-
-| Setting | Value |
-|---------|-------|
-| Model | `claude-sonnet-4-20250514` |
-| Max tokens (goal) | 30 |
-| Max tokens (summary) | 100 |
-
-### Rate Limiting
-
-- API calls queued through `fastq` with concurrency of 1
-- Prevents rate limit errors from Claude API
-- Requests processed in FIFO order
-- API calls timeout after 30 seconds (`EXTERNAL_CALL_TIMEOUT_MS`)
-
-### Cache Eviction
-
-Both summary and goal caches implement LRU-style eviction to prevent memory leaks:
-
-| Cache | Max Size | TTL |
-|-------|----------|-----|
-| Summary | 500 entries | 30 minutes |
-| Goal | 500 entries | 30 minutes |
-
-Eviction is triggered before each cache lookup. Entries are removed based on:
-1. TTL expiration (entries older than 30 minutes)
-2. Size limit (oldest entries removed when over 500)
-
-### Quick Summary Logic
-
-For working sessions, summaries are generated locally based on the last tool use:
-
-| Tool | Summary Format |
-|------|----------------|
-| `Edit`, `Write` | "Editing {filename}" |
-| `Read` | "Reading {filename}" |
-| `Bash` | "Running {command}" |
-| `Grep`, `Glob` | "Searching codebase" |
-| `Task` | "Running agent task" |
-| Other | "Using {tool}" |
-
-### Context Extraction
-
-For AI-generated summaries, context is built from:
-- Original prompt
-- Current status
-- Message count
-- Pending tool use flag
-- Last 10 entries (truncated)
 
 ---
 
@@ -437,6 +336,73 @@ curl -X DELETE http://127.0.0.1:4451/api/sessions/abc123
 
 ---
 
+## Hook Events API (`api/routes/hooks.ts`)
+
+Receives events from Claude Code hooks via the `emit-hook-event.py` bridge script. Used for segment chain management.
+
+### POST /api/hooks
+
+Receives hook events from Claude Code to maintain segment chains.
+
+**Request Body:**
+```json
+{
+  "hook_event_name": "SessionStart" | "PreCompact" | "Stop",
+  "session_id": "uuid",
+  "transcript_path": "~/.claude/projects/.../session.jsonl",
+  "source": "compact" | "clear" | "resume" | "new",
+  "trigger": "auto" | "user",
+  "command_center_tab_id": "uuid",
+  "cwd": "/path/to/project"
+}
+```
+
+**Events Handled:**
+| Event | Purpose |
+|-------|---------|
+| `PreCompact` | Mark current segment as ending (preparation) |
+| `SessionStart` (source=compact) | Append new segment after compaction |
+| `SessionStart` (source=clear) | Append new segment after /clear |
+| `SessionStart` (source=resume) | Append new segment for --resume |
+| `SessionStart` (source=new) | Append first segment for new session |
+
+**Response:**
+```json
+{ "ok": true, "action": "segment_appended", "segment": { "sessionId": "...", "reason": "compact" } }
+```
+
+### Tab Management Endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/api/tabs` | List all tabs |
+| GET | `/api/tabs/:tabId` | Get specific tab info |
+| POST | `/api/tabs` | Create new tab (from UI) |
+| DELETE | `/api/tabs/:tabId` | Delete a tab |
+
+**Create Tab:**
+```bash
+curl -X POST http://127.0.0.1:4451/api/tabs \
+  -H "Content-Type: application/json" \
+  -d '{"repoRoot": "/path/to/project"}'
+# { "tab": { "tabId": "uuid", "repoRoot": "...", "segments": [] } }
+```
+
+**List Tabs:**
+```bash
+curl http://127.0.0.1:4451/api/tabs
+# { "tabs": [...], "count": 3 }
+```
+
+### Segment Chain Concept
+
+Tabs maintain a "segment chain" - an ordered list of Claude Code sessions for a repository. When a session compacts (context resets), the new session is appended to the chain. This enables:
+- "Kitty effect" - compaction is invisible to the user
+- Session history preservation
+- PTY continuity across compaction
+
+---
+
 ## Database (`db/`)
 
 SQLite persistence for terminal links using Drizzle ORM.
@@ -586,6 +552,84 @@ interface WatcherOptions {
 | `start()` | `Promise<void>` | Begin watching |
 | `stop()` | `Promise<void>` | Stop watching |
 | `getSessions()` | `Map<string, SessionState>` | Get all sessions |
+
+---
+
+## Status Derivation (`status-derivation.ts`)
+
+Derives session status from log entries using the XState state machine.
+
+### Key Functions
+
+#### `deriveStatus(entries: LogEntry[]): StatusResult`
+
+Processes log entries through the state machine to determine current session status.
+
+```typescript
+import { deriveStatus } from "./status-derivation.js";
+
+const status = deriveStatus(entries);
+// Returns: { status: "working" | "waiting" | "idle", lastRole, hasPendingToolUse, lastActivityAt, messageCount }
+```
+
+**Status logic:**
+- `working` - Claude is actively processing (streaming or executing tools)
+- `waiting` - Claude finished, waiting for user input or approval
+  - `hasPendingToolUse: true` if waiting for tool approval
+- `idle` - No activity for 10+ minutes
+
+#### `formatStatus(result: StatusResult): string`
+
+Formats status for CLI display with emoji indicators.
+
+```typescript
+import { formatStatus } from "./status-derivation.js";
+
+formatStatus({ status: "working", ... }); // "🟢 Working"
+formatStatus({ status: "waiting", hasPendingToolUse: true, ... }); // "🟠 Tool pending"
+formatStatus({ status: "waiting", hasPendingToolUse: false, ... }); // "🟡 Waiting for input"
+formatStatus({ status: "idle", ... }); // "⚪ Idle"
+```
+
+#### `statusChanged(prev, next): boolean`
+
+Compares two status results to detect meaningful changes.
+
+```typescript
+import { statusChanged } from "./status-derivation.js";
+
+if (statusChanged(previousStatus, newStatus)) {
+  // Emit update event
+}
+```
+
+#### `getStatusKey(result: StatusResult): string`
+
+Returns a short status string for logging.
+
+```typescript
+getStatusKey({ status: "waiting", hasPendingToolUse: true, ... }); // "waiting:tool"
+getStatusKey({ status: "working", ... }); // "working"
+```
+
+### State Machine (`status-machine.ts`)
+
+The underlying XState state machine with four internal states:
+
+| State | Description | UI Mapping |
+|-------|-------------|------------|
+| `idle` | No activity for 10+ minutes | idle |
+| `working` | Claude actively processing | working |
+| `waiting_for_approval` | Tool use needs approval | waiting |
+| `waiting_for_input` | Finished, waiting for user | waiting |
+
+### Timeout Configuration
+
+| Constant | Value | Trigger |
+|----------|-------|---------|
+| `APPROVAL_TIMEOUT_MS` | 5 seconds | Stale tool_use detection |
+| `STALE_TIMEOUT_MS` | 60 seconds | Fallback for older Claude Code versions |
+| `IDLE_TIMEOUT_MS` | 10 minutes | Transition to idle |
 
 ---
 

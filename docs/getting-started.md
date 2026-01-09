@@ -43,7 +43,7 @@ The dashboard shows sessions in a Kanban-style board:
 | **Working** | Claude is actively processing |
 | **Needs Approval** | Tool use waiting for your approval |
 | **Waiting** | Claude finished, waiting for your input |
-| **Idle** | No activity for 5+ minutes |
+| **Idle** | No activity for 10+ minutes |
 
 Each session card shows:
 - AI-generated goal and summary

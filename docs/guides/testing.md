@@ -26,7 +26,7 @@ The watcher should detect this session and show status changes as we interact:
 2. **Observe status transitions**:
    - When you send a message → status should be "Working"
    - When Claude finishes responding → status should be "Waiting for input"
-   - After 5 minutes of no activity → status becomes "Idle"
+   - After 10 minutes of no activity → status becomes "Idle"
 
 ### 2. Spawn a Test Session
 
@@ -116,7 +116,7 @@ The watcher should detect this mock session.
 | User just sent a message | Working |
 | Claude finished responding | Waiting for input |
 | Claude requested a tool | Needs approval |
-| No activity for 5+ minutes | Idle |
+| No activity for 10+ minutes | Idle |
 | File deleted | Session removed from list |
 
 ## Debugging Tips

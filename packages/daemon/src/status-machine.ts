@@ -36,7 +36,7 @@ export type StatusState = "idle" | "working" | "waiting_for_approval" | "waiting
  * State machine for session status.
  *
  * States:
- * - idle: No activity for 5+ minutes
+ * - idle: No activity for 10+ minutes
  * - working: Claude is actively processing
  * - waiting_for_approval: Tool use needs user approval
  * - waiting_for_input: Claude finished, waiting for user

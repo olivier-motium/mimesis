@@ -61,7 +61,7 @@ pnpm dev             # Start UI dev server
 
 # Daemon watch modes:
 pnpm watch           # CLI watcher (no streaming server)
-pnpm watch:recent    # Only sessions from last 24h
+pnpm watch:recent    # Only sessions from last hour
 pnpm watch:active    # Only non-idle sessions
 
 # Testing:

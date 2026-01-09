@@ -35,7 +35,7 @@ These constants are defined in `packages/daemon/src/config.ts` and affect daemon
 
 | Constant | Value | Purpose |
 |----------|-------|---------|
-| `IDLE_TIMEOUT_MS` | 5 minutes | Session marked idle after inactivity |
+| `IDLE_TIMEOUT_MS` | 10 minutes | Session marked idle after inactivity |
 | `APPROVAL_TIMEOUT_MS` | 5 seconds | Time before stale tool_use detection |
 | `STALE_TIMEOUT_MS` | 60 seconds | Fallback for older Claude Code versions |
 | `RECENT_THRESHOLD_MS` | 1 hour | `--recent` flag filter threshold |

@@ -291,6 +291,72 @@ function FleetCommandPage() {
 }
 ```
 
+### `usePtyInitialization` Hook
+
+**Location:** `packages/ui/src/hooks/usePtyInitialization.ts`
+
+Manages PTY initialization for a session. Consolidates PTY logic used by TerminalDock and Viewport.
+
+**Signature:**
+```tsx
+function usePtyInitialization(
+  sessionId: string | null,
+  options?: { tabId?: string; cols?: number; rows?: number }
+): {
+  state: PtyState;
+  setConnected: (connected: boolean) => void;
+  reset: () => void;
+}
+```
+
+**Returns:**
+- `state.ptyInfo` - PTY connection info (ptyId, wsUrl, wsToken)
+- `state.isLoading` - Whether PTY is initializing
+- `state.error` - Error message if initialization failed
+- `state.isConnected` - Whether terminal is connected to WebSocket
+- `setConnected` - Update connection status
+- `reset` - Reset state for new session
+
+**Features:**
+- Get-or-create PTY in single API call
+- Optional `tabId` for segment tracking ("kitty effect")
+- Prevents duplicate initialization for same session
+
+### `useTabManager` Hook
+
+**Location:** `packages/ui/src/hooks/useTabs.ts`
+
+Manages terminal tabs for session compaction (segment rotation).
+
+**Signature:**
+```tsx
+function useTabManager(): {
+  tabs: Map<string, TerminalTab>;
+  tabsByRepo: Map<string, string[]>;
+  isLoading: boolean;
+  error: string | null;
+  createOrGetTab: (repoRoot: string) => Promise<TerminalTab>;
+  getTab: (tabId: string) => TerminalTab | undefined;
+  deleteTab: (tabId: string) => Promise<void>;
+  refresh: () => Promise<void>;
+}
+```
+
+**Tab Concept:**
+- A "tab" is a stable container that survives session compaction
+- When a session compacts, the new segment rotates into the same tab
+- This enables the "kitty effect" - compaction is invisible to the user
+- Each tab is scoped to a repository root
+
+**Usage:**
+```tsx
+const { createOrGetTab, tabs } = useTabManager();
+
+// Open terminal for a repo
+const tab = await createOrGetTab("/path/to/repo");
+// Pass tab.tabId to createPty() for segment tracking
+```
+
 ---
 
 ## Component Library
@@ -317,3 +383,99 @@ The DataTable replaces the old OpsTable with TanStack Table v8 architecture:
 | `DataTable.tsx` | Main table component with sorting |
 | `columns.tsx` | Column definitions |
 | `cells/*.tsx` | Individual cell renderers |
+
+---
+
+## Terminal Dock
+
+**Location:** `components/terminal-dock/`
+
+Persistent terminal panel for the Fleet Command center.
+
+### `TerminalDock`
+
+**Props:**
+- `session: Session | null` - Selected session
+- `onClose: () => void` - Close callback
+
+**Features:**
+- Shows terminal for selected session
+- Creates PTY on first attach via `ensurePty()`
+- Preserves terminal state when switching sessions (CSS show/hide)
+- Header with session info and controls (via `SessionHeader`)
+
+**PTY Lifecycle:**
+1. Session selected → check `initializedSessionRef`
+2. If new session → call `ensurePty(sessionId)`
+3. Connect `Terminal` component to WebSocket
+4. Terminal persists until dock closes
+
+---
+
+## Dialog Components
+
+**Location:** `components/`
+
+Modal dialogs for user interactions.
+
+### `SendTextDialog`
+
+Modal for sending text to a Claude Code session without full terminal attachment.
+
+**Props:**
+- `sessionId: string` - Target session
+- `open: boolean` - Dialog visibility
+- `onOpenChange: (open: boolean) => void` - Visibility callback
+
+**Features:**
+- Text input area
+- "Submit" checkbox (appends Enter key)
+- Cmd+Enter shortcut to send
+- Works with both embedded PTY and kitty terminals
+
+### `RenameWorkChainDialog`
+
+Modal for renaming work chains (session groups).
+
+**Props:**
+- `workChainId: string` - Work chain to rename
+- `currentName: string` - Current display name
+- `open: boolean` - Dialog visibility
+- `onOpenChange: (open: boolean) => void` - Visibility callback
+
+**Features:**
+- Text input pre-populated with current name
+- Empty input clears the name (reverts to default)
+- API call to `renameWorkChain()`
+
+---
+
+## Error Handling
+
+### `ErrorBoundary`
+
+**Location:** `components/ErrorBoundary.tsx`
+
+React error boundary to catch and display errors gracefully, preventing app crashes.
+
+**Props:**
+- `children: ReactNode` - Components to wrap
+- `fallback?: ReactNode` - Optional custom error UI
+
+**Features:**
+- Catches JavaScript errors in child component tree
+- Logs error details to console
+- Shows user-friendly error message
+- "Reload" button to recover
+
+**Usage:**
+```tsx
+<ErrorBoundary>
+  <FleetCommand />
+</ErrorBoundary>
+
+// With custom fallback
+<ErrorBoundary fallback={<CustomErrorPage />}>
+  <App />
+</ErrorBoundary>
+```

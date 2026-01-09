@@ -82,7 +82,7 @@ Sessions are displayed grouped by working directory with color-coded status:
 | WORKING | Green | Claude is actively processing |
 | WAITING | Yellow | Waiting for user input |
 | APPROVAL | Orange | Tool use needs user approval |
-| IDLE | Gray | No activity for 5+ minutes |
+| IDLE | Gray | No activity for 10+ minutes |
 
 ---
 
@@ -146,7 +146,7 @@ pnpm --filter @mimesis/daemon db:studio
 
 Opens Drizzle Studio GUI for database inspection and editing.
 
-**Database location:** `~/.mimesis/db.sqlite`
+**Database location:** `~/.mimesis/data.db`
 
 ---
 
