@@ -356,3 +356,34 @@ Added ability to permanently delete sessions from the UI via the actions dropdow
 - User requested ability to clean up duplicate/old sessions
 - No soft-delete needed - sessions can always be re-created by running Claude Code again
 - JSONL files are the source of truth, deleting the file is the clean approach
+
+## Hook Enforcement for Status Files (Jan 2026)
+
+Fixed the issue where Claude ignored status file instructions despite hook system being in place.
+
+**Root cause:** Status hooks (`status-working.py`, `status-stop.py`) used exit code 0 (advisory only). Claude prioritizes user requests over system reminders, so status files were often skipped.
+
+**Solution:** Modified `stop-validator.py` to verify `.claude/status.md` exists and is recent (< 5 minutes old) BEFORE the `stop_hook_active` escape hatch. Now Claude cannot stop without writing a status file.
+
+**Key code change in stop-validator.py:**
+```python
+# Check status file BEFORE stop_hook_active check
+status_ok, status_msg = check_status_file(cwd)
+if not status_ok:
+    print(block_message, file=sys.stderr)
+    sys.exit(2)
+
+# Only THEN allow escape hatch
+if stop_hook_active:
+    sys.exit(0)
+```
+
+**Why this works:**
+- Status check happens before escape hatch, not after
+- Even on second stop attempt, Claude must have fresh status file
+- Enforced at stop time (critical moment) rather than on every prompt
+
+**Files modified:**
+- `~/.claude/hooks/stop-validator.py` - Added `check_status_file()` function
+- `~/.claude/hooks/status-working.py` - Strengthened language (MANDATORY, MUST)
+- `~/.claude/hooks/status-stop.py` - Strengthened language
