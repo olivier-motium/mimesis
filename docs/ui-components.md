@@ -31,7 +31,7 @@ The Fleet Command uses a CSS Grid layout with 4 static zones:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│ COMMAND BAR: [NANO // BANANA // PRO] [ONLINE] [AGENTS: 3/5]   [v2] │
+│ COMMAND BAR: [MIMESIS] [ONLINE] [AGENTS: 3/5]                 [v2] │
 ├──────────────┬─────────────────────────────────────┬────────────────┤
 │ ROSTER       │ VIEWPORT                            │ TACTICAL INTEL │
 │ (Zone A)     │ (Zone B)                            │ (Zone C)       │
@@ -210,7 +210,7 @@ Top header with branding and status.
 - `workingCount: number` - Active sessions
 
 **Displays:**
-- Logo: "NANO // BANANA // PRO"
+- Logo: "MIMESIS"
 - Online indicator (green pulsing dot)
 - Agent count: "AGENTS: X/Y Active"
 - Version badge

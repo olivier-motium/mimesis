@@ -1,25 +1,80 @@
 # Mimesis
 
-A real-time dashboard for monitoring Claude Code sessions across multiple projects. See what Claude is working on, which sessions need approval, and control sessions directly from the UI.
+**Real-time mission control for Claude Code agents.**
+
+Monitor, command, and coordinate multiple Claude Code sessions from a single dashboard. Mimesis transforms session monitoring from passive observation into active fleet operations.
+
+> Think StarCraft for AI agents: persistent terminal as primary instrument, keyboard-driven navigation, cross-agent awareness.
+
+## Fleet Command UI
+
+Mimesis uses a 4-zone "Fleet Command" layout inspired by RTS games:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ MIMESIS                            [Ops] [Focus]    ● 3 ○ 2 │
+├─────────────────────────────────────────────────────────────┤
+│ [All] [Working] [Needs Input] [Idle] [Errors] [Stale]       │
+├────────┬──────────────────────────────────┬─────────────────┤
+│ ROSTER │         DATA TABLE               │ TACTICAL INTEL  │
+│        │  Status │ Goal │ Branch │ Age    │                 │
+│ ● proj │    ●    │ ...  │ main   │ 2m     │ Execution Plan  │
+│ ○ api  │    ○    │ ...  │ feat   │ 5m     │ □ Step 1        │
+│ ◐ cli  │    ◐    │ ...  │ fix    │ 1h     │ ☑ Step 2        │
+│        │                                  │ Modified Files  │
+├────────┴──────────────────────────────────┴─────────────────┤
+│                     TERMINAL DOCK                           │
+│ $ claude --resume abc123                                    │
+├─────────────────────────────────────────────────────────────┤
+│ EVENT TICKER: ● api started │ ○ cli waiting │ ...           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**4 Zones:**
+- **Roster** (left) - High-density agent list with status indicators
+- **Data Table** (center) - Sortable/filterable session grid (TanStack Table)
+- **Tactical Intel** (right) - Execution plan + modified artifacts for selected session
+- **Event Ticker** (bottom) - Cross-agent event stream for fleet awareness
+
+**Dual Mode:**
+- **Ops Mode** - Dense table view with terminal dock below
+- **Focus Mode** - Full-screen terminal for deep work
 
 ## Features
 
-- **Real-time updates** via Durable Streams
-- **Kanban board** showing sessions by status (Working, Needs Approval, Waiting, Idle)
-- **Hook-based status** from `.claude/status.md` files
-- **PR & CI tracking** - see associated PRs and their CI status
-- **Multi-repo support** - sessions grouped by GitHub repository
-- **Kitty terminal integration** - open sessions in terminal, send commands, focus windows
+### Terminal Integration
+- **Embedded xterm.js** - Full terminal in the browser via WebSocket + node-pty
+- **Kitty native support** - Auto-configured remote control for power users
+- **One-click resume** - Click any session to open `claude --resume` instantly
+
+### Real-time Intelligence
+- **Durable Streams** - Live state sync, no polling
+- **XState machine** - Deterministic status detection (working/waiting/idle)
+- **Hook-based status** - Goals and summaries from `.claude/status.md`
+- **Event ticker** - See what's happening across all agents
+
+### Keyboard-First Navigation
+| Key | Action |
+|-----|--------|
+| `↑/↓` | Navigate roster/table |
+| `Enter` | Enter focus mode |
+| `Escape` | Exit focus mode |
+| `A` | Filter: All |
+| `W` | Filter: Working |
+| `I` | Filter: Needs Input |
+| `E` | Filter: Errors |
+| `S` | Filter: Stale |
 
 ## Architecture
 
 ```
 ┌─────────────────┐     ┌─────────────────────────────┐     ┌─────────────────┐
 │  Claude Code    │     │           Daemon            │     │       UI        │
-│   Sessions      │────▶│   (Watcher + API Server)    │────▶│   (React)       │
+│   Sessions      │────▶│   (Watcher + API Server)    │────▶│   (React 19)    │
 │  ~/.claude/     │     │                             │     │                 │
-│   projects/     │     │  Port 4450: Durable Streams │     │  TanStack DB    │
-│                 │     │  Port 4451: Hono REST API   │     │                 │
+│   projects/     │     │  :4450 Durable Streams SSE  │     │  Fleet Command  │
+│                 │     │  :4451 Hono REST API        │     │  4-Zone Layout  │
+│                 │     │  :4452 PTY WebSocket        │     │  xterm.js       │
 └─────────────────┘     └─────────────────────────────┘     └─────────────────┘
                                      │
                                      ▼
@@ -31,60 +86,51 @@ A real-time dashboard for monitoring Claude Code sessions across multiple projec
 
 ### Daemon (`packages/daemon`)
 
-Watches `~/.claude/projects/` for session log changes and:
-- Parses JSONL log files incrementally
-- Derives session status using XState state machine
-- Reads status from `.claude/status.md` hook files
-- Detects git branches and polls for PR/CI status
-- Publishes state updates to Durable Streams
-- Provides REST API for terminal control
+Watches `~/.claude/projects/` for session log changes:
+- Incremental JSONL parsing (tracks byte positions)
+- XState state machine for status detection
+- Reads `.claude/status.md` hook files for goals/summaries
+- Git branch detection
+- Durable Streams publishing
+- REST API for terminal control
+- Embedded PTY server for xterm.js
 
 ### UI (`packages/ui`)
 
-React app using TanStack Router and Radix UI:
-- Subscribes to Durable Streams for real-time updates
-- Groups sessions by GitHub repository
-- Shows session cards with goal, summary, branch/PR info
-- Hover cards with recent output preview
-- Terminal control buttons (Open in Kitty, Send Text, Focus)
+React 19 app with Fleet Command interface:
+- TanStack Router for navigation
+- TanStack Table for data grid
+- shadcn/ui components (Radix primitives + Tailwind)
+- xterm.js for embedded terminals
+- Durable Streams client for real-time updates
 
-## Kitty Terminal Integration
+## Getting Started
 
-The dashboard integrates with [kitty terminal](https://sw.kovidgoyal.net/kitty/) for direct session control.
+```bash
+# Install dependencies
+pnpm install
 
-### Features
+# Start both daemon and UI
+pnpm start
 
-| Action | Description |
-|--------|-------------|
-| **Open in Kitty** | Opens a new tab with `claude --resume <sessionId>` |
-| **Focus Terminal** | Brings the linked kitty window to front |
-| **Send Text** | Types text into the terminal (with optional Enter) |
+# Or run separately:
+pnpm serve  # Daemon (ports 4450, 4451, 4452)
+pnpm dev    # UI dev server
+```
 
-### How It Works
+**Note:** Sessions require `.claude/status.md` files (written by Claude Code hooks) to appear in the dashboard.
 
-1. **Auto-setup**: On first run, the daemon configures kitty for remote control:
-   - Creates `~/.config/kitty/claude-code.conf` with socket-only mode
-   - Adds `include claude-code.conf` to kitty.conf
-   - Sends SIGUSR1 to reload kitty config
+## Daemon Ports
 
-2. **Session linking**: When you click "Open in Kitty":
-   - Creates a new tab with `--var cc_session_id=<sessionId>`
-   - Runs `claude --resume <sessionId> --dangerously-skip-permissions`
-   - Stores the link in SQLite at `~/.mimesis/data.db`
-
-3. **Link recovery**: Kitty window IDs are ephemeral (change on restart). The daemon recovers links using:
-   - Stored window ID (fast path)
-   - `user_vars.cc_session_id` (set via `--var`)
-   - Cmdline search for `--resume <sessionId>`
-
-### Requirements
-
-- [kitty terminal](https://sw.kovidgoyal.net/kitty/) installed and running
-- Socket at `unix:/tmp/kitty-$USER` (auto-configured)
+| Port | Protocol | Purpose |
+|------|----------|---------|
+| 4450 | SSE | Durable Streams (session state sync) |
+| 4451 | HTTP | REST API (terminal control, health) |
+| 4452 | WebSocket | Embedded PTY terminals (xterm.js) |
 
 ## Session Status State Machine
 
-The daemon uses an XState state machine to determine session status:
+The daemon uses XState to derive session status from log events:
 
 ```
                     ┌─────────────────┐
@@ -97,7 +143,6 @@ The daemon uses an XState state machine to determine session status:
 │   approval      │               └────────┬────────┘
 └────────┬────────┘                        │
          │                    ┌────────────┼────────────┐
-         │                    │            │            │
          │              TURN_END    ASSISTANT_   STALE_
          │                    │      TOOL_USE   TIMEOUT
          │                    ▼            │            │
@@ -108,68 +153,47 @@ The daemon uses an XState state machine to determine session status:
           TIMEOUT
 ```
 
-### States
+**Timeout fallbacks** for older Claude Code versions:
+- **5 seconds** - Pending tool → `waiting_for_approval`
+- **60 seconds** - Stale working → `waiting_for_input`
+- **5 minutes** - No activity → `idle`
 
-| State | Description | UI Column |
-|-------|-------------|-----------|
-| `idle` | No activity for 5+ minutes | Idle |
-| `working` | Claude is actively processing | Working |
-| `waiting_for_approval` | Tool use needs user approval | Needs Approval |
-| `waiting_for_input` | Claude finished, waiting for user | Waiting |
+## Kitty Terminal Integration
 
-### Timeout Fallbacks
+Native integration with [kitty terminal](https://sw.kovidgoyal.net/kitty/) for power users who prefer their own terminal.
 
-For older Claude Code versions or sessions without hooks:
-- **5 seconds**: If tool_use pending → `waiting_for_approval`
-- **60 seconds**: If no turn-end marker → `waiting_for_input`
-- **5 minutes**: No activity → `idle`
+**Auto-setup on first run:**
+1. Creates `~/.config/kitty/claude-code.conf` with socket-only remote control
+2. Adds include directive to `kitty.conf`
+3. Sends SIGUSR1 to reload config
 
-## Development
+**Session linking:**
+- "Open in Kitty" creates a new tab with `claude --resume <sessionId>`
+- Links are persisted in SQLite and recovered across kitty restarts
+- Focus, send text, and unlink from the UI
 
-```bash
-# Install dependencies
-pnpm install
+## API Endpoints
 
-# Start both daemon and UI
-pnpm start
-
-# Or run separately:
-pnpm serve  # Start daemon (ports 4450 + 4451)
-pnpm dev    # Start UI dev server
-```
-
-### Daemon Ports
-
-| Port | Protocol | Purpose |
-|------|----------|---------|
-| 4450 | SSE | Durable Streams (session state sync) |
-| 4451 | HTTP | REST API (terminal control, health checks) |
-
-### API Endpoints (Port 4451)
+All endpoints prefixed with `/api/v1` on port 4451:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/kitty/health` | GET | Check kitty socket connectivity |
-| `/kitty/setup` | POST | Trigger manual kitty configuration |
-| `/sessions/:id/open` | POST | Open session in kitty (or focus existing) |
-| `/sessions/:id/focus` | POST | Focus linked terminal window |
+| `/kitty/health` | GET | Kitty socket status |
+| `/kitty/setup` | POST | Manual kitty configuration |
+| `/sessions/:id/open` | POST | Open/focus session in kitty |
+| `/sessions/:id/focus` | POST | Focus linked terminal |
 | `/sessions/:id/send-text` | POST | Send text to terminal |
-| `/sessions/:id/link-terminal` | POST | Link via interactive picker |
-| `/sessions/:id/link-terminal` | DELETE | Unlink terminal |
-
-## Environment Variables
-
-```bash
-# Optional: GitHub PR/CI status (uses gh CLI auth if not set)
-export GITHUB_TOKEN=ghp_...
-```
+| `/sessions/:id/pty` | POST | Create embedded PTY |
+| `/sessions/:id/pty` | GET | Get PTY info |
+| `/sessions/:id/pty` | DELETE | Destroy PTY |
+| `/debug/sessions` | GET | List all sessions |
 
 ## File Locations
 
 | Path | Description |
 |------|-------------|
 | `~/.claude/projects/` | Claude Code session logs (JSONL) |
-| `~/.mimesis/data.db` | SQLite database (terminal links, history) |
+| `~/.mimesis/data.db` | SQLite database (terminal links) |
 | `~/.mimesis/streams/` | Durable Streams persistence |
 | `~/.config/kitty/claude-code.conf` | Kitty remote control config |
 
@@ -177,11 +201,11 @@ export GITHUB_TOKEN=ghp_...
 
 | Document | Description |
 |----------|-------------|
-| [docs/index.md](docs/index.md) | Documentation hub - start here |
+| [docs/index.md](docs/index.md) | Documentation hub |
+| [docs/getting-started.md](docs/getting-started.md) | Setup and first run |
 | [docs/cli-reference.md](docs/cli-reference.md) | CLI commands and flags |
 | [docs/ui-components.md](docs/ui-components.md) | React component guide |
 | [docs/api/daemon-api.md](docs/api/daemon-api.md) | REST API reference |
-| [docs/summarizer.md](docs/summarizer.md) | AI summarization service |
 | [CLAUDE.md](CLAUDE.md) | Claude Code project guidance |
 
 ## Tech Stack
@@ -190,14 +214,16 @@ export GITHUB_TOKEN=ghp_...
 |-----------|------------|
 | Runtime | Node.js 22+ |
 | Package Manager | pnpm |
-| File Watching | chokidar |
+| File Watching | chokidar v5 |
 | State Machine | XState v5 |
 | Streaming | @durable-streams/* |
 | REST API | Hono |
 | Database | SQLite (better-sqlite3) + Drizzle ORM |
 | UI Framework | React 19 |
 | Routing | TanStack Router |
-| UI Components | Radix UI Themes |
+| Tables | TanStack Table v8 |
+| UI Components | shadcn/ui + Tailwind CSS v4 |
+| Terminal | xterm.js + node-pty |
 
 ## Credits
 
