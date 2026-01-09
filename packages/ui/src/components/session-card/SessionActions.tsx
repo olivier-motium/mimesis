@@ -1,17 +1,34 @@
 /**
  * Session action menu for terminal control
+ *
+ * Provides unified access to:
+ * - Embedded terminal (primary)
+ * - Kitty terminal (secondary submenu)
+ * - Send message (works for both)
  */
 
 import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { DropdownMenu, IconButton } from "@radix-ui/themes";
 import { DotsVerticalIcon } from "@radix-ui/react-icons";
 import * as api from "../../lib/api";
 import type { SessionActionsProps } from "./types";
 
 export function SessionActions({ session, onSendText }: SessionActionsProps) {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
-  const handleFocus = async (e: React.MouseEvent) => {
+  // Open embedded terminal (primary action)
+  const handleOpenTerminal = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigate({
+      to: "/session/$sessionId/terminal",
+      params: { sessionId: session.sessionId },
+    });
+  };
+
+  // Kitty: Focus linked terminal
+  const handleKittyFocus = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setLoading(true);
     try {
@@ -23,7 +40,8 @@ export function SessionActions({ session, onSendText }: SessionActionsProps) {
     }
   };
 
-  const handleOpen = async (e: React.MouseEvent) => {
+  // Kitty: Open in new tab
+  const handleKittyOpen = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setLoading(true);
     try {
@@ -35,7 +53,8 @@ export function SessionActions({ session, onSendText }: SessionActionsProps) {
     }
   };
 
-  const handleLink = async (e: React.MouseEvent) => {
+  // Kitty: Link existing terminal
+  const handleKittyLink = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setLoading(true);
     try {
@@ -47,7 +66,8 @@ export function SessionActions({ session, onSendText }: SessionActionsProps) {
     }
   };
 
-  const handleUnlink = async (e: React.MouseEvent) => {
+  // Kitty: Unlink terminal
+  const handleKittyUnlink = async (e: React.MouseEvent) => {
     e.stopPropagation();
     setLoading(true);
     try {
@@ -59,6 +79,7 @@ export function SessionActions({ session, onSendText }: SessionActionsProps) {
     }
   };
 
+  // Send text (works for both embedded and kitty)
   const handleSendText = (e: React.MouseEvent) => {
     e.stopPropagation();
     onSendText?.();
@@ -76,30 +97,44 @@ export function SessionActions({ session, onSendText }: SessionActionsProps) {
           <DotsVerticalIcon />
         </IconButton>
       </DropdownMenu.Trigger>
-      <DropdownMenu.Content>
-        {session.terminalLink ? (
-          <>
-            <DropdownMenu.Item onClick={handleFocus}>
-              Focus terminal
-            </DropdownMenu.Item>
-            <DropdownMenu.Item onClick={handleSendText}>
-              Send message...
-            </DropdownMenu.Item>
-            <DropdownMenu.Separator />
-            <DropdownMenu.Item color="red" onClick={handleUnlink}>
-              Unlink terminal
-            </DropdownMenu.Item>
-          </>
-        ) : (
-          <>
-            <DropdownMenu.Item onClick={handleOpen}>
-              Open in kitty
-            </DropdownMenu.Item>
-            <DropdownMenu.Item onClick={handleLink}>
-              Link existing terminal...
-            </DropdownMenu.Item>
-          </>
-        )}
+      <DropdownMenu.Content onClick={(e) => e.stopPropagation()}>
+        {/* Primary: Open embedded terminal */}
+        <DropdownMenu.Item onClick={handleOpenTerminal}>
+          Open terminal
+        </DropdownMenu.Item>
+
+        {/* Kitty submenu */}
+        <DropdownMenu.Sub>
+          <DropdownMenu.SubTrigger>Kitty...</DropdownMenu.SubTrigger>
+          <DropdownMenu.SubContent>
+            {session.terminalLink ? (
+              <>
+                <DropdownMenu.Item onClick={handleKittyFocus}>
+                  Focus kitty window
+                </DropdownMenu.Item>
+                <DropdownMenu.Separator />
+                <DropdownMenu.Item color="red" onClick={handleKittyUnlink}>
+                  Unlink kitty
+                </DropdownMenu.Item>
+              </>
+            ) : (
+              <>
+                <DropdownMenu.Item onClick={handleKittyOpen}>
+                  Open in kitty
+                </DropdownMenu.Item>
+                <DropdownMenu.Item onClick={handleKittyLink}>
+                  Link existing kitty window...
+                </DropdownMenu.Item>
+              </>
+            )}
+          </DropdownMenu.SubContent>
+        </DropdownMenu.Sub>
+
+        {/* Send text - works for both */}
+        <DropdownMenu.Separator />
+        <DropdownMenu.Item onClick={handleSendText}>
+          Send message...
+        </DropdownMenu.Item>
       </DropdownMenu.Content>
     </DropdownMenu.Root>
   );

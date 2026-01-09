@@ -6,6 +6,7 @@ import type { KittyRc } from "../kitty-rc.js";
 import type { TerminalLinkRepo } from "../db/terminal-link-repo.js";
 import type { StreamServer } from "../server.js";
 import type { SessionState } from "../watcher.js";
+import type { PtyManager } from "../pty/index.js";
 
 export interface RouterDependencies {
   kittyRc: KittyRc;
@@ -13,4 +14,5 @@ export interface RouterDependencies {
   streamServer: StreamServer;
   getSession: (id: string) => SessionState | undefined;
   getAllSessions?: () => Map<string, SessionState>;
+  ptyManager?: PtyManager;
 }

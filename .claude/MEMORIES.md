@@ -106,6 +106,25 @@ This approach was chosen over:
 - Direct kitty.conf modification: Risky, could break user config
 - --override flags: Only work for terminal-launched kitty
 
+### Embedded Terminals (Port 4452)
+Browser-embedded xterm.js terminals via WebSocket + node-pty. Architecture decision: separate from kitty integration (not replacement).
+
+**Why WebSocket over SSE:**
+- Bidirectional: Terminal I/O requires both input and output streams
+- Low latency: Critical for interactive terminal experience
+- Separate port: Cannot share Durable Streams port (bound by DurableStreamTestServer)
+
+**Why complement kitty (not replace):**
+- Embedded: Quick interactions from UI, always available
+- Kitty: Power users who prefer native terminal, persistent sessions across browser tabs
+
+**Security model:**
+- Localhost-only binding (127.0.0.1)
+- Per-PTY token auth (UUID generated on create, required for WS upgrade)
+- Session-scoped: Only spawns `claude --resume <sessionId>`
+
+**Idle cleanup:** PTYs without active WS clients cleaned up after 30 min (PTY_IDLE_TIMEOUT_MS).
+
 ### Session Resume via Kitty
 "Open in kitty" runs `claude --resume <sessionId> --dangerously-skip-permissions`:
 - `--resume` continues the exact Claude Code session from its log file

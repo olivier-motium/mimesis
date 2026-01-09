@@ -164,11 +164,28 @@ export function createSessionRoutes(deps: RouterDependencies): Hono {
     return c.json({ success: true });
   });
 
-  // Send text to terminal (with recovery)
+  // Send text to terminal (supports both embedded PTY and kitty)
   router.post("/sessions/:id/send-text", async (c) => {
     const sessionId = c.req.param("id");
     const body = await c.req.json<{ text: string; submit: boolean }>();
 
+    // Try embedded PTY first (if active)
+    const { ptyManager } = deps;
+    if (ptyManager) {
+      const ptySession = ptyManager.getPtyBySessionId(sessionId);
+      if (ptySession && ptySession.clients.size > 0) {
+        // PTY has active clients - send text there
+        const textToSend = body.text + (body.submit ? "\n" : "");
+        const success = ptyManager.write(ptySession.id, textToSend);
+        if (success) {
+          // Log to command history
+          logCommand(sessionId, null, body.text, body.submit);
+          return c.json({ success: true, target: "embedded" });
+        }
+      }
+    }
+
+    // Fall back to kitty
     const link = linkRepo.get(sessionId);
     if (!link) {
       return c.json({ error: "No terminal linked" }, 404);
@@ -193,7 +210,7 @@ export function createSessionRoutes(deps: RouterDependencies): Hono {
     // Log to command history (fire and forget)
     logCommand(sessionId, result.windowId, body.text, body.submit);
 
-    return c.json({ success: true, recovered: result.recovered });
+    return c.json({ success: true, target: "kitty", recovered: result.recovered });
   });
 
   return router;

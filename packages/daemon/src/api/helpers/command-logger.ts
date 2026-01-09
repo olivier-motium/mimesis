@@ -10,7 +10,7 @@ import { getErrorMessage } from "../../utils/type-guards.js";
  */
 export function logCommand(
   sessionId: string,
-  windowId: number,
+  windowId: number | null,
   text: string,
   submitted: boolean
 ): void {
@@ -19,7 +19,7 @@ export function logCommand(
     db.insert(schema.commandHistory)
       .values({
         sessionId,
-        kittyWindowId: windowId,
+        kittyWindowId: windowId ?? 0, // Use 0 for embedded PTY
         command: text,
         sentAt: new Date().toISOString(),
         submitted,

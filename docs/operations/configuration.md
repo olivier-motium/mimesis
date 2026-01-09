@@ -17,6 +17,8 @@ Complete reference for all environment variables and tunable constants.
 | `STREAM_HOST` | `127.0.0.1` | HTTP server bind address |
 | `PORT` | `4450` | Stream server port |
 | `API_PORT` | `4451` | API server port for terminal control |
+| `PTY_WS_HOST` | `127.0.0.1` | PTY WebSocket server bind address |
+| `PTY_WS_PORT` | `4452` | PTY WebSocket server port |
 | `MAX_AGE_HOURS` | `24` | Filter sessions older than this |
 | `GITHUB_TOKEN` | gh CLI auth | GitHub API for PR/CI status |
 | `KITTY_SOCKET` | `unix:/tmp/claude-cc-kitty` | Kitty remote control socket |
@@ -88,6 +90,16 @@ These constants are defined in `packages/daemon/src/config.ts` and affect daemon
 | `KITTY_COMMAND_TIMEOUT_MS` | 5 seconds | Timeout for kitty commands |
 | `API_PORT` | `4451` | Port for terminal control API |
 | `API_PREFIX` | `/api` | URL prefix for API endpoints |
+
+### Embedded PTY Server
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `PTY_WS_HOST` | `127.0.0.1` | WebSocket server bind address |
+| `PTY_WS_PORT` | `4452` | WebSocket server port |
+| `PTY_IDLE_TIMEOUT_MS` | 30 minutes | Cleanup inactive PTYs |
+| `PTY_DEFAULT_COLS` | `120` | Default terminal width |
+| `PTY_DEFAULT_ROWS` | `40` | Default terminal height |
 
 ---
 

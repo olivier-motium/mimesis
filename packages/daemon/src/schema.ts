@@ -38,13 +38,22 @@ export const PRInfoSchema = z.object({
 });
 export type PRInfo = z.infer<typeof PRInfoSchema>;
 
-// Terminal link info
+// Terminal link info (kitty)
 export const TerminalLinkSchema = z.object({
   kittyWindowId: z.number(),
   linkedAt: z.string(), // ISO timestamp
   stale: z.boolean(),
 });
 export type TerminalLink = z.infer<typeof TerminalLinkSchema>;
+
+// Embedded PTY info
+export const EmbeddedPtySchema = z.object({
+  ptyId: z.string(),
+  wsUrl: z.string(),
+  connectedAt: z.string(), // ISO timestamp
+  active: z.boolean(),
+});
+export type EmbeddedPty = z.infer<typeof EmbeddedPtySchema>;
 
 // File-based status (from .claude/status.md)
 export const FileStatusValueSchema = z.enum([
@@ -86,6 +95,7 @@ export const SessionSchema = z.object({
   recentOutput: z.array(RecentOutputSchema), // Last few messages for live view
   pr: PRInfoSchema.nullable(), // Associated PR if branch has one
   terminalLink: TerminalLinkSchema.nullable(), // Linked kitty terminal window
+  embeddedPty: EmbeddedPtySchema.nullable(), // Embedded PTY terminal
   fileStatus: FileStatusSchema.nullable(), // File-based status from .claude/status.md
 });
 export type Session = z.infer<typeof SessionSchema>;

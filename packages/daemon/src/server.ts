@@ -187,6 +187,7 @@ export class StreamServer {
       pr,
       terminalLink,
       fileStatus,
+      embeddedPty: null,
     };
 
     // Create the event using the schema helpers
@@ -251,6 +252,7 @@ export class StreamServer {
       pr,
       terminalLink,
       fileStatus,
+      embeddedPty: null,
     };
 
     const event = sessionsStateSchema.sessions.update({ value: session });
@@ -305,6 +307,7 @@ export class StreamServer {
       pr,
       terminalLink,
       fileStatus,
+      embeddedPty: null,
     };
 
     const event = sessionsStateSchema.sessions.update({ value: session });
@@ -361,6 +364,7 @@ export class StreamServer {
       pr,
       terminalLink,
       fileStatus,
+      embeddedPty: null,
     };
 
     const event = sessionsStateSchema.sessions.update({ value: session });

@@ -1,3 +1,6 @@
+/* Import xterm.js styles */
+@import "@xterm/xterm/css/xterm.css";
+
 :root {
   font-synthesis: none;
   text-rendering: optimizeLegibility;

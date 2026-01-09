@@ -2,6 +2,7 @@
  * Main card body content
  */
 
+import { useNavigate } from "@tanstack/react-router";
 import { Card, Flex, Text, Code, Badge } from "@radix-ui/themes";
 import { SessionActions } from "./SessionActions";
 import { toolIcons } from "./constants";
@@ -9,11 +10,24 @@ import { getCardClass, formatTimeAgo, formatTarget, getCIStatusIcon, getCIStatus
 import type { SessionCardContentProps } from "./types";
 
 export function SessionCardContent({ session, onSendText }: SessionCardContentProps) {
+  const navigate = useNavigate();
   const { pendingTool } = session;
   const dirPath = session.cwd.replace(/^\/Users\/[^/]+/, "~");
 
+  const handleClick = () => {
+    navigate({
+      to: "/session/$sessionId/terminal",
+      params: { sessionId: session.sessionId },
+    });
+  };
+
   return (
-    <Card size="2" className={getCardClass(session)} style={{ cursor: "pointer" }}>
+    <Card
+      size="2"
+      className={getCardClass(session)}
+      style={{ cursor: "pointer" }}
+      onClick={handleClick}
+    >
       <Flex direction="column" gap="2">
         {/* Header: directory, terminal status, time, and actions */}
         <Flex justify="between" align="center">

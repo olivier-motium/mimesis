@@ -111,3 +111,61 @@ export async function sendText(
     body: JSON.stringify({ text, submit }),
   });
 }
+
+// =============================================================================
+// PTY (Embedded Terminal) API
+// =============================================================================
+
+/** PTY session info returned from API */
+export interface PtyInfo {
+  ptyId: string;
+  wsUrl: string;
+  wsToken: string;
+  active: boolean;
+  connectedClients: number;
+}
+
+/**
+ * Create a PTY session for embedded terminal.
+ */
+export async function createPty(
+  sessionId: string,
+  options?: { cols?: number; rows?: number }
+): Promise<PtyInfo> {
+  return apiCall(`/sessions/${sessionId}/pty`, {
+    method: "POST",
+    body: options ? JSON.stringify(options) : undefined,
+  });
+}
+
+/**
+ * Get existing PTY info for a session.
+ */
+export async function getPty(sessionId: string): Promise<PtyInfo | null> {
+  try {
+    return await apiCall(`/sessions/${sessionId}/pty`);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Destroy a PTY session.
+ */
+export async function destroyPty(sessionId: string): Promise<ApiResponse> {
+  return apiCall(`/sessions/${sessionId}/pty`, { method: "DELETE" });
+}
+
+/**
+ * Resize a PTY session.
+ */
+export async function resizePty(
+  sessionId: string,
+  cols: number,
+  rows: number
+): Promise<ApiResponse> {
+  return apiCall(`/sessions/${sessionId}/pty/resize`, {
+    method: "POST",
+    body: JSON.stringify({ cols, rows }),
+  });
+}

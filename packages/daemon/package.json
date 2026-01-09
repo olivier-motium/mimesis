@@ -29,10 +29,13 @@
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.45.1",
     "hono": "^4.11.3",
+    "node-pty": "^1.0.0",
+    "ws": "^8.18.0",
     "zod": "^4.3.5"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13",
+    "@types/ws": "^8.5.10",
     "@types/node": "^22.10.0",
     "drizzle-kit": "^0.31.8",
     "tsx": "^4.19.0",

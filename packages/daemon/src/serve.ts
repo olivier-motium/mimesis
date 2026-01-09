@@ -27,7 +27,7 @@ import { Hono } from "hono";
 import { SessionWatcher, type SessionEvent, type SessionState } from "./watcher.js";
 import { StreamServer } from "./server.js";
 import { formatStatus } from "./status.js";
-import { STREAM_PORT, STREAM_HOST, API_PORT, API_PREFIX, MAX_AGE_HOURS, MAX_AGE_MS } from "./config.js";
+import { STREAM_PORT, STREAM_HOST, API_PORT, API_PREFIX, MAX_AGE_HOURS, MAX_AGE_MS, PTY_WS_HOST, PTY_WS_PORT } from "./config.js";
 import { colors } from "./utils/colors.js";
 import { createApiRouter } from "./api/router.js";
 import { KittyRc } from "./kitty-rc.js";
@@ -35,6 +35,7 @@ import { TerminalLinkRepo } from "./db/terminal-link-repo.js";
 import { closeDb } from "./db/index.js";
 import { setupKitty, getKittyStatus } from "./kitty-setup.js";
 import { getErrorMessage } from "./utils/type-guards.js";
+import { PtyManager, createPtyWsServer, closePtyWsServer } from "./pty/index.js";
 
 // Validate required environment variables at startup
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -78,6 +79,14 @@ async function main(): Promise<void> {
   const kittyRc = new KittyRc();
   const linkRepo = new TerminalLinkRepo();
 
+  // Initialize PTY manager and WebSocket server for embedded terminals
+  const ptyManager = new PtyManager();
+  const ptyWsServer = createPtyWsServer({
+    ptyManager,
+    host: PTY_WS_HOST,
+    port: PTY_WS_PORT,
+  });
+
   // Auto-setup kitty remote control if needed
   const kittyStatus = await getKittyStatus();
 
@@ -112,6 +121,7 @@ async function main(): Promise<void> {
       kittyRc,
       linkRepo,
       streamServer,
+      ptyManager,
       getSession: (id) => watcher.getSessions().get(id),
       getAllSessions: () => watcher.getSessions(),
     })
@@ -183,6 +193,8 @@ async function main(): Promise<void> {
     try {
       watcher.stop();
       apiServer.close();
+      ptyManager.destroyAll();
+      await closePtyWsServer(ptyWsServer);
       closeDb();
       await streamServer.stop();
     } finally {
