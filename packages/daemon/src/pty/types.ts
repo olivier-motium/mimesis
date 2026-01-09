@@ -12,6 +12,8 @@ export interface PtySession {
   id: string;
   /** Claude Code session ID this PTY is attached to */
   sessionId: string;
+  /** Stable tab ID for segment tracking (injected as COMMAND_CENTER_TAB_ID) */
+  tabId?: string;
   /** PTY process PID */
   pid: number;
   /** Working directory */
@@ -44,6 +46,8 @@ export interface CreatePtyOptions {
   cols?: number;
   /** Terminal rows (optional, uses default if not provided) */
   rows?: number;
+  /** Stable tab ID for segment tracking (injected as COMMAND_CENTER_TAB_ID) */
+  tabId?: string;
 }
 
 /**

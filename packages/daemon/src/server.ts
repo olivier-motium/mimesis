@@ -48,12 +48,18 @@ export class StreamServer {
   private sessionCreatedAt = new Map<string, string>();
   // Track work chain IDs (persists across compaction)
   private sessionWorkChainId = new Map<string, string>();
+  // Track work chain names (user-defined, persists across compaction)
+  private workChainNames = new Map<string, string>();
+  // Track compaction counts per work chain
+  private workChainCompactionCounts = new Map<string, number>();
   // Terminal link repository for lookups
   private linkRepo: TerminalLinkRepo;
   // Status watcher for .claude/status.md files
   private statusWatcher: StatusWatcher;
   // Compaction watcher for session supersession
   private compactionWatcher: CompactionWatcher;
+  // Pending status updates for sessions not yet in cache (race condition fix)
+  private pendingStatusUpdates = new Map<string, { cwd: string; status: FileStatus | null }>();
   // Flag to prevent race conditions during shutdown
   private stopping = false;
   // Flag to pause publishing (for stream reset)
@@ -92,6 +98,10 @@ export class StreamServer {
         if (sessionState) {
           console.log(`[STATUS] Session status update for ${sessionId.slice(0, 8)}: ${status?.status ?? "null"}`);
           await this.publishSessionWithFileStatus(sessionState, status);
+        } else {
+          // Session not in cache yet - queue for later (race condition fix)
+          console.log(`[STATUS] Queuing update for unknown session ${sessionId.slice(0, 8)} (will apply when session discovered)`);
+          this.pendingStatusUpdates.set(sessionId, { cwd, status });
         }
       }
     });
@@ -266,6 +276,11 @@ export class StreamServer {
     // Get createdAt from cache or use lastActivityAt as fallback
     const createdAt = this.sessionCreatedAt.get(sessionState.sessionId) ?? sessionState.status.lastActivityAt;
 
+    // Get work chain info
+    const workChainId = this.getOrCreateWorkChainId(sessionState.sessionId);
+    const workChainName = this.workChainNames.get(workChainId) ?? null;
+    const compactionCount = this.workChainCompactionCounts.get(workChainId) ?? 0;
+
     return {
       sessionId: sessionState.sessionId,
       cwd: sessionState.cwd,
@@ -286,7 +301,9 @@ export class StreamServer {
       fileStatus,
       embeddedPty: null,
       // Work chain tracking - inherit from cache or generate new
-      workChainId: this.getOrCreateWorkChainId(sessionState.sessionId),
+      workChainId,
+      workChainName,
+      compactionCount,
       // Supersession fields - defaults, will be updated by handleCompaction
       superseded: false,
       supersededBy: null,
@@ -315,6 +332,20 @@ export class StreamServer {
     // Start watching for status and compaction markers
     this.statusWatcher.watchProject(sessionState.cwd);
     this.compactionWatcher.watchProject(sessionState.cwd);
+
+    // Check for pending status updates (race condition fix)
+    const pendingStatus = this.pendingStatusUpdates.get(sessionState.sessionId);
+    if (pendingStatus) {
+      console.log(`[STATUS] Applying queued status update for ${sessionState.sessionId.slice(0, 8)}`);
+      this.pendingStatusUpdates.delete(sessionState.sessionId);
+      // Use the pending status when building the session
+      const session = await this.buildSession(sessionState, { fileStatus: pendingStatus.status });
+      const event = operation === "insert"
+        ? sessionsStateSchema.sessions.insert({ value: session })
+        : sessionsStateSchema.sessions.update({ value: session });
+      await this.stream.append(event);
+      return;
+    }
 
     const session = await this.buildSession(sessionState);
 
@@ -359,6 +390,43 @@ export class StreamServer {
     const session = await this.buildSession(sessionState, { terminalLink });
     const event = sessionsStateSchema.sessions.update({ value: session });
     await this.stream.append(event);
+  }
+
+  // ===========================================================================
+  // Public: Work Chain Management
+  // ===========================================================================
+
+  /**
+   * Rename a work chain (user-defined name for session continuity).
+   * Returns the sessionId of the updated session, or null if not found.
+   */
+  async renameWorkChain(workChainId: string, name: string | null): Promise<string | null> {
+    if (this.stopping || this.paused || !this.stream) return null;
+
+    // Store the name by work chain ID
+    if (name) {
+      this.workChainNames.set(workChainId, name);
+    } else {
+      this.workChainNames.delete(workChainId);
+    }
+
+    console.log(`[WORKCHAIN] Renamed ${workChainId.slice(0, 8)} to "${name ?? "(cleared)"}"`);
+
+    // Find the active session in this work chain and republish it
+    for (const [sessionId, sessionState] of this.sessionCache) {
+      const chainId = this.sessionWorkChainId.get(sessionId);
+      if (chainId === workChainId) {
+        const session = await this.buildSession(sessionState);
+        // Only republish the non-superseded session (the active one in the chain)
+        if (!session.superseded) {
+          const event = sessionsStateSchema.sessions.update({ value: session });
+          await this.stream.append(event);
+          return sessionId;
+        }
+      }
+    }
+
+    return null;
   }
 
   // ===========================================================================
@@ -421,6 +489,11 @@ export class StreamServer {
     if (predecessorWorkChainId) {
       this.setWorkChainId(newSessionId, predecessorWorkChainId);
       console.log(`[COMPACTION] Inherited workChainId ${predecessorWorkChainId.slice(0, 8)} to new session`);
+
+      // Increment compaction count for this work chain
+      const currentCount = this.workChainCompactionCounts.get(predecessorWorkChainId) ?? 0;
+      this.workChainCompactionCounts.set(predecessorWorkChainId, currentCount + 1);
+      console.log(`[COMPACTION] Incremented compaction count to ${currentCount + 1}`);
     }
 
     // Inherit terminal link from predecessor (if user was in Kitty)

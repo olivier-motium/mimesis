@@ -41,9 +41,10 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
   // Count active sessions for CommandBar
   const workingCount = statusCounts.working;
 
-  // Get selected session object
+  // Get selected session object by workChainId (or sessionId for non-compacted sessions)
+  // This ensures selection persists across compaction events
   const selectedSession = useMemo(
-    () => sessions.find((s) => s.sessionId === selectedSessionId) ?? null,
+    () => sessions.find((s) => (s.workChainId ?? s.sessionId) === selectedSessionId) ?? null,
     [sessions, selectedSessionId]
   );
 
@@ -85,8 +86,11 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
         return;
       }
 
+      // Helper to get work chain ID for a session
+      const getChainId = (s: typeof sessions[0]) => s.workChainId ?? s.sessionId;
+
       const currentIndex = sessions.findIndex(
-        (s) => s.sessionId === selectedSessionId
+        (s) => getChainId(s) === selectedSessionId
       );
 
       switch (e.key) {
@@ -94,9 +98,9 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
           e.preventDefault();
           if (sessions.length === 0) return;
           if (currentIndex <= 0) {
-            setSelectedSessionId(sessions[sessions.length - 1].sessionId);
+            setSelectedSessionId(getChainId(sessions[sessions.length - 1]));
           } else {
-            setSelectedSessionId(sessions[currentIndex - 1].sessionId);
+            setSelectedSessionId(getChainId(sessions[currentIndex - 1]));
           }
           break;
         }
@@ -104,9 +108,9 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
           e.preventDefault();
           if (sessions.length === 0) return;
           if (currentIndex < 0 || currentIndex >= sessions.length - 1) {
-            setSelectedSessionId(sessions[0].sessionId);
+            setSelectedSessionId(getChainId(sessions[0]));
           } else {
-            setSelectedSessionId(sessions[currentIndex + 1].sessionId);
+            setSelectedSessionId(getChainId(sessions[currentIndex + 1]));
           }
           break;
         }
@@ -216,7 +220,7 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
           />
         </div>
       ) : (
-        <Viewport session={selectedSession} onSendCommand={handleSendCommand} onSelectSession={handleSelectSession} />
+        <Viewport session={selectedSession} onSendCommand={handleSendCommand} />
       )}
 
       {/* Right: Tactical Intel */}

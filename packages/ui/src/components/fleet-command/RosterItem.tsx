@@ -39,7 +39,14 @@ export function RosterItem({ session, isSelected, onSelect }: RosterItemProps) {
       }}
     >
       <div className="fleet-roster-item__header">
-        <span className="fleet-roster-item__name">{getAgentName(session)}</span>
+        <span className="fleet-roster-item__name">
+          {session.workChainName || getAgentName(session)}
+          {session.compactionCount > 0 && (
+            <span className="fleet-roster-item__compaction-badge" title={`Compacted ${session.compactionCount} time${session.compactionCount === 1 ? "" : "s"}`}>
+              ↻{session.compactionCount}
+            </span>
+          )}
+        </span>
         <Activity size={12} className={`fleet-roster-item__status ${getStatusClass()}`} />
       </div>
 

@@ -7,6 +7,7 @@ import type { TerminalLinkRepo } from "../db/terminal-link-repo.js";
 import type { StreamServer } from "../server.js";
 import type { SessionState } from "../watcher.js";
 import type { PtyManager } from "../pty/index.js";
+import type { TabManager } from "../tab-manager.js";
 
 export interface RouterDependencies {
   kittyRc: KittyRc;
@@ -16,4 +17,5 @@ export interface RouterDependencies {
   getAllSessions?: () => Map<string, SessionState>;
   deleteSession?: (id: string) => boolean;
   ptyManager?: PtyManager;
+  tabManager?: TabManager;
 }

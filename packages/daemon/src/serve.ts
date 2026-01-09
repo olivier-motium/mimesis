@@ -38,6 +38,7 @@ import { closeDb } from "./db/index.js";
 import { setupKitty, getKittyStatus } from "./kitty-setup.js";
 import { getErrorMessage } from "./utils/type-guards.js";
 import { PtyManager, createPtyWsServer, closePtyWsServer } from "./pty/index.js";
+import { tabManager } from "./tab-manager.js";
 
 // Validate required environment variables at startup
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -220,6 +221,7 @@ async function main(): Promise<void> {
       linkRepo,
       streamServer,
       ptyManager,
+      tabManager,
       getSession: (id) => watcher.getSessions().get(id),
       getAllSessions: () => watcher.getSessions(),
       deleteSession: (id) => watcher.deleteSession(id),

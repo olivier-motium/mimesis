@@ -80,6 +80,8 @@ export const SessionSchema = z.object({
   fileStatus: FileStatusSchema.nullable(), // File-based status from .claude/status.md
   // Work chain tracking (for compaction)
   workChainId: z.string().nullable(), // UUID identifying the work chain this session belongs to
+  workChainName: z.string().nullable(), // User-defined name for the work chain
+  compactionCount: z.number(), // How many times this work chain has been compacted (0 = never)
   // Supersession tracking (for compaction)
   superseded: z.boolean(), // Whether this session has been superseded by a compacted session
   supersededBy: z.string().nullable(), // Session ID that superseded this one
@@ -95,6 +97,62 @@ export const sessionsStateSchema = createStateSchema({
     primaryKey: "sessionId",
   },
 });
+
+// =============================================================================
+// SEGMENT ROTATION ARCHITECTURE
+// =============================================================================
+// These types support the "kitty effect" where compaction rotates sessions
+// within a stable UI tab rather than creating new tabs.
+// Core concept: Tab → Segments (1:many) instead of Tab → Session (1:1)
+
+/** Reason why a segment was created */
+export const SegmentReasonSchema = z.enum([
+  "startup",  // New terminal tab, first session
+  "resume",   // Resumed from explicit --resume
+  "compact",  // Created from compaction
+  "clear",    // Created from /clear
+]);
+export type SegmentReason = z.infer<typeof SegmentReasonSchema>;
+
+/** Trigger for compaction */
+export const CompactTriggerSchema = z.enum(["auto", "manual"]);
+export type CompactTrigger = z.infer<typeof CompactTriggerSchema>;
+
+/** One segment of work within a tab (one Claude session) */
+export const ClaudeSegmentSchema = z.object({
+  sessionId: z.string(),
+  transcriptPath: z.string(),
+  startedAt: z.string(),      // ISO timestamp
+  endedAt: z.string().optional(),  // Set when compacted/ended
+  reason: SegmentReasonSchema,
+  trigger: CompactTriggerSchema.optional(),  // For compact events
+});
+export type ClaudeSegment = z.infer<typeof ClaudeSegmentSchema>;
+
+/** Stable UI tab that persists across compactions */
+export const TerminalTabSchema = z.object({
+  tabId: z.string(),              // Stable, UI-generated UUID
+  ptyId: z.string().optional(),   // Runtime PTY ID (if active)
+  repoRoot: z.string(),
+  segments: z.array(ClaudeSegmentSchema),  // Append-only chain
+  activeSegmentIndex: z.number(), // Points to current segment (-1 if none)
+  createdAt: z.string(),          // ISO timestamp
+  lastActivityAt: z.string(),     // ISO timestamp
+});
+export type TerminalTab = z.infer<typeof TerminalTabSchema>;
+
+/** Hook event payload from emit-hook-event.py */
+export const HookEventPayloadSchema = z.object({
+  hook_event_name: z.string(),
+  session_id: z.string().optional(),
+  transcript_path: z.string().optional(),
+  source: z.string().optional(),
+  trigger: z.string().optional(),
+  command_center_tab_id: z.string().nullable(),
+  command_center_task_id: z.string().nullable(),
+  cwd: z.string().optional(),
+});
+export type HookEventPayload = z.infer<typeof HookEventPayloadSchema>;
 
 // Re-export tool registry for UI consumption
 export {

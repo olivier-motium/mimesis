@@ -12,23 +12,20 @@ import { getEffectiveStatus } from "../../lib/sessionStatus";
 import { getGoalText, STATUS_LABELS } from "./constants";
 import type { ViewportProps } from "./types";
 
-export function Viewport({ session, onSendCommand, onSelectSession }: ViewportProps) {
+export function Viewport({ session, onSendCommand }: ViewportProps) {
   const [ptyInfo, setPtyInfo] = useState<PtyInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [inputValue, setInputValue] = useState("");
 
-  // Track which session we've initialized
+  // Track which session we've initialized (by sessionId, not workChainId)
+  // This allows PTY to reconnect seamlessly when compaction changes the sessionId
   const initializedSessionRef = useRef<string | null>(null);
 
-  // Detect when session is superseded and auto-switch to successor
-  useEffect(() => {
-    if (session?.superseded && session.supersededBy && onSelectSession) {
-      console.log(`[Viewport] Session ${session.sessionId.slice(0, 8)} superseded, switching to ${session.supersededBy.slice(0, 8)}`);
-      onSelectSession(session.supersededBy);
-    }
-  }, [session?.superseded, session?.supersededBy, session?.sessionId, onSelectSession]);
+  // Track retry attempts
+  const retryCountRef = useRef(0);
+  const maxRetries = 3;
 
   // Initialize PTY when session changes
   const initializePty = useCallback(async (sessionId: string) => {
@@ -44,10 +41,26 @@ export function Viewport({ session, onSendCommand, onSelectSession }: ViewportPr
       // Single API call - daemon handles get-or-create
       const info = await ensurePty(sessionId);
       setPtyInfo(info);
+      retryCountRef.current = 0; // Reset retry count on success
     } catch (err) {
-      console.error("[Viewport] Failed to initialize PTY:", err);
-      setError(err instanceof Error ? err.message : "Failed to create terminal");
+      const errorMessage = err instanceof Error ? err.message : "Failed to create terminal";
+      console.error("[Viewport] Failed to initialize PTY:", errorMessage);
+
+      // Auto-retry on "Session not found" (race condition - session may still be loading)
+      if (errorMessage.includes("Session not found") && retryCountRef.current < maxRetries) {
+        retryCountRef.current++;
+        console.log(`[Viewport] Session not found, retrying (${retryCountRef.current}/${maxRetries})...`);
+        initializedSessionRef.current = null;
+        // Retry after a short delay
+        setTimeout(() => {
+          initializePty(sessionId);
+        }, 1000);
+        return;
+      }
+
+      setError(errorMessage);
       initializedSessionRef.current = null;
+      retryCountRef.current = 0;
     } finally {
       setIsLoading(false);
     }

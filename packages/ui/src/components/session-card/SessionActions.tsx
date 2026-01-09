@@ -21,12 +21,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
+import { RenameWorkChainDialog } from "@/components/RenameWorkChainDialog";
 import * as api from "../../lib/api";
 import type { SessionActionsProps } from "./types";
 
 export function SessionActions({ session, onSendText }: SessionActionsProps) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [renameOpen, setRenameOpen] = useState(false);
 
   /**
    * Factory for async action handlers.
@@ -86,65 +88,86 @@ export function SessionActions({ session, onSendText }: SessionActionsProps) {
     "Delete"
   );
 
+  // Rename work chain (opens dialog)
+  const handleRename = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRenameOpen(true);
+  };
+
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={(e) => e.stopPropagation()}
-          disabled={loading}
-          className="h-7 w-7 opacity-60 hover:opacity-100 transition-opacity"
-        >
-          <MoreVertical className="h-4 w-4" />
-          <span className="sr-only">Actions</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-        {/* Primary: Open embedded terminal */}
-        <DropdownMenuItem onClick={handleOpenTerminal}>
-          Open terminal
-        </DropdownMenuItem>
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={(e) => e.stopPropagation()}
+            disabled={loading}
+            className="h-7 w-7 opacity-60 hover:opacity-100 transition-opacity"
+          >
+            <MoreVertical className="h-4 w-4" />
+            <span className="sr-only">Actions</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+          {/* Primary: Open embedded terminal */}
+          <DropdownMenuItem onClick={handleOpenTerminal}>
+            Open terminal
+          </DropdownMenuItem>
 
-        {/* Kitty submenu */}
-        <DropdownMenuSub>
-          <DropdownMenuSubTrigger>Kitty...</DropdownMenuSubTrigger>
-          <DropdownMenuSubContent>
-            {session.terminalLink ? (
-              <>
-                <DropdownMenuItem onClick={handleKittyFocus}>
-                  Focus kitty window
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive" onClick={handleKittyUnlink}>
-                  Unlink kitty
-                </DropdownMenuItem>
-              </>
-            ) : (
-              <>
-                <DropdownMenuItem onClick={handleKittyOpen}>
-                  Open in kitty
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={handleKittyLink}>
-                  Link existing kitty window...
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuSubContent>
-        </DropdownMenuSub>
+          {/* Kitty submenu */}
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger>Kitty...</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent>
+              {session.terminalLink ? (
+                <>
+                  <DropdownMenuItem onClick={handleKittyFocus}>
+                    Focus kitty window
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem variant="destructive" onClick={handleKittyUnlink}>
+                    Unlink kitty
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <>
+                  <DropdownMenuItem onClick={handleKittyOpen}>
+                    Open in kitty
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleKittyLink}>
+                    Link existing kitty window...
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
 
-        {/* Send text - works for both */}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleSendText}>
-          Send message...
-        </DropdownMenuItem>
+          {/* Send text - works for both */}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleSendText}>
+            Send message...
+          </DropdownMenuItem>
 
-        {/* Danger zone */}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" onClick={handleDelete}>
-          Delete session
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {/* Rename work chain */}
+          <DropdownMenuItem onClick={handleRename}>
+            Rename...
+          </DropdownMenuItem>
+
+          {/* Danger zone */}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive" onClick={handleDelete}>
+            Delete session
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      {/* Rename dialog - outside DropdownMenu for proper portal behavior */}
+      <RenameWorkChainDialog
+        open={renameOpen}
+        onOpenChange={setRenameOpen}
+        workChainId={session.workChainId ?? session.sessionId}
+        currentName={session.workChainName || ""}
+      />
+    </>
   );
 }

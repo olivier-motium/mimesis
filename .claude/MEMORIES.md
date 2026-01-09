@@ -593,3 +593,87 @@ UI filters out superseded sessions
 **Test coverage:**
 - `compaction-watcher.test.ts` - Unit tests for marker file detection
 - `compaction.test.ts` - Integration tests for predecessor selection and work chain inheritance
+
+## Segment Rotation Architecture (Jan 2026)
+
+**Problem:** When Claude Code compacts a session, the UI creates a new tab/view for the new session, breaking the user's mental model of continuous work. Users expect compaction to be invisible - same tab, new underlying file.
+
+**Solution:** "Kitty effect" - segment rotation within a stable UI tab.
+
+**Core concept change:**
+- Before: UI Tab ↔ Claude Session (1:1)
+- After: UI Tab ↔ Claude Segments (1:many)
+
+A "TerminalTab" becomes a **chain of Claude sessions** (segments), not a single session.
+
+**Architecture:**
+```
+UI creates tab (POST /tabs) → gets tabId
+                ↓
+UI spawns PTY with tabId → COMMAND_CENTER_TAB_ID injected into env
+                ↓
+Claude Code hooks fire → emit-hook-event.py reads env var
+                ↓
+Hook POSTs to /hooks endpoint → TabManager appends segment
+                ↓
+UI receives segment rotation event → writes marker to terminal
+```
+
+**New data types (packages/daemon/src/schema.ts):**
+```typescript
+type ClaudeSegment = {
+  sessionId: string;
+  transcriptPath: string;
+  startedAt: string;
+  endedAt?: string;
+  reason: "startup" | "resume" | "compact" | "clear";
+  trigger?: "auto" | "manual";
+};
+
+type TerminalTab = {
+  tabId: string;              // Stable UUID
+  ptyId?: string;             // Runtime PTY ID
+  repoRoot: string;
+  segments: ClaudeSegment[];  // Append-only chain
+  activeSegmentIndex: number;
+  createdAt: string;
+  lastActivityAt: string;
+};
+```
+
+**New modules:**
+- `~/.claude/hooks/emit-hook-event.py` - Bridge script that reads hook JSON from stdin, attaches COMMAND_CENTER_TAB_ID from env, POSTs to daemon
+- `packages/daemon/src/tab-manager.ts` - TabManager class managing tabs and segment chains
+- `packages/daemon/src/api/routes/hooks.ts` - API endpoint receiving hook events
+- `packages/ui/src/hooks/useTabs.ts` - React hook for tab management
+
+**Hook configuration (~/.claude/settings.json):**
+```json
+{
+  "hooks": {
+    "PreCompact": [{ "hooks": [{ "type": "command", "command": "python3 ~/.claude/hooks/emit-hook-event.py" }] }],
+    "SessionStart": [{
+      "matcher": "compact",
+      "hooks": [
+        { "type": "command", "command": "python3 ~/.claude/hooks/emit-hook-event.py" }
+      ]
+    }]
+  }
+}
+```
+
+**PTY environment injection:**
+When creating a PTY via `POST /sessions/:id/pty`, pass `tabId` in the body. The PTY spawns Claude with `COMMAND_CENTER_TAB_ID` in its environment.
+
+**Terminal segment markers:**
+When segment changes, Terminal component writes a visual marker:
+```
+─── Compacted (manual) at 14:30 ───
+```
+
+**Key design decisions:**
+1. Tab ID is ours, not Claude's - stable UUID survives compaction
+2. Segments are append-only - never delete, just close and append
+3. PTY stream is continuous - same WebSocket connection across segments
+4. Hooks fail open - if daemon is down, Claude still works
+5. Backward compatible - existing Session type unchanged, tabs layer on top

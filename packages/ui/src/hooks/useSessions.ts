@@ -41,16 +41,43 @@ export function useSessions() {
   }
 
   // Memoize expensive transformations - only recompute when data changes
+  // Aggregate by work chain: show one session per work chain (the latest non-superseded one)
   const sessions = useMemo(() => {
     if (!query?.data) return [];
 
     // Transform Map to array
     const allSessions = Array.from(query.data.values()) as Session[];
 
-    // Filter out superseded sessions (old sessions that were compacted)
-    // Status file is optional enrichment - sessions are shown regardless
-    // Daemon already filters by MAX_AGE_HOURS (24 hours)
-    return allSessions.filter((s) => !s.superseded);
+    // Group sessions by work chain ID
+    // Each work chain gets one representative session (the active/latest one)
+    const workChains = new Map<string, Session>();
+
+    for (const session of allSessions) {
+      // Use workChainId if available, otherwise sessionId (for sessions that haven't been compacted)
+      const chainId = session.workChainId ?? session.sessionId;
+      const existing = workChains.get(chainId);
+
+      // Keep the non-superseded session, or if both superseded, keep the most recent
+      if (!existing) {
+        workChains.set(chainId, session);
+      } else if (!session.superseded && existing.superseded) {
+        // Prefer non-superseded session
+        workChains.set(chainId, session);
+      } else if (!existing.superseded && session.superseded) {
+        // Keep the non-superseded existing session
+        // (do nothing)
+      } else {
+        // Both same superseded status - keep the most recently active one
+        const existingTime = new Date(existing.lastActivityAt).getTime();
+        const sessionTime = new Date(session.lastActivityAt).getTime();
+        if (sessionTime > existingTime) {
+          workChains.set(chainId, session);
+        }
+      }
+    }
+
+    // Return the representative session for each work chain
+    return Array.from(workChains.values());
   }, [query?.data]);
 
   return {

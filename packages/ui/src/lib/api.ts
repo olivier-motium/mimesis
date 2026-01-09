@@ -106,6 +106,19 @@ export async function deleteSession(sessionId: string): Promise<ApiResponse> {
 }
 
 /**
+ * Rename a work chain (set user-defined name).
+ */
+export async function renameWorkChain(
+  workChainId: string,
+  name: string | null
+): Promise<ApiResponse & { sessionId?: string }> {
+  return apiCall(`/workchains/${workChainId}/name`, {
+    method: "PATCH",
+    body: JSON.stringify({ name }),
+  });
+}
+
+/**
  * Send text to a session's linked terminal.
  */
 export async function sendText(
@@ -134,10 +147,11 @@ export interface PtyInfo {
 
 /**
  * Create a PTY session for embedded terminal.
+ * @param tabId - Optional tab ID for segment tracking (enables "kitty effect")
  */
 export async function createPty(
   sessionId: string,
-  options?: { cols?: number; rows?: number }
+  options?: { cols?: number; rows?: number; tabId?: string }
 ): Promise<PtyInfo> {
   return apiCall(`/sessions/${sessionId}/pty`, {
     method: "POST",
@@ -187,4 +201,67 @@ export async function resizePty(
     method: "POST",
     body: JSON.stringify({ cols, rows }),
   });
+}
+
+// =============================================================================
+// Tab (Segment Rotation) API
+// =============================================================================
+
+/** Segment reason for why a segment was created */
+export type SegmentReason = "startup" | "resume" | "compact" | "clear";
+
+/** Trigger for compaction */
+export type CompactTrigger = "auto" | "manual";
+
+/** One segment of work within a tab (one Claude session) */
+export interface ClaudeSegment {
+  sessionId: string;
+  transcriptPath: string;
+  startedAt: string;
+  endedAt?: string;
+  reason: SegmentReason;
+  trigger?: CompactTrigger;
+}
+
+/** Stable UI tab that persists across compactions */
+export interface TerminalTab {
+  tabId: string;
+  ptyId?: string;
+  repoRoot: string;
+  segments: ClaudeSegment[];
+  activeSegmentIndex: number;
+  createdAt: string;
+  lastActivityAt: string;
+}
+
+/**
+ * Create a new terminal tab.
+ * Returns a stable tab ID to use with PTY creation.
+ */
+export async function createTab(repoRoot: string): Promise<{ tab: TerminalTab }> {
+  return apiCall("/tabs", {
+    method: "POST",
+    body: JSON.stringify({ repoRoot }),
+  });
+}
+
+/**
+ * Get all terminal tabs.
+ */
+export async function getTabs(): Promise<{ tabs: TerminalTab[]; count: number }> {
+  return apiCall("/tabs");
+}
+
+/**
+ * Get a specific terminal tab by ID.
+ */
+export async function getTab(tabId: string): Promise<{ tab: TerminalTab }> {
+  return apiCall(`/tabs/${tabId}`);
+}
+
+/**
+ * Delete a terminal tab.
+ */
+export async function deleteTab(tabId: string): Promise<ApiResponse> {
+  return apiCall(`/tabs/${tabId}`, { method: "DELETE" });
 }

@@ -87,7 +87,8 @@ export function DataTable({
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getRowId: (row) => row.sessionId,
+    // Use workChainId for row identity - persists across compaction
+    getRowId: (row) => row.workChainId ?? row.sessionId,
   })
 
   if (filteredData.length === 0) {
@@ -127,7 +128,7 @@ export function DataTable({
               return (
                 <TableRow
                   key={row.id}
-                  onClick={() => onSelect(row.original.sessionId)}
+                  onClick={() => onSelect(row.original.workChainId ?? row.original.sessionId)}
                   className={cn(
                     "cursor-pointer transition-all duration-150 border-b border-border/50",
                     "hover:bg-accent hover:border-l-2 hover:border-l-muted-foreground/50",

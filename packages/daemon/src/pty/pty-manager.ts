@@ -55,7 +55,7 @@ export class PtyManager {
    * Create a new PTY session for a Claude Code session.
    */
   async createPty(options: CreatePtyOptions): Promise<PtyInfo> {
-    const { sessionId, cwd, command, cols, rows } = options;
+    const { sessionId, cwd, command, cols, rows, tabId } = options;
 
     // Check if PTY already exists for this session
     const existingPtyId = this.sessionToPty.get(sessionId);
@@ -77,21 +77,30 @@ export class PtyManager {
     const shell = command[0];
     const args = command.slice(1);
 
+    // Build environment with optional tab ID for segment tracking
+    const spawnEnv: Record<string, string> = {
+      ...process.env as Record<string, string>,
+      TERM: "xterm-256color",
+      COLORTERM: "truecolor",
+    };
+
+    // Inject COMMAND_CENTER_TAB_ID for hook bridge script
+    if (tabId) {
+      spawnEnv.COMMAND_CENTER_TAB_ID = tabId;
+    }
+
     const proc = pty.spawn(shell, args, {
       name: "xterm-256color",
       cols: termCols,
       rows: termRows,
       cwd,
-      env: {
-        ...process.env,
-        TERM: "xterm-256color",
-        COLORTERM: "truecolor",
-      },
+      env: spawnEnv,
     });
 
     const session: PtySession = {
       id: ptyId,
       sessionId,
+      tabId,
       pid: proc.pid,
       cwd,
       wsToken,

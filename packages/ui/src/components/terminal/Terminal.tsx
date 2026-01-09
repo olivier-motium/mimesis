@@ -17,6 +17,14 @@ const TERMINAL_ERROR_PATTERNS = [
   { pattern: /Error: Could not resume/i, message: "Unable to resume this session" },
 ] as const;
 
+/** Segment info for displaying rotation markers */
+export interface SegmentInfo {
+  sessionId: string;
+  reason: "startup" | "resume" | "compact" | "clear";
+  trigger?: "auto" | "manual";
+  startedAt: string;
+}
+
 export interface TerminalProps {
   /** WebSocket URL for PTY connection */
   wsUrl: string;
@@ -32,6 +40,10 @@ export interface TerminalProps {
   onError?: (error: string) => void;
   /** Called when terminal output contains a known error pattern */
   onTerminalError?: (error: string) => void;
+  /** Current segment info (for segment markers) */
+  segment?: SegmentInfo;
+  /** Called when a segment rotation event is detected */
+  onSegmentRotated?: (segment: SegmentInfo) => void;
 }
 
 interface WsMessage {
@@ -39,6 +51,27 @@ interface WsMessage {
   payload?: string;
   cols?: number;
   rows?: number;
+}
+
+/**
+ * Format a segment marker for display in terminal.
+ */
+function formatSegmentMarker(segment: SegmentInfo): string {
+  const time = new Date(segment.startedAt).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const reasonText = {
+    startup: "Started",
+    resume: "Resumed",
+    compact: "Compacted",
+    clear: "Cleared",
+  }[segment.reason];
+
+  const triggerSuffix = segment.trigger ? ` (${segment.trigger})` : "";
+
+  return `\r\n\x1b[90m─── ${reasonText}${triggerSuffix} at ${time} ───\x1b[0m\r\n`;
 }
 
 /**
@@ -52,11 +85,14 @@ export function Terminal({
   onResize,
   onError,
   onTerminalError,
+  segment,
+  onSegmentRotated,
 }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<XTerminal | null>(null);
   const fitAddonRef = useRef<FitAddon | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const lastSegmentIdRef = useRef<string | null>(null);
 
   // Initialize xterm.js
   useEffect(() => {
@@ -92,6 +128,26 @@ export function Terminal({
       fitAddonRef.current = null;
     };
   }, []);
+
+  // Handle segment rotation markers
+  useEffect(() => {
+    const terminal = terminalRef.current;
+    if (!terminal || !segment) return;
+
+    // Check if segment changed (not just re-render)
+    if (lastSegmentIdRef.current !== segment.sessionId) {
+      // Skip marker for first segment (startup) - just track it
+      if (lastSegmentIdRef.current !== null) {
+        // Write segment marker to terminal
+        terminal.write(formatSegmentMarker(segment));
+
+        // Notify parent of segment rotation
+        onSegmentRotated?.(segment);
+      }
+
+      lastSegmentIdRef.current = segment.sessionId;
+    }
+  }, [segment, onSegmentRotated]);
 
   // Connect WebSocket
   useEffect(() => {

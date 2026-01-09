@@ -213,6 +213,21 @@ export function createSessionRoutes(deps: RouterDependencies): Hono {
     return c.json({ success: true, target: "kitty", recovered: result.recovered });
   });
 
+  // Rename work chain (set user-defined name)
+  router.patch("/workchains/:id/name", async (c) => {
+    const workChainId = c.req.param("id");
+    const body = await c.req.json<{ name: string | null }>();
+
+    const sessionId = await streamServer.renameWorkChain(workChainId, body.name);
+
+    if (!sessionId) {
+      return c.json({ error: "Work chain not found or no active session" }, 404);
+    }
+
+    console.log(`[API] Work chain ${workChainId.slice(0, 8)} renamed to "${body.name ?? "(cleared)"}" (session: ${sessionId.slice(0, 8)})`);
+    return c.json({ success: true, sessionId });
+  });
+
   // Delete session permanently (removes JSONL file from disk)
   router.delete("/sessions/:id", (c) => {
     const sessionId = c.req.param("id");

@@ -47,6 +47,7 @@ export class StatusWatcher extends EventEmitter {
   /**
    * Start watching a project directory for status file changes.
    * Call this when a new session is discovered.
+   * Returns a promise that resolves when initial scan is complete.
    */
   watchProject(cwd: string): void {
     // Already watching this directory
@@ -57,9 +58,10 @@ export class StatusWatcher extends EventEmitter {
     const statusDir = path.join(cwd, STATUS_DIR);
 
     // Watch the .claude directory to catch all status files
+    // Use ignoreInitial: true so we can control initial scan ourselves
     const watcher = watch(statusDir, {
       persistent: true,
-      ignoreInitial: false,
+      ignoreInitial: true,  // We'll scan manually after watcher is ready
       depth: 0,
     });
 
@@ -79,23 +81,34 @@ export class StatusWatcher extends EventEmitter {
           this.handleDelete(cwd, filepath);
         }
       })
-      .on("error", (error) => this.emit("error", error));
+      .on("error", (error) => this.emit("error", error))
+      .on("ready", () => {
+        // Process existing status files after watcher is ready
+        this.scanExistingStatusFiles(cwd, statusDir);
+      });
 
     this.watchers.set(cwd, watcher);
+  }
 
-    // Check for existing status files
-    if (existsSync(statusDir)) {
-      try {
-        const files = readdirSync(statusDir);
-        for (const file of files) {
-          const filepath = path.join(statusDir, file);
-          if (this.isStatusFile(filepath)) {
-            this.handleStatusFile(cwd, filepath);
-          }
+  /**
+   * Scan existing status files in a directory.
+   * Called after watcher is ready.
+   */
+  private async scanExistingStatusFiles(cwd: string, statusDir: string): Promise<void> {
+    if (!existsSync(statusDir)) {
+      return;
+    }
+
+    try {
+      const files = readdirSync(statusDir);
+      for (const file of files) {
+        const filepath = path.join(statusDir, file);
+        if (this.isStatusFile(filepath)) {
+          await this.handleStatusFile(cwd, filepath);  // Now awaited!
         }
-      } catch {
-        // Directory might not exist or be unreadable
       }
+    } catch {
+      // Directory might not exist or be unreadable
     }
   }
 

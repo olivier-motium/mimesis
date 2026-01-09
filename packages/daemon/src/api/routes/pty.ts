@@ -63,10 +63,14 @@ export function createPtyRoutes(deps: RouterDependencies): Hono {
   router.post("/sessions/:id/pty", async (c) => {
     const sessionId = c.req.param("id");
 
-    // Validate session exists
+    // Validate session exists in cache
     const session = getSession(sessionId);
     if (!session) {
-      return c.json({ error: "Session not found" }, 404);
+      console.log(`[PTY] Session ${sessionId.slice(0, 8)} not found in cache (may still be loading)`);
+      return c.json({
+        error: "Session not found",
+        hint: "Session may still be loading. Try again in a moment.",
+      }, 404);
     }
 
     // Check if PTY already exists
@@ -75,18 +79,22 @@ export function createPtyRoutes(deps: RouterDependencies): Hono {
       return c.json(existing);
     }
 
-    // Parse optional resize from body
+    // Parse optional params from body
     let cols: number | undefined;
     let rows: number | undefined;
+    let tabId: string | undefined;
     try {
       const body = await c.req.json();
       if (typeof body.cols === "number") cols = body.cols;
       if (typeof body.rows === "number") rows = body.rows;
+      if (typeof body.tabId === "string") tabId = body.tabId;
     } catch {
       // Expected: request may have no body or non-JSON body - use defaults
     }
 
     // Create PTY with claude --resume command
+    // If tabId is provided, it will be injected as COMMAND_CENTER_TAB_ID
+    // for the hook bridge script to use
     try {
       const ptyInfo = await ptyManager!.createPty({
         sessionId,
@@ -94,6 +102,7 @@ export function createPtyRoutes(deps: RouterDependencies): Hono {
         command: [CLAUDE_PATH, "--resume", sessionId, "--dangerously-skip-permissions"],
         cols,
         rows,
+        tabId,
       });
 
       return c.json(ptyInfo);

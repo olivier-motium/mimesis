@@ -8,6 +8,12 @@
   --font-heading: "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
   --font-mono: "JetBrains Mono Variable", "JetBrains Mono", monospace;
 
+  /* shadcn/ui semantic colors (mapped to Mimesis palette) */
+  --color-background: #0a0a0c;
+  --color-foreground: #fafafa;
+  --color-border: #27272a;
+  --color-muted-foreground: #52525b;
+
   /* Status colors */
   --color-status-working: hsl(142 71% 45%);
   --color-status-waiting: hsl(43 96% 56%);
@@ -62,6 +68,12 @@ body {
   --nb-text-bright: #fafafa;
   --nb-text-dim: #52525b;
   --nb-text-muted: #3f3f46;
+
+  /* shadcn/ui CSS variables (mapped to Mimesis theme) */
+  --background: var(--nb-sidebar);
+  --foreground: var(--nb-text-bright);
+  --border: var(--nb-border);
+  --muted-foreground: var(--nb-text-dim);
 }
 
 /* Fleet Command Main Container */
@@ -387,6 +399,49 @@ body {
   overflow-y: auto;
 }
 
+/* Roster Repo Groups */
+.fleet-roster__group {
+  /* Each repo group */
+}
+
+.fleet-roster__group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--nb-terminal);
+  border-bottom: 1px solid var(--nb-border-dim);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--nb-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.fleet-roster__group-chevron {
+  color: var(--nb-text-muted);
+  flex-shrink: 0;
+}
+
+.fleet-roster__group-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fleet-roster__group-count {
+  background: var(--nb-sidebar);
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--nb-text-muted);
+}
+
 /* Compact Roster (Focus Mode) */
 .fleet-roster--compact {
   width: 180px;
@@ -447,6 +502,17 @@ body {
 
 .fleet-roster-item--selected .fleet-roster-item__name {
   color: var(--nb-text-bright);
+}
+
+.fleet-roster-item__compaction-badge {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--nb-text-muted);
+  background: var(--nb-sidebar);
+  padding: 1px 4px;
+  border-radius: 4px;
+  border: 1px solid var(--nb-border);
+  flex-shrink: 0;
 }
 
 .fleet-roster-item__status {
@@ -918,4 +984,30 @@ body > div[style*="position: fixed"]:last-child {
 
 .fleet-viewport .xterm-viewport {
   overflow-y: auto !important;
+}
+
+/* ===========================================
+   Rename Work Chain Dialog
+   =========================================== */
+
+.rename-dialog__input {
+  width: 100%;
+  background: var(--nb-terminal);
+  border: 1px solid var(--nb-border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--nb-text-bright);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.rename-dialog__input:focus {
+  border-color: var(--nb-yellow);
+  box-shadow: 0 0 0 2px var(--nb-yellow-glow);
+}
+
+.rename-dialog__input::placeholder {
+  color: var(--nb-text-muted);
 }
