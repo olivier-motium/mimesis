@@ -194,6 +194,10 @@ Also, node-pty spawns don't inherit shell PATH. Use full executable paths (e.g.,
 
 The `ws` WebSocketServer's `path` option only matches exact paths. Don't use `path: "/pty"` if you need `/pty/:id` - handle path validation in the connection handler instead.
 
+### Browser/Node Module Isolation
+
+Daemon modules imported by UI (via schema.ts) must not use `process.env` or other Node-only globals. The config barrel export (`config/index.ts`) re-exports all config modules including `stream.ts` which uses `process.env`. Solution: import specific config files directly (e.g., `config/content.ts`) instead of the barrel export when the importing module may run in browser context.
+
 ### Pre-existing Test Failures
 `pnpm test` in daemon has 7 unique failures (14 total, running twice from dist/src):
 - Status derivation tests have mismatched expectations
