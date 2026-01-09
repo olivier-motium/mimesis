@@ -198,3 +198,7 @@ export GITHUB_TOKEN=ghp_...
 | UI Framework | React 19 |
 | Routing | TanStack Router |
 | UI Components | Radix UI Themes |
+
+## Credits
+
+Inspired by and originally forked from [Kyle Mathews' claude-code-ui](https://github.com/KyleAMathews/claude-code-ui).
