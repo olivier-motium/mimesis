@@ -492,6 +492,32 @@ if stop_hook_active:
 .claude/status.md
 ```
 
+## Git User Configuration for Multiple GitHub Accounts (Jan 2026)
+
+**Problem:** Commits in motium repos were attributed to personal account (`markov-kernel`) instead of org account (`olivier-motium`), even when `gh auth` was logged in as motium.
+
+**Root cause:** Git commit author comes from `~/.gitconfig`, not from `gh auth`. These are separate systems.
+
+**Solution:** Git's conditional includes (`includeIf`) to automatically switch identities by directory:
+
+```
+# ~/.gitconfig
+[user]
+    name = markov-kernel
+    email = olivier@markov.bot
+[includeIf "gitdir:~/Desktop/motium_github/"]
+    path = ~/.gitconfig-motium
+
+# ~/.gitconfig-motium
+[user]
+    name = olivier-motium
+    email = 243932812+olivier-motium@users.noreply.github.com
+```
+
+**Key insight:** The trailing `/` in `gitdir:` is required to match all subdirectories.
+
+**History rewrite:** Used `git filter-branch` with `--env-filter` to change existing commits, then force pushed. Required stashing changes first.
+
 ## Session Compaction Handling (Jan 2026)
 
 **Problem:** When Claude Code compacts a session (via `/compact` or auto-compact at ~95% context), it creates a NEW session file. Both old and new sessions appeared in UI, causing duplicate session listings.
