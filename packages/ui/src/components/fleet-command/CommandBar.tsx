@@ -66,7 +66,7 @@ export function CommandBar({
       <div style={{ display: "flex", alignItems: "center" }}>
         <div className="fleet-command-bar__logo">
           <Cpu size={18} />
-          <span>NANO // BANANA // PRO</span>
+          <span>MIMESIS</span>
         </div>
 
         <div className="fleet-command-bar__divider" />

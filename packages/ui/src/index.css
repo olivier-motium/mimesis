@@ -859,13 +859,21 @@ body {
   background: linear-gradient(90deg, rgba(239, 68, 68, 0.08) 0%, transparent 50%);
 }
 
-/* Hide TanStack devtools in production-style view */
+/* Hide TanStack Router devtools completely */
 button[aria-label*="TanStack"],
 button[title*="TanStack"],
 [class*="TanStackRouterDevtools"],
 [class*="RouterDevtools"],
-.dark > button:last-of-type[style*="position: fixed"] {
+/* Target the devtools toggle button at bottom-left */
+[style*="position: fixed"][style*="bottom"][style*="left"]:has(svg),
+/* Target any floating panel from TanStack */
+div[style*="position: fixed"][style*="z-index"]:has(button[aria-label*="TanStack"]),
+/* Fallback: hide by bottom/left fixed positioning */
+body > div[style*="position: fixed"]:last-child {
   display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* Enhanced card styling for table container */
