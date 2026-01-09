@@ -11,8 +11,6 @@ A real-time dashboard for monitoring Claude Code sessions across multiple projec
 - **Multi-repo support** - sessions grouped by GitHub repository
 - **Kitty terminal integration** - open sessions in terminal, send commands, focus windows
 
-https://github.com/user-attachments/assets/877a43af-25f9-4751-88eb-24e7bbda68da
-
 ## Architecture
 
 ```
