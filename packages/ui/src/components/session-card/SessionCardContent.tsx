@@ -7,12 +7,17 @@ import { Card, Flex, Text, Code, Badge } from "@radix-ui/themes";
 import { SessionActions } from "./SessionActions";
 import { toolIcons } from "./constants";
 import { getCardClass, formatTimeAgo, formatTarget, getCIStatusIcon, getCIStatusColor } from "./utils";
+import { getEffectiveStatus } from "../../lib/sessionStatus";
 import type { SessionCardContentProps } from "./types";
 
 export function SessionCardContent({ session, onSendText }: SessionCardContentProps) {
   const navigate = useNavigate();
   const { pendingTool } = session;
   const dirPath = session.cwd.replace(/^\/Users\/[^/]+/, "~");
+  const { fileStatusValue } = getEffectiveStatus(session);
+
+  // Prefer fileStatus.summary over AI summary when fresh
+  const displaySummary = session.fileStatus?.summary || session.summary;
 
   const handleClick = () => {
     navigate({
@@ -53,10 +58,28 @@ export function SessionCardContent({ session, onSendText }: SessionCardContentPr
           </Flex>
         </Flex>
 
-        {/* Main content: goal as primary text */}
-        <Text size="2" weight="medium" highContrast mb="1">
-          {session.goal || session.originalPrompt.slice(0, 50)}
-        </Text>
+        {/* Main content: goal with status badge */}
+        <Flex align="center" gap="2">
+          <Text size="2" weight="medium" highContrast>
+            {session.goal || session.originalPrompt.slice(0, 50)}
+          </Text>
+          {fileStatusValue === "completed" && (
+            <Badge color="blue" variant="soft" size="1">✓ Done</Badge>
+          )}
+          {fileStatusValue === "error" && (
+            <Badge color="red" variant="soft" size="1">✗ Error</Badge>
+          )}
+          {fileStatusValue === "blocked" && (
+            <Badge color="orange" variant="soft" size="1">⊘ Blocked</Badge>
+          )}
+        </Flex>
+
+        {/* Task from fileStatus (if available) */}
+        {session.fileStatus?.task && (
+          <Text size="1" color="gray" style={{ fontStyle: "italic" }}>
+            {session.fileStatus.task}
+          </Text>
+        )}
 
         {/* Secondary: current activity (pending tool or summary) */}
         {pendingTool ? (
@@ -70,7 +93,7 @@ export function SessionCardContent({ session, onSendText }: SessionCardContentPr
           </Flex>
         ) : (
           <Text size="1" color="gray">
-            {session.summary}
+            {displaySummary}
           </Text>
         )}
 

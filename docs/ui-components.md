@@ -97,8 +97,10 @@ The SessionCard is split into modular subcomponents:
 
 **Displays:**
 - **Goal**: AI-generated high-level objective
-- **Summary**: Current activity description
-- **Status indicator**: Color-coded badge
+- **File status badge**: Shows completion state (✓ Done, ✗ Error, ⊘ Blocked) when available
+- **Task**: Current task from file status (italic, below goal)
+- **Summary**: From file status if fresh, otherwise AI-generated
+- **Status indicator**: Color-coded card border and pulse/wiggle animations
 - **PR badge**: If branch has open PR, shows number and CI status
 - **Tool icons**: Shows pending tool with icon
 - **Terminal link badge**: Shows "linked" (green) or "stale" (orange) when terminal is associated
@@ -210,6 +212,43 @@ Singleton StreamDB connection.
 
 **Configuration:**
 - `VITE_STREAM_URL` - Override the daemon endpoint (default: `http://127.0.0.1:4450/sessions`)
+
+---
+
+## Session Status Utilities
+
+The UI includes utilities for determining effective session status from file-based or XState-derived sources.
+
+**Location:** `packages/ui/src/lib/sessionStatus.ts`
+
+### `getEffectiveStatus(session)`
+
+Returns the effective status for column placement and display.
+
+**Returns:**
+```typescript
+interface EffectiveStatus {
+  status: "working" | "waiting" | "idle";  // For column placement
+  fileStatusValue: FileStatusValue | null;  // Original 7-value status if fresh
+  isFileStatusFresh: boolean;               // Whether file status is being used
+}
+```
+
+**Status Mapping (7 file statuses → 3 UI columns):**
+| File Status | UI Column |
+|-------------|-----------|
+| `working` | Working |
+| `waiting_for_approval` | Needs Approval (waiting + hasPendingToolUse) |
+| `waiting_for_input` | Waiting |
+| `completed`, `error`, `blocked`, `idle` | Idle |
+
+### `isFileStatusStale(updated, ttlMs)`
+
+Checks if file status timestamp is older than TTL (default: 5 minutes).
+
+### `getStatusBadgeType(session)`
+
+Returns badge type for completed/error/blocked states, or null.
 
 ---
 

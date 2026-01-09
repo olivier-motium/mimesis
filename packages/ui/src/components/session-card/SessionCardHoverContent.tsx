@@ -2,8 +2,9 @@
  * Hover panel content with detailed session info
  */
 
-import { Flex, Text, Box, Badge } from "@radix-ui/themes";
+import { Flex, Text, Box, Badge, Separator } from "@radix-ui/themes";
 import { getRoleColor, getRolePrefix, getCIStatusIcon, getCIStatusColor } from "./utils";
+import { getEffectiveStatus } from "../../lib/sessionStatus";
 import type { SessionCardProps } from "./types";
 import type { RecentOutput, CIStatus } from "@claude-code-ui/daemon/schema";
 
@@ -14,12 +15,58 @@ interface CICheck {
 }
 
 export function SessionCardHoverContent({ session }: SessionCardProps) {
+  const { fileStatusValue } = getEffectiveStatus(session);
+  const fileStatus = session.fileStatus;
+
   return (
     <Flex direction="column" gap="3" style={{ height: "100%" }}>
-      {/* Header: goal */}
-      <Text size="2" weight="bold" highContrast>
-        {session.goal || session.originalPrompt.slice(0, 60)}
-      </Text>
+      {/* Header: goal with status badge */}
+      <Flex align="center" gap="2">
+        <Text size="2" weight="bold" highContrast>
+          {session.goal || session.originalPrompt.slice(0, 60)}
+        </Text>
+        {fileStatusValue === "completed" && (
+          <Badge color="blue" variant="soft" size="1">✓ Done</Badge>
+        )}
+        {fileStatusValue === "error" && (
+          <Badge color="red" variant="soft" size="1">✗ Error</Badge>
+        )}
+        {fileStatusValue === "blocked" && (
+          <Badge color="orange" variant="soft" size="1">⊘ Blocked</Badge>
+        )}
+      </Flex>
+
+      {/* File status details (if available) */}
+      {fileStatus && (fileStatus.task || fileStatus.blockers || fileStatus.nextSteps) && (
+        <Box
+          p="2"
+          style={{
+            backgroundColor: "var(--gray-3)",
+            borderRadius: "var(--radius-2)",
+          }}
+        >
+          {fileStatus.task && (
+            <Text as="p" size="1" color="gray" mb="1">
+              <Text weight="medium">Task:</Text> {fileStatus.task}
+            </Text>
+          )}
+          {fileStatus.summary && (
+            <Text as="p" size="1" color="gray" mb="1">
+              <Text weight="medium">Summary:</Text> {fileStatus.summary}
+            </Text>
+          )}
+          {fileStatus.blockers && (
+            <Text as="p" size="1" color="red" mb="1">
+              <Text weight="medium">Blockers:</Text> {fileStatus.blockers}
+            </Text>
+          )}
+          {fileStatus.nextSteps && (
+            <Text as="p" size="1" color="grass">
+              <Text weight="medium">Next Steps:</Text> {fileStatus.nextSteps}
+            </Text>
+          )}
+        </Box>
+      )}
 
       {/* Recent output */}
       <Box

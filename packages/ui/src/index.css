@@ -105,3 +105,18 @@ body {
 .session-card:nth-child(3) { animation-delay: 100ms; }
 .session-card:nth-child(4) { animation-delay: 150ms; }
 .session-card:nth-child(5) { animation-delay: 200ms; }
+
+/* File status visual indicators */
+.file-status-completed {
+  border-left: 3px solid #3b82f6; /* blue */
+}
+
+.file-status-error {
+  border-left: 3px solid #ef4444; /* red */
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, transparent 50%);
+}
+
+.file-status-blocked {
+  border-left: 3px solid #f97316; /* orange */
+  background: linear-gradient(135deg, rgba(249, 115, 22, 0.05) 0%, transparent 50%);
+}

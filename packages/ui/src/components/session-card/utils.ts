@@ -3,15 +3,31 @@
  */
 
 import type { Session, CIStatus } from "@claude-code-ui/daemon/schema";
+import { getEffectiveStatus } from "../../lib/sessionStatus";
 
 export function getCardClass(session: Session): string {
   const classes = ["session-card"];
-  if (session.status === "working") {
+  const { status, fileStatusValue } = getEffectiveStatus(session);
+
+  // Base status classes
+  if (status === "working") {
     classes.push("status-working");
   }
-  if (session.status === "waiting" && session.hasPendingToolUse) {
+  if (status === "waiting" && session.hasPendingToolUse) {
     classes.push("status-needs-approval");
   }
+
+  // File-status-specific classes for visual indicators
+  if (fileStatusValue === "completed") {
+    classes.push("file-status-completed");
+  }
+  if (fileStatusValue === "error") {
+    classes.push("file-status-error");
+  }
+  if (fileStatusValue === "blocked") {
+    classes.push("file-status-blocked");
+  }
+
   return classes.join(" ");
 }
 

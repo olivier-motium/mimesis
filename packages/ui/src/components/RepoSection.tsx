@@ -1,6 +1,7 @@
 import { Box, Flex, Heading, Link, Text, Separator } from "@radix-ui/themes";
 import { KanbanColumn } from "./KanbanColumn";
 import type { Session } from "@claude-code-ui/daemon/schema";
+import { getEffectiveStatus } from "../lib/sessionStatus";
 
 interface RepoSectionProps {
   repoId: string;
@@ -10,14 +11,15 @@ interface RepoSectionProps {
 }
 
 export function RepoSection({ repoId, repoUrl, sessions, activityScore }: RepoSectionProps) {
-  const working = sessions.filter((s) => s.status === "working");
+  // Use effective status (prefers file-based status when fresh)
+  const working = sessions.filter((s) => getEffectiveStatus(s).status === "working");
   const needsApproval = sessions.filter(
-    (s) => s.status === "waiting" && s.hasPendingToolUse
+    (s) => getEffectiveStatus(s).status === "waiting" && s.hasPendingToolUse
   );
   const waiting = sessions.filter(
-    (s) => s.status === "waiting" && !s.hasPendingToolUse
+    (s) => getEffectiveStatus(s).status === "waiting" && !s.hasPendingToolUse
   );
-  const idle = sessions.filter((s) => s.status === "idle");
+  const idle = sessions.filter((s) => getEffectiveStatus(s).status === "idle");
 
   const isHot = activityScore > 50;
 
