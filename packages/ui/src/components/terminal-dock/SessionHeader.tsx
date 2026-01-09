@@ -19,6 +19,7 @@ interface SessionHeaderProps {
   isConnected: boolean;
   isLoading: boolean;
   onClose: () => void;
+  onReconnect?: () => void;
 }
 
 const STATUS_STYLES = {
@@ -38,6 +39,7 @@ export function SessionHeader({
   isConnected,
   isLoading,
   onClose,
+  onReconnect,
 }: SessionHeaderProps) {
   const { status } = getEffectiveStatus(session);
   const goalText = session.goal || session.originalPrompt.slice(0, 50);
@@ -70,18 +72,35 @@ export function SessionHeader({
         )}
 
         {/* Connection status */}
-        <span
-          className={cn(
-            "inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full border",
-            isLoading
-              ? "bg-status-waiting/10 text-status-waiting border-status-waiting/20"
-              : isConnected
-              ? "bg-status-working/10 text-status-working border-status-working/20"
-              : "bg-status-error/10 text-status-error border-status-error/20"
-          )}
-        >
-          {isLoading ? "Connecting..." : isConnected ? "Connected" : "Disconnected"}
-        </span>
+        {!isConnected && !isLoading && onReconnect ? (
+          <button
+            onClick={onReconnect}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-full border",
+              "bg-status-idle/10 text-status-idle border-status-idle/20",
+              "hover:bg-status-idle/20 hover:border-status-idle/40 transition-colors cursor-pointer"
+            )}
+            title="Click to reconnect"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-status-idle" />
+            Offline · Reconnect
+          </button>
+        ) : (
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 px-2 py-0.5 text-xs font-medium rounded-full border",
+              isLoading
+                ? "bg-status-waiting/10 text-status-waiting border-status-waiting/20"
+                : "bg-status-working/10 text-status-working border-status-working/20"
+            )}
+          >
+            <span className={cn(
+              "w-1.5 h-1.5 rounded-full",
+              isLoading ? "bg-status-waiting animate-pulse" : "bg-status-working"
+            )} />
+            {isLoading ? "Connecting..." : "Connected"}
+          </span>
+        )}
       </div>
 
       {/* Close button */}

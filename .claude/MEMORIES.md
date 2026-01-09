@@ -295,6 +295,8 @@ Custom dark theme with industrial operator console aesthetic:
 - Banana yellow accent (`#eab308`) for selection/active states
 - Status colors: green (working), yellow (waiting), red (error)
 - JetBrains Mono font for terminal consistency
+- Plus Jakarta Sans for body text (loaded via Google Fonts in index.html, not fontsource)
+- Subtle gradient overlays on zones for depth (not flat backgrounds)
 
 ### shadcn/ui + Tailwind Migration (Jan 2026)
 Migrated from Radix UI Themes to shadcn/ui + Tailwind CSS v4.

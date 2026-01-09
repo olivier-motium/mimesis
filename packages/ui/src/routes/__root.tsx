@@ -1,5 +1,5 @@
 import { createRootRoute, Outlet } from "@tanstack/react-router";
-import { TanStackRouterDevtools } from "@tanstack/router-devtools";
+// import { TanStackRouterDevtools } from "@tanstack/router-devtools";
 import { getSessionsDb } from "../data/sessionsDb";
 
 export const Route = createRootRoute({
@@ -15,7 +15,7 @@ function RootLayout() {
   return (
     <div className="dark min-h-screen bg-background text-foreground">
       <Outlet />
-      <TanStackRouterDevtools />
+      {/* <TanStackRouterDevtools /> */}
     </div>
   );
 }

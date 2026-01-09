@@ -129,8 +129,8 @@ export function DataTable({
                   key={row.id}
                   onClick={() => onSelect(row.original.sessionId)}
                   className={cn(
-                    "cursor-pointer transition-colors border-b border-border/50",
-                    "hover:bg-accent/50",
+                    "cursor-pointer transition-all duration-150 border-b border-border/50",
+                    "hover:bg-accent hover:border-l-2 hover:border-l-muted-foreground/50",
                     isSelected && "bg-accent border-l-4 border-l-primary",
                     getStatusRowClass(row.original)
                   )}

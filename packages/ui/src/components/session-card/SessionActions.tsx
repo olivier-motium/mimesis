@@ -88,7 +88,7 @@ export function SessionActions({ session, onSendText }: SessionActionsProps) {
           size="icon-sm"
           onClick={(e) => e.stopPropagation()}
           disabled={loading}
-          className="h-7 w-7"
+          className="h-7 w-7 opacity-60 hover:opacity-100 transition-opacity"
         >
           <MoreVertical className="h-4 w-4" />
           <span className="sr-only">Actions</span>

@@ -130,6 +130,7 @@ export function TerminalDock({ session, onClose }: TerminalDockProps) {
         isConnected={isConnected}
         isLoading={isLoading}
         onClose={onClose}
+        onReconnect={handleRetry}
       />
 
       {/* Terminal body */}

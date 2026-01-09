@@ -10,10 +10,22 @@ interface GoalCellProps {
   session: Session
 }
 
+/**
+ * Strip XML-like tags from goal text for cleaner display.
+ * Handles <command-message>, <local-command-caveat>, etc.
+ */
+function stripXmlTags(text: string): string {
+  return text
+    .replace(/<[^>]+>/g, "") // Remove all XML-like tags
+    .replace(/\s+/g, " ") // Normalize whitespace
+    .trim()
+}
+
 export function GoalCell({ session }: GoalCellProps) {
   const { fileStatusValue } = getEffectiveStatus(session)
-  const text = session.goal || session.originalPrompt
-  const displayText = text.length > 60 ? text.slice(0, 57) + "..." : text
+  const rawText = session.goal || session.originalPrompt
+  const cleanText = stripXmlTags(rawText)
+  const displayText = cleanText.length > 60 ? cleanText.slice(0, 57) + "..." : cleanText
 
   return (
     <div className="flex items-center gap-2 min-w-0">
