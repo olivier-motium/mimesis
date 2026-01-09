@@ -1246,6 +1246,9 @@ body {
 
 /* Terminal dock styles */
 .terminal-dock {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   border: 1px solid var(--nb-border);
   border-radius: 8px;
   overflow: hidden;
@@ -1256,6 +1259,7 @@ body {
 }
 
 .terminal-dock-header {
+  flex-shrink: 0;
   padding: 10px 14px;
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
   background-color: var(--nb-sidebar);
@@ -1263,6 +1267,8 @@ body {
 }
 
 .terminal-dock-body {
+  flex: 1;
+  min-height: 0;
   background: var(--nb-terminal);
   background-image: radial-gradient(ellipse 100% 100% at 50% 0%, rgba(234, 179, 8, 0.01) 0%, transparent 50%);
 }

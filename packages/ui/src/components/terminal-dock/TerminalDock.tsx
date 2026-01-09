@@ -129,7 +129,7 @@ export function TerminalDock({ session, onClose }: TerminalDockProps) {
       />
 
       {/* Terminal body */}
-      <div className="terminal-dock-body h-[280px]">
+      <div className="terminal-dock-body">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <span className="text-sm text-muted-foreground">
