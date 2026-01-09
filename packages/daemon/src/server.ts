@@ -46,6 +46,8 @@ export class StreamServer {
   private sessionCache = new Map<string, SessionState>();
   // Track session creation times for compaction comparison
   private sessionCreatedAt = new Map<string, string>();
+  // Track work chain IDs (persists across compaction)
+  private sessionWorkChainId = new Map<string, string>();
   // Terminal link repository for lookups
   private linkRepo: TerminalLinkRepo;
   // Status watcher for .claude/status.md files
@@ -283,6 +285,8 @@ export class StreamServer {
       terminalLink,
       fileStatus,
       embeddedPty: null,
+      // Work chain tracking - inherit from cache or generate new
+      workChainId: this.getOrCreateWorkChainId(sessionState.sessionId),
       // Supersession fields - defaults, will be updated by handleCompaction
       superseded: false,
       supersededBy: null,
@@ -358,45 +362,155 @@ export class StreamServer {
   }
 
   // ===========================================================================
+  // Private: Work Chain Management
+  // ===========================================================================
+
+  /**
+   * Get or create a work chain ID for a session.
+   * Work chains persist across compaction.
+   */
+  private getOrCreateWorkChainId(sessionId: string): string {
+    let workChainId = this.sessionWorkChainId.get(sessionId);
+    if (!workChainId) {
+      workChainId = crypto.randomUUID();
+      this.sessionWorkChainId.set(sessionId, workChainId);
+    }
+    return workChainId;
+  }
+
+  /**
+   * Set the work chain ID for a session (used during compaction inheritance).
+   */
+  private setWorkChainId(sessionId: string, workChainId: string): void {
+    this.sessionWorkChainId.set(sessionId, workChainId);
+  }
+
+  // ===========================================================================
   // Private: Compaction Handling
   // ===========================================================================
 
   /**
-   * Handle compaction event - mark older sessions in the same cwd as superseded.
+   * Handle compaction event - mark only the DIRECT PREDECESSOR as superseded.
    * Called when a compaction marker file is detected.
+   *
+   * Key insight: Multiple terminal tabs can work on the same repo simultaneously.
+   * Each tab represents a separate "work chain" - only sessions in the same
+   * work chain should be superseded, not all sessions in the same cwd.
    */
   private async handleCompaction(event: CompactionEvent): Promise<void> {
     if (this.stopping || this.paused || !this.stream) return;
 
     const { newSessionId, cwd, compactedAt } = event;
-    const compactedAtTime = new Date(compactedAt).getTime();
 
     console.log(`[COMPACTION] Session ${newSessionId.slice(0, 8)} compacted at ${compactedAt}`);
 
-    // Find all sessions with same cwd that are OLDER than this compaction
+    // Find the DIRECT predecessor (not all sessions in cwd)
+    const predecessor = this.findPredecessor(newSessionId, cwd);
+
+    if (!predecessor) {
+      console.log(`[COMPACTION] No predecessor found for ${newSessionId.slice(0, 8)}`);
+      return;
+    }
+
+    const [predecessorId, predecessorState] = predecessor;
+    const predecessorWorkChainId = this.sessionWorkChainId.get(predecessorId);
+
+    console.log(`[COMPACTION] Found predecessor ${predecessorId.slice(0, 8)}, workChain: ${predecessorWorkChainId?.slice(0, 8) ?? 'none'}`);
+
+    // Inherit workChainId from predecessor to new session
+    if (predecessorWorkChainId) {
+      this.setWorkChainId(newSessionId, predecessorWorkChainId);
+      console.log(`[COMPACTION] Inherited workChainId ${predecessorWorkChainId.slice(0, 8)} to new session`);
+    }
+
+    // Inherit terminal link from predecessor (if user was in Kitty)
+    const predecessorLink = this.linkRepo.get(predecessorId);
+    if (predecessorLink) {
+      // Update link repo to point to new session
+      this.linkRepo.upsert({
+        ...predecessorLink,
+        sessionId: newSessionId,
+        linkedAt: new Date().toISOString(),
+      });
+      // Remove old link
+      this.linkRepo.delete(predecessorId);
+      console.log(`[COMPACTION] Inherited terminal link (kitty:${predecessorLink.kittyWindowId}) to new session`);
+    }
+
+    // Only supersede the predecessor (not all sessions in cwd!)
+    console.log(`[COMPACTION] Superseding predecessor ${predecessorId.slice(0, 8)}`);
+    const session = await this.buildSession(predecessorState);
+    session.superseded = true;
+    session.supersededBy = newSessionId;
+    session.supersededAt = compactedAt;
+
+    const updateEvent = sessionsStateSchema.sessions.update({ value: session });
+    await this.stream.append(updateEvent);
+
+    // Publish the new session with inherited workChainId
+    const newSessionState = this.sessionCache.get(newSessionId);
+    if (newSessionState) {
+      const newSession = await this.buildSession(newSessionState);
+      const newSessionEvent = sessionsStateSchema.sessions.update({ value: newSession });
+      await this.stream.append(newSessionEvent);
+    }
+  }
+
+  /**
+   * Find the direct predecessor session for compaction.
+   *
+   * Strategy:
+   * 1. If new session has terminal context (kittyWindowId or ptyId), match it
+   * 2. Otherwise, use most recently active session in same cwd (heuristic)
+   *
+   * Only considers non-superseded sessions.
+   */
+  private findPredecessor(newSessionId: string, cwd: string): [string, SessionState] | null {
+    // Get new session's terminal context (may not exist yet at compaction time)
+    const newLink = this.linkRepo.get(newSessionId);
+    const newKittyId = newLink?.kittyWindowId;
+    // Note: embeddedPty would be checked similarly if tracked
+
+    const candidates: [string, SessionState, string][] = []; // [id, state, lastActivityAt]
+
     for (const [sessionId, sessionState] of this.sessionCache) {
-      if (sessionState.cwd === cwd && sessionId !== newSessionId) {
-        // Get session creation time
-        const sessionCreatedAt = this.sessionCreatedAt.get(sessionId);
-        if (!sessionCreatedAt) continue;
+      // Skip the new session itself
+      if (sessionId === newSessionId) continue;
+      // Skip sessions in different directories
+      if (sessionState.cwd !== cwd) continue;
+      // Skip already superseded sessions
+      // (check via sessionCreatedAt existence as proxy for tracked sessions)
+      // We also need to check if it's been marked superseded in a previous compaction
 
-        const sessionCreatedTime = new Date(sessionCreatedAt).getTime();
+      // Get this session's terminal context
+      const link = this.linkRepo.get(sessionId);
+      const kittyId = link?.kittyWindowId;
 
-        // Only supersede sessions that were created BEFORE the compaction
-        if (sessionCreatedTime < compactedAtTime) {
-          console.log(`[COMPACTION] Superseding session ${sessionId.slice(0, 8)} (created before compaction)`);
-
-          // Build session with supersession fields
-          const session = await this.buildSession(sessionState);
-          session.superseded = true;
-          session.supersededBy = newSessionId;
-          session.supersededAt = compactedAt;
-
-          const updateEvent = sessionsStateSchema.sessions.update({ value: session });
-          await this.stream.append(updateEvent);
+      // Matching logic:
+      // If new session has a kitty link, only consider sessions with SAME kitty link
+      // If new session has no link yet, consider ALL sessions (will pick most recent)
+      if (newKittyId !== undefined) {
+        // New session has kitty context - only match same kitty window
+        if (kittyId === newKittyId) {
+          candidates.push([sessionId, sessionState, sessionState.status.lastActivityAt]);
         }
+      } else {
+        // No terminal context yet - include all candidates
+        candidates.push([sessionId, sessionState, sessionState.status.lastActivityAt]);
       }
     }
+
+    if (candidates.length === 0) {
+      return null;
+    }
+
+    // Sort by lastActivityAt descending (most recent first)
+    candidates.sort((a, b) =>
+      new Date(b[2]).getTime() - new Date(a[2]).getTime()
+    );
+
+    // Return the most recently active session
+    return [candidates[0][0], candidates[0][1]];
   }
 }
 

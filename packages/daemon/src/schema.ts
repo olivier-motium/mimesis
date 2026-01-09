@@ -78,6 +78,8 @@ export const SessionSchema = z.object({
   terminalLink: TerminalLinkSchema.nullable(), // Linked kitty terminal window
   embeddedPty: EmbeddedPtySchema.nullable(), // Embedded PTY terminal
   fileStatus: FileStatusSchema.nullable(), // File-based status from .claude/status.md
+  // Work chain tracking (for compaction)
+  workChainId: z.string().nullable(), // UUID identifying the work chain this session belongs to
   // Supersession tracking (for compaction)
   superseded: z.boolean(), // Whether this session has been superseded by a compacted session
   supersededBy: z.string().nullable(), // Session ID that superseded this one

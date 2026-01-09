@@ -10,6 +10,13 @@ import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { radixDarkTheme, terminalStyles } from "./theme";
 
+/** Known error patterns from Claude CLI output */
+const TERMINAL_ERROR_PATTERNS = [
+  { pattern: /No conversation found with session ID/i, message: "Session not found - it may have been compacted or cleared" },
+  { pattern: /Session .+ not found/i, message: "Session not found - it may have been compacted or cleared" },
+  { pattern: /Error: Could not resume/i, message: "Unable to resume this session" },
+] as const;
+
 export interface TerminalProps {
   /** WebSocket URL for PTY connection */
   wsUrl: string;
@@ -23,6 +30,8 @@ export interface TerminalProps {
   onResize?: (cols: number, rows: number) => void;
   /** Called when connection error occurs */
   onError?: (error: string) => void;
+  /** Called when terminal output contains a known error pattern */
+  onTerminalError?: (error: string) => void;
 }
 
 interface WsMessage {
@@ -42,6 +51,7 @@ export function Terminal({
   onDisconnect,
   onResize,
   onError,
+  onTerminalError,
 }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<XTerminal | null>(null);
@@ -108,6 +118,16 @@ export function Terminal({
         const msg: WsMessage = JSON.parse(event.data);
         if (msg.type === "data" && msg.payload) {
           terminal.write(msg.payload);
+
+          // Check for known error patterns in output
+          if (onTerminalError) {
+            for (const { pattern, message } of TERMINAL_ERROR_PATTERNS) {
+              if (pattern.test(msg.payload)) {
+                onTerminalError(message);
+                break;
+              }
+            }
+          }
         }
       } catch {
         // Binary data or invalid JSON - write directly
@@ -142,7 +162,7 @@ export function Terminal({
       }
       wsRef.current = null;
     };
-  }, [wsUrl, wsToken, onConnect, onDisconnect, onError]);
+  }, [wsUrl, wsToken, onConnect, onDisconnect, onError, onTerminalError]);
 
   // Handle resize
   const handleResize = useCallback(() => {

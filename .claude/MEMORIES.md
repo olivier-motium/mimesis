@@ -565,3 +565,31 @@ UI filters out superseded sessions
   "compactedAt": "2026-01-09T18:00:00.000Z"
 }
 ```
+
+## Work Chain Management (Jan 2026)
+
+**Problem:** Original compaction handling marked ALL sessions in the same `cwd` as superseded, but this was wrong when multiple terminal tabs work on the same repo. Each tab is a separate "work chain" - only sessions in the SAME work chain should be superseded.
+
+**Key insight:** "Work chain" = sequence of Claude Code sessions connected by compaction in the same terminal tab. Multiple tabs = multiple independent work chains, even if in the same repo.
+
+**Solution:** Only supersede the DIRECT PREDECESSOR, not all sessions in same cwd.
+
+**Implementation:**
+1. **workChainId** - UUID that persists across compaction, inherited from predecessor to successor
+2. **findPredecessor()** - Uses terminal context (kittyWindowId) to match same work chain, falls back to most-recently-active heuristic
+3. **Terminal link inheritance** - Kitty window link transferred from predecessor to new session on compaction
+4. **Viewport auto-switch** - UI automatically switches to successor when session is superseded
+
+**Terminal Context Matching:**
+- If new session has kittyWindowId → only consider sessions with SAME kittyWindowId
+- If no terminal context (embedded Mimesis terminal) → use most recently active session in same cwd
+
+**Files modified:**
+- `packages/daemon/src/schema.ts` - Added `workChainId`, `superseded`, `supersededBy`, `supersededAt` fields
+- `packages/daemon/src/server.ts` - Rewrote `handleCompaction()`, added `findPredecessor()`, `getOrCreateWorkChainId()`
+- `packages/ui/src/components/fleet-command/Viewport.tsx` - Added supersession detection for auto-switch
+- `packages/ui/src/components/fleet-command/types.ts` - Added `onSelectSession` to ViewportProps
+
+**Test coverage:**
+- `compaction-watcher.test.ts` - Unit tests for marker file detection
+- `compaction.test.ts` - Integration tests for predecessor selection and work chain inheritance

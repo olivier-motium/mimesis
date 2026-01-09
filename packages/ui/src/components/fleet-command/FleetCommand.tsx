@@ -216,7 +216,7 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
           />
         </div>
       ) : (
-        <Viewport session={selectedSession} onSendCommand={handleSendCommand} />
+        <Viewport session={selectedSession} onSendCommand={handleSendCommand} onSelectSession={handleSelectSession} />
       )}
 
       {/* Right: Tactical Intel */}

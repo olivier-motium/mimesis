@@ -40,6 +40,8 @@ export interface RosterItemProps {
 export interface ViewportProps {
   session: Session | null;
   onSendCommand: (text: string) => void;
+  /** Called when session is superseded and should switch to successor */
+  onSelectSession?: (sessionId: string) => void;
 }
 
 /** Props for TacticalIntel */

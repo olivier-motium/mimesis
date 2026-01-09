@@ -47,11 +47,10 @@ export function useSessions() {
     // Transform Map to array
     const allSessions = Array.from(query.data.values()) as Session[];
 
-    // Filter to only sessions with status files (hook system installed)
-    // AND exclude superseded sessions (old sessions that were compacted)
-    // Each session now has its own status file (status.<sessionId>.md),
-    // so multiple sessions in the same project are handled correctly
-    return allSessions.filter((s) => s.fileStatus !== null && !s.superseded);
+    // Filter out superseded sessions (old sessions that were compacted)
+    // Status file is optional enrichment - sessions are shown regardless
+    // Daemon already filters by MAX_AGE_HOURS (24 hours)
+    return allSessions.filter((s) => !s.superseded);
   }, [query?.data]);
 
   return {

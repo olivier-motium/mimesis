@@ -12,7 +12,7 @@ import { getEffectiveStatus } from "../../lib/sessionStatus";
 import { getGoalText, STATUS_LABELS } from "./constants";
 import type { ViewportProps } from "./types";
 
-export function Viewport({ session, onSendCommand }: ViewportProps) {
+export function Viewport({ session, onSendCommand, onSelectSession }: ViewportProps) {
   const [ptyInfo, setPtyInfo] = useState<PtyInfo | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +21,14 @@ export function Viewport({ session, onSendCommand }: ViewportProps) {
 
   // Track which session we've initialized
   const initializedSessionRef = useRef<string | null>(null);
+
+  // Detect when session is superseded and auto-switch to successor
+  useEffect(() => {
+    if (session?.superseded && session.supersededBy && onSelectSession) {
+      console.log(`[Viewport] Session ${session.sessionId.slice(0, 8)} superseded, switching to ${session.supersededBy.slice(0, 8)}`);
+      onSelectSession(session.supersededBy);
+    }
+  }, [session?.superseded, session?.supersededBy, session?.sessionId, onSelectSession]);
 
   // Initialize PTY when session changes
   const initializePty = useCallback(async (sessionId: string) => {
@@ -139,8 +147,10 @@ export function Viewport({ session, onSendCommand }: ViewportProps) {
           <Terminal
             wsUrl={ptyInfo.wsUrl}
             wsToken={ptyInfo.wsToken}
+            onConnect={() => setIsConnected(true)}
             onDisconnect={() => setIsConnected(false)}
             onError={(err) => setError(err)}
+            onTerminalError={(err) => setError(err)}
           />
         ) : (
           <div className="fleet-viewport__empty">
