@@ -325,3 +325,18 @@ This provides real-time cross-agent awareness without additional daemon work.
 - Context health bars (token usage indicators) - not implemented
 
 These were descoped to focus on core functionality. Can be added later if needed.
+
+## Project Rebrand: Mimesis (Jan 2026)
+
+Rebranded from "claude-code-ui" to "Mimesis".
+
+**Why Mimesis:**
+- Girardian philosophy: "mimesis" means imitation/mirroring
+- The UI *mirrors* what sessions are doing (mimetic representation)
+- Philosophically rich but not obscure
+- Clean package names: `mimesis`, `@mimesis/daemon`, `@mimesis/ui`
+
+**Migration:**
+- New repo: `github.com/olivier-motium/mimesis` (not a fork)
+- Data directory: `~/.mimesis/` (was `~/.claude-code-ui/`)
+- Existing users: rename data dir or start fresh
