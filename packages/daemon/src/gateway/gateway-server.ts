@@ -36,6 +36,7 @@ import { EventMergerManager } from "./event-merger.js";
 import { OutboxTailer } from "./outbox-tailer.js";
 import { JobManager, type JobEventListener } from "./job-manager.js";
 import { SessionStore, type SessionStoreEvent } from "./session-store.js";
+import { convertEntriesToEvents } from "./entry-converter.js";
 import type { SessionWatcher, SessionEvent as WatcherSessionEvent } from "../watcher.js";
 import type { StatusWatcher, StatusUpdateEvent } from "../status-watcher.js";
 
@@ -144,6 +145,7 @@ export class GatewayServer {
           gitRepoUrl: session.gitRepoUrl,
           originalPrompt: session.originalPrompt,
           startedAt: session.startedAt,
+          entries: session.entries,
         });
       }
 
@@ -460,91 +462,79 @@ export class GatewayServer {
         status: trackedSession.status,
       });
 
-      // Send session info as events for Timeline display
-      const now = new Date().toISOString();
-      let seq = 0;
+      // Send full conversation history if entries are available
+      if (trackedSession.entries && trackedSession.entries.length > 0) {
+        const { events } = convertEntriesToEvents(trackedSession.entries);
+        let seq = 0;
+        for (const event of events) {
+          this.send(ws, {
+            type: "event",
+            session_id: sessionId,
+            seq: seq++,
+            event,
+          });
+        }
+      } else {
+        // Fallback: Send session metadata as events (no conversation entries)
+        const now = new Date().toISOString();
+        let seq = 0;
 
-      // Header: External session indicator
-      this.send(ws, {
-        type: "event",
-        session_id: sessionId,
-        seq: seq++,
-        event: {
-          type: "text",
-          data: `📡 Monitoring external session${trackedSession.gitBranch ? ` on ${trackedSession.gitBranch}` : ""}`,
-          timestamp: now,
-        },
-      });
-
-      // Show task/goal if available from status file
-      if (trackedSession.fileStatus?.task) {
+        // Header: External session indicator
         this.send(ws, {
           type: "event",
           session_id: sessionId,
           seq: seq++,
           event: {
             type: "text",
-            data: `📋 Task: ${trackedSession.fileStatus.task}`,
+            data: `📡 Monitoring external session${trackedSession.gitBranch ? ` on ${trackedSession.gitBranch}` : ""}`,
             timestamp: now,
           },
         });
-      } else if (trackedSession.originalPrompt) {
-        // Fallback to original prompt
-        const truncated = trackedSession.originalPrompt.length > 200
-          ? trackedSession.originalPrompt.slice(0, 200) + "..."
-          : trackedSession.originalPrompt;
+
+        // Show task/goal if available from status file
+        if (trackedSession.fileStatus?.task) {
+          this.send(ws, {
+            type: "event",
+            session_id: sessionId,
+            seq: seq++,
+            event: {
+              type: "text",
+              data: `📋 Task: ${trackedSession.fileStatus.task}`,
+              timestamp: now,
+            },
+          });
+        } else if (trackedSession.originalPrompt) {
+          // Fallback to original prompt
+          const truncated = trackedSession.originalPrompt.length > 200
+            ? trackedSession.originalPrompt.slice(0, 200) + "..."
+            : trackedSession.originalPrompt;
+          this.send(ws, {
+            type: "event",
+            session_id: sessionId,
+            seq: seq++,
+            event: {
+              type: "text",
+              data: `📋 Prompt: ${truncated}`,
+              timestamp: now,
+            },
+          });
+        }
+
+        // Status indicator
+        const statusEmoji = trackedSession.status === "working" ? "🟢"
+          : trackedSession.status === "waiting" ? "🟡"
+          : "⚪";
         this.send(ws, {
           type: "event",
           session_id: sessionId,
           seq: seq++,
           event: {
             type: "text",
-            data: `📋 Prompt: ${truncated}`,
+            data: `${statusEmoji} Status: ${trackedSession.status.charAt(0).toUpperCase() + trackedSession.status.slice(1)}`,
             timestamp: now,
           },
         });
       }
-
-      // Show summary if available
-      if (trackedSession.fileStatus?.summary) {
-        this.send(ws, {
-          type: "event",
-          session_id: sessionId,
-          seq: seq++,
-          event: {
-            type: "text",
-            data: `📝 ${trackedSession.fileStatus.summary}`,
-            timestamp: now,
-          },
-        });
-      }
-
-      // Status indicator
-      const statusEmoji = trackedSession.status === "working" ? "🟢"
-        : trackedSession.status === "waiting" ? "🟡"
-        : "⚪";
-      this.send(ws, {
-        type: "event",
-        session_id: sessionId,
-        seq: seq++,
-        event: {
-          type: "text",
-          data: `${statusEmoji} Status: ${trackedSession.status.charAt(0).toUpperCase() + trackedSession.status.slice(1)}`,
-          timestamp: now,
-        },
-      });
-
-      // Working directory
-      this.send(ws, {
-        type: "event",
-        session_id: sessionId,
-        seq: seq++,
-        event: {
-          type: "text",
-          data: `📁 ${trackedSession.cwd}`,
-          timestamp: now,
-        },
-      });
 
       return;
     }
@@ -800,6 +790,7 @@ export class GatewayServer {
           gitRepoUrl: session.gitRepoUrl,
           originalPrompt: session.originalPrompt,
           startedAt: session.startedAt,
+          entries: session.entries,
         });
 
         // Start watching status files for this project

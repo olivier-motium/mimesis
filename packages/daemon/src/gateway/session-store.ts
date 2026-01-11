@@ -8,7 +8,7 @@
  * Also integrates status updates from StatusWatcher (file-based status).
  */
 
-import type { StatusResult } from "../types.js";
+import type { StatusResult, LogEntry } from "../types.js";
 import type { FileStatus } from "../schema.js";
 
 // =============================================================================
@@ -40,6 +40,9 @@ export interface TrackedSession {
 
   // PTY-specific
   pid?: number;
+
+  // Conversation entries (for watcher sessions - enables full chat display)
+  entries?: LogEntry[];
 }
 
 /**
@@ -53,6 +56,7 @@ export interface WatcherSessionData {
   gitRepoUrl?: string | null;
   originalPrompt?: string | null;
   startedAt?: string;
+  entries?: LogEntry[];
 }
 
 /**
@@ -105,6 +109,8 @@ export class SessionStore {
       fileStatus: existing?.fileStatus,
       projectId: existing?.projectId,
       pid: existing?.pid,
+      // Store entries for full chat history display
+      entries: data.entries,
     };
 
     const isNew = !existing;

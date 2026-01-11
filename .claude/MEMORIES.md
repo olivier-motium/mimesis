@@ -1000,3 +1000,37 @@ const connectionManager: ConnectionManager = (globalThis as unknown as { __gatew
 - Status and messages broadcast to all subscribers via Sets
 
 **Files:** `packages/ui/src/hooks/useGateway.ts`
+
+### Entry Conversion for Watcher Sessions (Jan 2026)
+
+**Problem:** External/watcher sessions only showed metadata ("Monitoring external session...") in Timeline, not the actual conversation history.
+
+**Solution:** Convert JSONL LogEntry[] to WebSocket SessionEvent[] on attach.
+
+**Architecture:**
+```
+SessionWatcher.tailJSONL()  →  LogEntry[] (up to 500)
+        ↓
+session-store.ts stores entries in TrackedSession
+        ↓
+On attach: convertEntriesToEvents(entries)
+        ↓
+TextEvent[], ToolEvent[], ThinkingEvent[] sent to UI
+```
+
+**Conversion mapping:**
+| LogEntry | SessionEvent |
+|----------|--------------|
+| UserEntry (string) | TextEvent (user prompt) |
+| UserEntry (tool_result[]) | ToolEvent (post) |
+| AssistantEntry TextBlock | TextEvent |
+| AssistantEntry ToolUseBlock | ToolEvent (pre) |
+| AssistantEntry ThinkingBlock | ThinkingEvent |
+| SystemEntry stop_hook_summary | TextEvent |
+
+**Key insight:** SessionWatcher already parses and stores full conversation data in `entries`. The gap was only that gateway didn't convert and send it to UI for watcher sessions.
+
+**Files:**
+- `packages/daemon/src/gateway/entry-converter.ts` (NEW) - Conversion functions
+- `packages/daemon/src/gateway/session-store.ts` - Added `entries?: LogEntry[]`
+- `packages/daemon/src/gateway/gateway-server.ts` - Uses converter on watcher attach
