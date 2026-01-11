@@ -9,11 +9,13 @@
  */
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { config } from "../config";
+import { dispatchMessage, type GatewayStateSetters, type GatewayRefs } from "./gateway-handlers";
 
-// Gateway config
-const GATEWAY_URL = "ws://127.0.0.1:4452";
-const RECONNECT_DELAY_MS = 2000;
-const MAX_RECONNECT_ATTEMPTS = 10;
+// Gateway config (from centralized config)
+const GATEWAY_URL = config.gateway.wsUrl;
+const RECONNECT_DELAY_MS = config.gateway.reconnectDelayMs;
+const MAX_RECONNECT_ATTEMPTS = config.gateway.maxReconnectAttempts;
 
 // ============================================================================
 // Singleton Connection Manager (survives HMR and Strict Mode)
@@ -290,194 +292,28 @@ export function useGateway(): UseGatewayResult {
     attachedSessionRef.current = attachedSession;
   }, [attachedSession]);
 
-  // Handle incoming messages (using ref to avoid recreating the handler)
+  // State setters for message handlers
+  const stateSetters: GatewayStateSetters = useMemo(() => ({
+    setFleetEvents,
+    setLastEventId,
+    setSessions,
+    setAttachedSession,
+    setSessionEvents,
+    setTrackedSessions,
+    setActiveJob,
+    setLastError,
+  }), []);
+
+  // Refs for message handlers
+  const gatewayRefs: GatewayRefs = useMemo(() => ({
+    lastEventIdRef,
+    attachedSessionRef,
+  }), []);
+
+  // Handle incoming messages (delegates to handler registry)
   const handleMessage = useCallback((message: Record<string, unknown>) => {
-    const type = message.type as string;
-
-    switch (type) {
-      case "pong":
-        // Heartbeat response
-        break;
-
-      case "fleet.event": {
-        const event: FleetEvent = {
-          eventId: message.event_id as number,
-          ts: message.ts as string,
-          type: (message.event as Record<string, unknown>).type as string,
-          projectId: (message.event as Record<string, unknown>).project_id as string | undefined,
-          briefingId: (message.event as Record<string, unknown>).briefing_id as number | undefined,
-          data: (message.event as Record<string, unknown>).data,
-        };
-        setFleetEvents((prev) => [...prev, event]);
-        setLastEventId(event.eventId);
-        lastEventIdRef.current = event.eventId; // Keep ref in sync
-        break;
-      }
-
-      case "session.created": {
-        const session: SessionState = {
-          sessionId: message.session_id as string,
-          projectId: message.project_id as string,
-          pid: message.pid as number,
-          status: "idle",
-          attachedClients: 1,
-        };
-        setSessions((prev) => new Map(prev).set(session.sessionId, session));
-        setAttachedSession(session.sessionId);
-        break;
-      }
-
-      case "session.status": {
-        const sessionId = message.session_id as string;
-        const status = message.status as "working" | "waiting" | "idle";
-        setSessions((prev) => {
-          const updated = new Map(prev);
-          const existing = updated.get(sessionId);
-          if (existing) {
-            updated.set(sessionId, { ...existing, status });
-          }
-          return updated;
-        });
-        break;
-      }
-
-      case "session.ended": {
-        const sessionId = message.session_id as string;
-        setSessions((prev) => {
-          const updated = new Map(prev);
-          updated.delete(sessionId);
-          return updated;
-        });
-        if (attachedSessionRef.current === sessionId) {
-          setAttachedSession(null);
-        }
-        break;
-      }
-
-      case "event": {
-        // Session event from PTY or hooks - store for Timeline rendering
-        const sessionId = message.session_id as string;
-        const seq = message.seq as number;
-        const eventData = message.event as SessionEvent;
-
-        const sequencedEvent: SequencedSessionEvent = {
-          ...eventData,
-          seq,
-          sessionId,
-        };
-
-        setSessionEvents((prev) => {
-          const updated = new Map(prev);
-          const existing = updated.get(sessionId) ?? [];
-          // Insert in order by seq (events may arrive out of order during replay)
-          const insertIndex = existing.findIndex((e) => e.seq > seq);
-          if (insertIndex === -1) {
-            updated.set(sessionId, [...existing, sequencedEvent]);
-          } else {
-            const newEvents = [...existing];
-            newEvents.splice(insertIndex, 0, sequencedEvent);
-            updated.set(sessionId, newEvents);
-          }
-          return updated;
-        });
-        break;
-      }
-
-      case "job.started": {
-        setActiveJob({
-          jobId: message.job_id as number,
-          projectId: message.project_id as string | undefined,
-          status: "running",
-          events: [],
-        });
-        break;
-      }
-
-      case "job.stream": {
-        const chunk = message.chunk as JobStreamChunk;
-        setActiveJob((prev) => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            events: [...prev.events, chunk],
-          };
-        });
-        break;
-      }
-
-      case "job.completed": {
-        const ok = message.ok as boolean;
-        setActiveJob((prev) => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            status: ok ? "completed" : "failed",
-            result: ok ? (message.result as JobResult) : undefined,
-            error: ok ? undefined : (message.error as string),
-          };
-        });
-        break;
-      }
-
-      case "error": {
-        const error = message.message as string;
-        console.error("[GATEWAY] Error:", error);
-        setLastError(error);
-        break;
-      }
-
-      // Session tracking messages (v5.2)
-      case "sessions.snapshot": {
-        const sessionsList = message.sessions as TrackedSession[];
-        const sessionsMap = new Map<string, TrackedSession>();
-        for (const session of sessionsList) {
-          sessionsMap.set(session.sessionId, session);
-        }
-        setTrackedSessions(sessionsMap);
-        console.log("[GATEWAY] Sessions snapshot received:", sessionsList.length, "sessions");
-        break;
-      }
-
-      case "session.discovered": {
-        const session = message.session as TrackedSession;
-        setTrackedSessions((prev) => {
-          const updated = new Map(prev);
-          updated.set(session.sessionId, session);
-          return updated;
-        });
-        console.log("[GATEWAY] Session discovered:", session.sessionId);
-        break;
-      }
-
-      case "session.updated": {
-        const sessionId = message.session_id as string;
-        const updates = message.updates as Partial<TrackedSession>;
-        setTrackedSessions((prev) => {
-          const updated = new Map(prev);
-          const existing = updated.get(sessionId);
-          if (existing) {
-            updated.set(sessionId, { ...existing, ...updates });
-          }
-          return updated;
-        });
-        break;
-      }
-
-      case "session.removed": {
-        const sessionId = message.session_id as string;
-        setTrackedSessions((prev) => {
-          const updated = new Map(prev);
-          updated.delete(sessionId);
-          return updated;
-        });
-        console.log("[GATEWAY] Session removed:", sessionId);
-        break;
-      }
-
-      default:
-        console.log("[GATEWAY] Unknown message type:", type);
-    }
-  }, []); // No dependencies - uses refs for mutable values
+    dispatchMessage(message, stateSetters, gatewayRefs);
+  }, [stateSetters, gatewayRefs]);
 
   // ============================================================================
   // Session Management (uses singleton sendMessage)

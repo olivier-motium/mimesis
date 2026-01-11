@@ -24,28 +24,46 @@ import {
 import {
   parseClientMessage,
   serializeGatewayMessage,
-  parseHookEvent,
   type ClientMessage,
   type GatewayMessage,
-  type SessionEvent,
-  type HookEvent,
 } from "./protocol.js";
-import { PtyBridge, type PtySessionInfo } from "./pty-bridge.js";
+import { PtyBridge } from "./pty-bridge.js";
 import { RingBufferManager } from "./ring-buffer.js";
 import { EventMergerManager } from "./event-merger.js";
 import { OutboxTailer } from "./outbox-tailer.js";
-import { JobManager, type JobEventListener } from "./job-manager.js";
+import { JobManager } from "./job-manager.js";
 import { SessionStore, type SessionStoreEvent } from "./session-store.js";
-import { convertEntriesToEvents } from "./entry-converter.js";
 import type { SessionWatcher, SessionEvent as WatcherSessionEvent } from "../watcher.js";
 import type { StatusWatcher, StatusUpdateEvent } from "../status-watcher.js";
 
-interface ClientState {
-  ws: WebSocket;
-  attachedSession: string | null;
-  fleetSubscribed: boolean;
-  fleetCursor: number;
-}
+// Handler imports
+import {
+  type ClientState,
+  type PtyHandlerDependencies,
+  handleSessionCreate,
+  handleSessionStdin,
+  handleSessionSignal,
+  handleSessionResize,
+  handlePtyOutput,
+  handlePtyExit,
+} from "./handlers/pty-session-handlers.js";
+import {
+  type WatcherHandlerDependencies,
+  handleWatcherSession,
+  handleStatusUpdate,
+  handleSessionsList,
+  handleWatcherSessionAttach,
+} from "./handlers/watcher-handlers.js";
+import {
+  type JobHandlerDependencies,
+  type JobCreateMessage,
+  handleJobCreate,
+  handleJobCancel,
+} from "./handlers/job-handlers.js";
+import {
+  type HookHandlerDependencies,
+  handleHookEvent,
+} from "./handlers/hook-handlers.js";
 
 /**
  * Gateway server options.
@@ -77,6 +95,12 @@ export class GatewayServer {
   private sessionWatcher?: SessionWatcher;
   private statusWatcher?: StatusWatcher;
 
+  // Handler dependencies (lazy initialized)
+  private _ptyDeps: PtyHandlerDependencies | null = null;
+  private _watcherDeps: WatcherHandlerDependencies | null = null;
+  private _jobDeps: JobHandlerDependencies | null = null;
+  private _hookDeps: HookHandlerDependencies | null = null;
+
   constructor(options: GatewayServerOptions = {}) {
     // Store watchers
     this.sessionWatcher = options.sessionWatcher;
@@ -92,10 +116,10 @@ export class GatewayServer {
       this.bufferManager.getOrCreate(sessionId)
     );
 
-    // Initialize PTY bridge with callbacks
+    // Initialize PTY bridge with callbacks (use handler module)
     this.ptyBridge = new PtyBridge({
-      onOutput: (sessionId, event) => this.handlePtyOutput(sessionId, event),
-      onExit: (sessionId, code, signal) => this.handlePtyExit(sessionId, code, signal),
+      onOutput: (sessionId, event) => handlePtyOutput(this.ptyDeps, sessionId, event),
+      onExit: (sessionId, code, signal) => handlePtyExit(this.ptyDeps, sessionId, code, signal),
     });
 
     // Initialize outbox tailer
@@ -103,6 +127,58 @@ export class GatewayServer {
 
     // Initialize job manager
     this.jobManager = new JobManager();
+  }
+
+  // ============================================================================
+  // Handler Dependencies (lazy getters)
+  // ============================================================================
+
+  private get ptyDeps(): PtyHandlerDependencies {
+    if (!this._ptyDeps) {
+      this._ptyDeps = {
+        ptyBridge: this.ptyBridge,
+        sessionStore: this.sessionStore,
+        mergerManager: this.mergerManager,
+        bufferManager: this.bufferManager,
+        statusWatcher: this.statusWatcher,
+        clients: this.clients,
+        send: (ws, msg) => this.send(ws, msg),
+      };
+    }
+    return this._ptyDeps;
+  }
+
+  private get watcherDeps(): WatcherHandlerDependencies {
+    if (!this._watcherDeps) {
+      this._watcherDeps = {
+        sessionStore: this.sessionStore,
+        statusWatcher: this.statusWatcher,
+        clients: this.clients,
+        send: (ws, msg) => this.send(ws, msg),
+      };
+    }
+    return this._watcherDeps;
+  }
+
+  private get jobDeps(): JobHandlerDependencies {
+    if (!this._jobDeps) {
+      this._jobDeps = {
+        jobManager: this.jobManager,
+        send: (ws, msg) => this.send(ws, msg),
+      };
+    }
+    return this._jobDeps;
+  }
+
+  private get hookDeps(): HookHandlerDependencies {
+    if (!this._hookDeps) {
+      this._hookDeps = {
+        mergerManager: this.mergerManager,
+        clients: this.clients,
+        send: (ws, msg) => this.send(ws, msg),
+      };
+    }
+    return this._hookDeps;
   }
 
   /**
@@ -131,7 +207,7 @@ export class GatewayServer {
     // Subscribe to session watcher (external sessions)
     if (this.sessionWatcher) {
       this.sessionWatcher.on("session", (event: WatcherSessionEvent) => {
-        this.handleWatcherSession(event);
+        handleWatcherSession(this.watcherDeps, event);
       });
 
       // Load existing sessions from watcher
@@ -155,7 +231,7 @@ export class GatewayServer {
     // Subscribe to status watcher (file-based status)
     if (this.statusWatcher) {
       this.statusWatcher.on("status", (event: StatusUpdateEvent) => {
-        this.handleStatusUpdate(event);
+        handleStatusUpdate(this.watcherDeps, event);
       });
       console.log("[GATEWAY] StatusWatcher subscribed");
     }
@@ -237,7 +313,7 @@ export class GatewayServer {
           const line = buffer.substring(0, newlineIndex);
           buffer = buffer.substring(newlineIndex + 1);
 
-          this.handleHookEvent(line);
+          handleHookEvent(this.hookDeps, line);
         }
       });
 
@@ -305,7 +381,7 @@ export class GatewayServer {
         break;
 
       case "session.create":
-        this.handleSessionCreate(ws, state, message);
+        handleSessionCreate(this.ptyDeps, ws, state, message);
         break;
 
       case "session.attach":
@@ -317,27 +393,27 @@ export class GatewayServer {
         break;
 
       case "session.stdin":
-        this.handleSessionStdin(state, message);
+        handleSessionStdin(this.ptyDeps, state, message);
         break;
 
       case "session.signal":
-        this.handleSessionSignal(state, message);
+        handleSessionSignal(this.ptyDeps, state, message);
         break;
 
       case "session.resize":
-        this.handleSessionResize(state, message);
+        handleSessionResize(this.ptyDeps, state, message);
         break;
 
       case "job.create":
-        this.handleJobCreate(ws, message);
+        handleJobCreate(this.jobDeps, ws, message as JobCreateMessage);
         break;
 
       case "job.cancel":
-        this.handleJobCancel(message);
+        handleJobCancel(this.jobDeps, message);
         break;
 
       case "sessions.list":
-        this.handleSessionsList(ws);
+        handleSessionsList(this.watcherDeps, ws);
         break;
     }
   }
@@ -353,54 +429,6 @@ export class GatewayServer {
     const events = this.outboxTailer.getEventsAfter(fromEventId);
     for (const event of events) {
       this.send(ws, event);
-    }
-  }
-
-  /**
-   * Handle session.create message.
-   */
-  private async handleSessionCreate(
-    ws: WebSocket,
-    state: ClientState,
-    message: { project_id: string; repo_root: string; command?: string[]; cols?: number; rows?: number }
-  ): Promise<void> {
-    try {
-      const session = await this.ptyBridge.create({
-        projectId: message.project_id,
-        cwd: message.repo_root,
-        command: message.command,
-        cols: message.cols,
-        rows: message.rows,
-      });
-
-      // Add to session store (PTY-created session)
-      this.sessionStore.addFromPty({
-        sessionId: session.sessionId,
-        projectId: session.projectId,
-        cwd: message.repo_root,
-        pid: session.pid,
-      });
-
-      // Start watching status files for this project
-      if (this.statusWatcher) {
-        this.statusWatcher.watchProject(message.repo_root);
-      }
-
-      // Auto-attach to the new session
-      state.attachedSession = session.sessionId;
-
-      this.send(ws, {
-        type: "session.created",
-        session_id: session.sessionId,
-        project_id: session.projectId,
-        pid: session.pid,
-      });
-    } catch (error) {
-      this.send(ws, {
-        type: "error",
-        code: "SESSION_CREATE_FAILED",
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
   }
 
@@ -452,90 +480,8 @@ export class GatewayServer {
     const trackedSession = this.sessionStore.get(sessionId);
 
     if (trackedSession) {
-      // Limited attach for watcher sessions - status only, no stdin/signals
-      state.attachedSession = sessionId;
-
-      // Send session status
-      this.send(ws, {
-        type: "session.status",
-        session_id: sessionId,
-        status: trackedSession.status,
-      });
-
-      // Send full conversation history if entries are available
-      if (trackedSession.entries && trackedSession.entries.length > 0) {
-        const { events } = convertEntriesToEvents(trackedSession.entries);
-        let seq = 0;
-        for (const event of events) {
-          this.send(ws, {
-            type: "event",
-            session_id: sessionId,
-            seq: seq++,
-            event,
-          });
-        }
-      } else {
-        // Fallback: Send session metadata as events (no conversation entries)
-        const now = new Date().toISOString();
-        let seq = 0;
-
-        // Header: External session indicator
-        this.send(ws, {
-          type: "event",
-          session_id: sessionId,
-          seq: seq++,
-          event: {
-            type: "text",
-            data: `📡 Monitoring external session${trackedSession.gitBranch ? ` on ${trackedSession.gitBranch}` : ""}`,
-            timestamp: now,
-          },
-        });
-
-        // Show task/goal if available from status file
-        if (trackedSession.fileStatus?.task) {
-          this.send(ws, {
-            type: "event",
-            session_id: sessionId,
-            seq: seq++,
-            event: {
-              type: "text",
-              data: `📋 Task: ${trackedSession.fileStatus.task}`,
-              timestamp: now,
-            },
-          });
-        } else if (trackedSession.originalPrompt) {
-          // Fallback to original prompt
-          const truncated = trackedSession.originalPrompt.length > 200
-            ? trackedSession.originalPrompt.slice(0, 200) + "..."
-            : trackedSession.originalPrompt;
-          this.send(ws, {
-            type: "event",
-            session_id: sessionId,
-            seq: seq++,
-            event: {
-              type: "text",
-              data: `📋 Prompt: ${truncated}`,
-              timestamp: now,
-            },
-          });
-        }
-
-        // Status indicator
-        const statusEmoji = trackedSession.status === "working" ? "🟢"
-          : trackedSession.status === "waiting" ? "🟡"
-          : "⚪";
-        this.send(ws, {
-          type: "event",
-          session_id: sessionId,
-          seq: seq++,
-          event: {
-            type: "text",
-            data: `${statusEmoji} Status: ${trackedSession.status.charAt(0).toUpperCase() + trackedSession.status.slice(1)}`,
-            timestamp: now,
-          },
-        });
-      }
-
+      // Delegate to watcher handler
+      handleWatcherSessionAttach(this.watcherDeps, ws, state, trackedSession);
       return;
     }
 
@@ -561,193 +507,6 @@ export class GatewayServer {
   }
 
   /**
-   * Handle session.stdin message.
-   * Only PTY sessions support stdin - watcher sessions are read-only.
-   */
-  private handleSessionStdin(state: ClientState, message: { session_id: string; data: string }): void {
-    if (state.attachedSession !== message.session_id) return;
-
-    // Only PTY sessions support stdin
-    const ptySession = this.ptyBridge.getSession(message.session_id);
-    if (!ptySession) {
-      // Silently ignore - watcher sessions don't have stdin
-      return;
-    }
-
-    this.ptyBridge.write(message.session_id, message.data);
-  }
-
-  /**
-   * Handle session.signal message.
-   * Only PTY sessions support signals - watcher sessions are read-only.
-   */
-  private handleSessionSignal(
-    state: ClientState,
-    message: { session_id: string; signal: "SIGINT" | "SIGTERM" | "SIGKILL" }
-  ): void {
-    if (state.attachedSession !== message.session_id) return;
-
-    // Only PTY sessions support signals
-    const ptySession = this.ptyBridge.getSession(message.session_id);
-    if (!ptySession) {
-      // Silently ignore - watcher sessions don't have signals
-      return;
-    }
-
-    this.ptyBridge.signal(message.session_id, message.signal);
-  }
-
-  /**
-   * Handle session.resize message.
-   */
-  private handleSessionResize(
-    state: ClientState,
-    message: { session_id: string; cols: number; rows: number }
-  ): void {
-    if (state.attachedSession === message.session_id) {
-      this.ptyBridge.resize(message.session_id, message.cols, message.rows);
-    }
-  }
-
-  /**
-   * Handle job.create message.
-   */
-  private async handleJobCreate(
-    ws: WebSocket,
-    message: { job: { type: string; project_id?: string; repo_root?: string; model: "opus" | "sonnet" | "haiku"; request: { prompt: string; system_prompt?: string; json_schema?: string; max_turns?: number; disallowed_tools?: string[] } } }
-  ): Promise<void> {
-    const listener: JobEventListener = (event) => {
-      this.send(ws, event);
-    };
-
-    try {
-      await this.jobManager.createJob(
-        {
-          type: message.job.type,
-          projectId: message.job.project_id,
-          repoRoot: message.job.repo_root,
-          model: message.job.model,
-          request: {
-            prompt: message.job.request.prompt,
-            systemPrompt: message.job.request.system_prompt,
-            jsonSchema: message.job.request.json_schema,
-            maxTurns: message.job.request.max_turns,
-            disallowedTools: message.job.request.disallowed_tools,
-          },
-        },
-        listener
-      );
-    } catch (error) {
-      this.send(ws, {
-        type: "error",
-        code: "JOB_CREATE_FAILED",
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  /**
-   * Handle job.cancel message.
-   */
-  private handleJobCancel(message: { job_id: number }): void {
-    this.jobManager.cancelJob(message.job_id);
-  }
-
-  /**
-   * Handle PTY output event.
-   */
-  private handlePtyOutput(sessionId: string, event: SessionEvent): void {
-    const merger = this.mergerManager.getOrCreate(sessionId);
-    const seq = merger.addStdout((event as { data: string }).data);
-
-    // Broadcast to attached clients
-    for (const [ws, state] of this.clients) {
-      if (state.attachedSession === sessionId) {
-        this.send(ws, {
-          type: "event",
-          session_id: sessionId,
-          seq,
-          event,
-        });
-      }
-    }
-  }
-
-  /**
-   * Handle PTY exit event.
-   */
-  private handlePtyExit(sessionId: string, code: number, signal?: string): void {
-    // Notify attached clients
-    for (const [ws, state] of this.clients) {
-      if (state.attachedSession === sessionId) {
-        this.send(ws, {
-          type: "session.ended",
-          session_id: sessionId,
-          exit_code: code,
-          signal,
-        });
-        state.attachedSession = null;
-      }
-    }
-
-    // Clean up merger and buffer
-    this.mergerManager.remove(sessionId);
-    this.bufferManager.remove(sessionId);
-  }
-
-  /**
-   * Handle hook event from Unix socket.
-   */
-  private handleHookEvent(line: string): void {
-    const hookEvent = parseHookEvent(line);
-    if (!hookEvent) return;
-
-    const sessionId = hookEvent.fleet_session_id;
-    const merger = this.mergerManager.get(sessionId);
-    if (!merger) return;
-
-    const seq = merger.addHookEvent(hookEvent);
-    if (seq < 0) return;
-
-    // Create session event from hook
-    const event = this.hookToSessionEvent(hookEvent);
-    if (!event) return;
-
-    // Broadcast to attached clients
-    for (const [ws, state] of this.clients) {
-      if (state.attachedSession === sessionId) {
-        this.send(ws, {
-          type: "event",
-          session_id: sessionId,
-          seq,
-          event,
-        });
-      }
-    }
-  }
-
-  /**
-   * Convert hook event to session event.
-   */
-  private hookToSessionEvent(hook: HookEvent): SessionEvent | null {
-    const timestamp = hook.timestamp ?? new Date().toISOString();
-
-    if (hook.tool_name) {
-      return {
-        type: "tool",
-        phase: hook.phase ?? "post",
-        tool_name: hook.tool_name,
-        tool_input: hook.tool_input,
-        tool_result: hook.tool_result,
-        ok: hook.ok ?? true,
-        timestamp,
-      };
-    }
-
-    return null;
-  }
-
-  /**
    * Broadcast fleet event to subscribed clients.
    */
   private broadcastFleetEvent(event: GatewayMessage): void {
@@ -759,59 +518,8 @@ export class GatewayServer {
   }
 
   // ==========================================================================
-  // Session Tracking (v5.2)
+  // Session Tracking (v5.2) - Event Broadcasting
   // ==========================================================================
-
-  /**
-   * Handle sessions.list message - return full session snapshot.
-   */
-  private handleSessionsList(ws: WebSocket): void {
-    const sessions = this.sessionStore.getAll();
-    this.send(ws, {
-      type: "sessions.snapshot",
-      sessions,
-    });
-  }
-
-  /**
-   * Handle session watcher events (external Claude Code sessions).
-   */
-  private handleWatcherSession(event: WatcherSessionEvent): void {
-    const { type, session } = event;
-
-    switch (type) {
-      case "created":
-      case "updated":
-        this.sessionStore.addFromWatcher({
-          sessionId: session.sessionId,
-          cwd: session.cwd,
-          status: session.status,
-          gitBranch: session.gitBranch,
-          gitRepoUrl: session.gitRepoUrl,
-          originalPrompt: session.originalPrompt,
-          startedAt: session.startedAt,
-          entries: session.entries,
-        });
-
-        // Start watching status files for this project
-        if (this.statusWatcher) {
-          this.statusWatcher.watchProject(session.cwd);
-        }
-        break;
-
-      case "deleted":
-        this.sessionStore.remove(session.sessionId);
-        break;
-    }
-  }
-
-  /**
-   * Handle status watcher events (file-based status updates).
-   */
-  private handleStatusUpdate(event: StatusUpdateEvent): void {
-    const { sessionId, status } = event;
-    this.sessionStore.updateFileStatus(sessionId, status);
-  }
 
   /**
    * Handle session store events - broadcast to clients.

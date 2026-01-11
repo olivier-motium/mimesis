@@ -2,7 +2,9 @@
  * API client for kitty terminal remote control endpoints.
  */
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:4451/api";
+import { config } from "../config";
+
+const API_BASE = config.api.baseUrl;
 
 /** Detailed kitty status for diagnostics */
 interface KittyStatusDetails {
