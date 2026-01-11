@@ -142,10 +142,13 @@ If durable-streams client shows `Symbol(liveQueryInternal)` errors, the stream d
 
 **Auto-recovery flow:**
 1. UI detects corruption error during `createStreamDB()` or `preload()`
-2. UI calls `POST /api/v1/stream/reset` to daemon
+2. UI calls `POST /api/stream/reset` to daemon (note: `/api` not `/api/v1`)
 3. Daemon pauses publishing, clears `~/.mimesis/streams/`, restarts stream server
-4. Daemon republishes all cached sessions
-5. UI retries connection (up to 3 attempts with exponential backoff)
+4. Daemon calls `resume()` to restart publishing after successful reset
+5. Daemon republishes all cached sessions
+6. UI clears cached dbInstance/dbPromise before retry
+7. UI waits 2 seconds (not 1s) for daemon restart
+8. UI retries connection (up to 3 attempts with exponential backoff)
 
 **Key files:**
 - `packages/ui/src/data/sessionsDb.ts` - Retry logic and corruption detection
@@ -207,6 +210,27 @@ Also, node-pty spawns don't inherit shell PATH. Use full executable paths (e.g.,
 
 The `ws` WebSocketServer's `path` option only matches exact paths. Don't use `path: "/pty"` if you need `/pty/:id` - handle path validation in the connection handler instead.
 
+### PTY Stability Check for Session Resume
+
+When spawning a PTY for `claude --resume <sessionId>`, the process may exit immediately if the session doesn't exist (compacted/cleared). Without a stability check, the daemon returns PTY info, UI tries to connect WebSocket, and gets error 1006.
+
+**Solution:** 1-second stability check in `pty-manager.ts`:
+```typescript
+const STABILITY_CHECK_MS = 1000;
+const stabilityResult = await Promise.race([
+  exitPromise.then((exit) => ({ type: "exit", ...exit })),
+  new Promise<{ type: "stable" }>((resolve) =>
+    setTimeout(() => resolve({ type: "stable" }), STABILITY_CHECK_MS)
+  ),
+]);
+
+if (stabilityResult.type === "exit") {
+  throw new Error(`Session "${sessionId}" may not be resumable`);
+}
+```
+
+This delays PTY info response by 1s but ensures the process is actually running before UI attempts connection.
+
 ### Browser/Node Module Isolation
 
 Daemon modules imported by UI (via schema.ts) must not use `process.env` or other Node-only globals. The config barrel export (`config/index.ts`) re-exports all config modules including `stream.ts` which uses `process.env`. Solution: import specific config files directly (e.g., `config/content.ts`) instead of the barrel export when the importing module may run in browser context.
@@ -224,6 +248,33 @@ requestAnimationFrame(() => {
   }
 });
 ```
+
+### React StrictMode and WebSocket Connections
+
+React StrictMode double-mounts components in development. For WebSocket connections (like Terminal.tsx), this causes:
+1. First mount creates WebSocket → starts connecting
+2. First unmount cleanup runs → closes WebSocket (error 1006 if still CONNECTING)
+3. Second mount creates WebSocket → this one stays connected
+
+**Solution:** Use abort flag pattern to ignore callbacks after unmount:
+```typescript
+useEffect(() => {
+  let aborted = false;
+  const ws = new WebSocket(url);
+
+  ws.onclose = (event) => {
+    if (aborted) return;  // Ignore close events after unmount
+    onDisconnect?.();
+  };
+
+  return () => {
+    aborted = true;  // Set flag BEFORE closing
+    ws.close(1000, "Component unmounting");
+  };
+}, [url]);
+```
+
+This prevents error callbacks from the first mount's cleanup from triggering error states.
 
 ### PTY API Idempotency (Terminal Latency)
 

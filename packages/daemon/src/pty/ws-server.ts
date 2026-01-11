@@ -40,6 +40,7 @@ export function createPtyWsServer(options: PtyWsServerOptions): WebSocketServer 
   console.log(`[PTY WS] Server listening on ws://${host}:${port}/pty`);
 
   wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
+    console.log("[PTY WS] New connection attempt from:", req.url);
     const url = new URL(req.url || "", `http://${req.headers.host}`);
 
     // Extract PTY ID from path: /pty/:ptyId
@@ -61,7 +62,8 @@ export function createPtyWsServer(options: PtyWsServerOptions): WebSocketServer 
 
     // Validate token
     if (!ptyManager.validateToken(ptyId, token)) {
-      console.log("[PTY WS] Invalid token for PTY:", ptyId);
+      const session = ptyManager.getPty(ptyId);
+      console.log("[PTY WS] Invalid token for PTY:", ptyId, "session exists:", !!session);
       ws.close(4003, "Invalid token");
       return;
     }

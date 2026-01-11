@@ -29,11 +29,13 @@ export interface RosterProps {
   compact?: boolean;
 }
 
-/** Props for RosterItem */
+/** Props for RosterItem (Mission Card) */
 export interface RosterItemProps {
   session: Session;
   isSelected: boolean;
   onSelect: () => void;
+  /** Compact mode - only show title line */
+  compact?: boolean;
 }
 
 /** Props for Viewport */

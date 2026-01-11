@@ -1414,10 +1414,14 @@ body > div[style*="position: fixed"]:last-child {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
-/* Terminal container within viewport */
+/* Terminal area container - handles HUD spacing */
+.fleet-viewport__terminal-area {
+  padding-top: 80px; /* Space for HUD overlay */
+}
+
+/* Terminal within viewport - NO padding so FitAddon calculates correctly */
 .fleet-viewport .xterm {
   height: 100%;
-  padding: 80px 8px 8px;
 }
 
 .fleet-viewport .xterm-viewport {

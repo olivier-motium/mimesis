@@ -28,14 +28,24 @@ export function createStreamRoutes(deps: RouterDependencies): Hono {
       // Republish all cached sessions
       const cachedSessions = deps.streamServer.getCachedSessions();
       let republished = 0;
+      let failed = 0;
 
       for (const [, sessionState] of cachedSessions) {
         try {
           await deps.streamServer.publishSession(sessionState, "insert");
           republished++;
         } catch (error) {
+          failed++;
           console.error(`[STREAM] Failed to republish session ${sessionState.sessionId.slice(0, 8)}:`, error);
         }
+      }
+
+      // Resume publishing regardless of partial failures
+      deps.streamServer.resume();
+
+      if (failed > 0) {
+        console.error(`[STREAM] Reset partial failure: ${failed}/${cachedSessions.size} sessions failed to republish`);
+        return c.json({ success: false, error: `${failed}/${cachedSessions.size} sessions failed to republish`, republished }, 500);
       }
 
       console.log(`[STREAM] Reset complete, republished ${republished} sessions`);

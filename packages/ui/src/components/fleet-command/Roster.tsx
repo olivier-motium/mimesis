@@ -3,14 +3,39 @@
  *
  * Zone A of the Fleet Command layout
  * Supports compact mode for focus view
- * Sessions are grouped by repository for better organization
+ * Sessions are grouped by status for attention-first organization:
+ *   1. Needs Attention (waiting with pending tool)
+ *   2. Running (working status)
+ *   3. Idle (collapsed by default)
  */
 
-import { useMemo } from "react";
-import { Search, ChevronDown } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Search, ChevronDown, ChevronRight, AlertTriangle, Circle } from "lucide-react";
 import { RosterItem } from "./RosterItem";
-import { groupSessionsByRepo } from "../../lib/sessionScoring";
+import { getEffectiveStatus } from "@/lib/sessionStatus";
 import type { RosterProps } from "./types";
+import type { Session } from "@/types/schema";
+
+/** Group sessions by status for attention-first display */
+function groupSessionsByStatus(sessions: Session[]) {
+  const attention: Session[] = [];
+  const running: Session[] = [];
+  const idle: Session[] = [];
+
+  for (const session of sessions) {
+    const { status } = getEffectiveStatus(session);
+
+    if (status === "waiting" && session.hasPendingToolUse) {
+      attention.push(session);
+    } else if (status === "working") {
+      running.push(session);
+    } else {
+      idle.push(session);
+    }
+  }
+
+  return { attention, running, idle };
+}
 
 export function Roster({
   sessions,
@@ -20,6 +45,9 @@ export function Roster({
   onSearchChange,
   compact = false,
 }: RosterProps) {
+  // Idle section collapsed by default
+  const [idleExpanded, setIdleExpanded] = useState(false);
+
   // Filter sessions by search query
   const filteredSessions = useMemo(() => {
     return sessions.filter((session) => {
@@ -30,18 +58,33 @@ export function Roster({
         session.goal?.toLowerCase().includes(query) ||
         session.originalPrompt?.toLowerCase().includes(query) ||
         session.sessionId.toLowerCase().includes(query) ||
-        session.gitRepoId?.toLowerCase().includes(query)
+        session.gitRepoId?.toLowerCase().includes(query) ||
+        session.workChainName?.toLowerCase().includes(query)
       );
     });
   }, [sessions, searchQuery]);
 
-  // Group filtered sessions by repo
-  const groupedSessions = useMemo(
-    () => groupSessionsByRepo(filteredSessions),
+  // Group filtered sessions by status
+  const { attention, running, idle } = useMemo(
+    () => groupSessionsByStatus(filteredSessions),
     [filteredSessions]
   );
 
   const rosterClass = compact ? "fleet-roster fleet-roster--compact" : "fleet-roster";
+
+  // Helper to render a session item
+  const renderSession = (session: Session) => {
+    const chainId = session.workChainId ?? session.sessionId;
+    return (
+      <RosterItem
+        key={chainId}
+        session={session}
+        isSelected={chainId === selectedSessionId}
+        onSelect={() => onSelectSession(chainId)}
+        compact={compact}
+      />
+    );
+  };
 
   return (
     <aside className={rosterClass}>
@@ -67,30 +110,59 @@ export function Roster({
             {searchQuery ? "No matching agents" : "No active agents"}
           </div>
         ) : (
-          groupedSessions.map((group) => (
-            <div key={group.repoId} className="fleet-roster__group">
-              {/* Repo header - show repo name from gitRepoId (owner/repo format) */}
-              <div className="fleet-roster__group-header">
-                <ChevronDown size={12} className="fleet-roster__group-chevron" />
-                <span className="fleet-roster__group-name">
-                  {group.repoId === "Other" ? "Other" : group.repoId.split("/").pop() || group.repoId}
-                </span>
-                <span className="fleet-roster__group-count">{group.sessions.length}</span>
+          <>
+            {/* Needs Attention Section */}
+            {attention.length > 0 && (
+              <div className="fleet-roster__section fleet-roster__section--attention">
+                <div className="fleet-roster__section-header">
+                  <AlertTriangle size={12} className="fleet-roster__section-icon" />
+                  <span className="fleet-roster__section-name">Needs Attention</span>
+                  <span className="fleet-roster__section-count">{attention.length}</span>
+                </div>
+                <div className="fleet-roster__section-content">
+                  {attention.map(renderSession)}
+                </div>
               </div>
-              {/* Sessions in this repo - use workChainId as key for React stability across compaction */}
-              {group.sessions.map((session) => {
-                const chainId = session.workChainId ?? session.sessionId;
-                return (
-                  <RosterItem
-                    key={chainId}
-                    session={session}
-                    isSelected={chainId === selectedSessionId}
-                    onSelect={() => onSelectSession(chainId)}
-                  />
-                );
-              })}
-            </div>
-          ))
+            )}
+
+            {/* Running Section */}
+            {running.length > 0 && (
+              <div className="fleet-roster__section fleet-roster__section--running">
+                <div className="fleet-roster__section-header">
+                  <Circle size={10} fill="currentColor" className="fleet-roster__section-icon" />
+                  <span className="fleet-roster__section-name">Running</span>
+                  <span className="fleet-roster__section-count">{running.length}</span>
+                </div>
+                <div className="fleet-roster__section-content">
+                  {running.map(renderSession)}
+                </div>
+              </div>
+            )}
+
+            {/* Idle Section (collapsible) */}
+            {idle.length > 0 && (
+              <div className="fleet-roster__section fleet-roster__section--idle">
+                <button
+                  className="fleet-roster__section-header fleet-roster__section-header--clickable"
+                  onClick={() => setIdleExpanded(!idleExpanded)}
+                >
+                  {idleExpanded ? (
+                    <ChevronDown size={12} className="fleet-roster__section-chevron" />
+                  ) : (
+                    <ChevronRight size={12} className="fleet-roster__section-chevron" />
+                  )}
+                  <Circle size={10} className="fleet-roster__section-icon" />
+                  <span className="fleet-roster__section-name">Idle</span>
+                  <span className="fleet-roster__section-count">{idle.length}</span>
+                </button>
+                {idleExpanded && (
+                  <div className="fleet-roster__section-content">
+                    {idle.map(renderSession)}
+                  </div>
+                )}
+              </div>
+            )}
+          </>
         )}
       </div>
     </aside>

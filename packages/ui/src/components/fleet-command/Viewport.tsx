@@ -23,6 +23,9 @@ export function Viewport({ session, onSendCommand }: ViewportProps) {
   // This allows PTY to reconnect seamlessly when compaction changes the sessionId
   const initializedSessionRef = useRef<string | null>(null);
 
+  // Track previous session to detect actual changes
+  const prevSessionIdRef = useRef<string | null>(null);
+
   // Track retry attempts
   const retryCountRef = useRef(0);
   const maxRetries = 3;
@@ -67,7 +70,19 @@ export function Viewport({ session, onSendCommand }: ViewportProps) {
   }, []);
 
   useEffect(() => {
+    const currentSessionId = session?.sessionId ?? null;
+    const sessionChanged = currentSessionId !== prevSessionIdRef.current;
+    prevSessionIdRef.current = currentSessionId;
+
     if (session) {
+      // Only reset state when session actually changes (not on every effect run)
+      // This prevents unnecessary Terminal unmount/remount in StrictMode
+      if (sessionChanged && initializedSessionRef.current !== session.sessionId) {
+        setPtyInfo(null);
+        setIsConnected(false);
+        setError(null);
+        initializedSessionRef.current = null;
+      }
       initializePty(session.sessionId);
     } else {
       setPtyInfo(null);
@@ -126,7 +141,7 @@ export function Viewport({ session, onSendCommand }: ViewportProps) {
       </div>
 
       {/* Terminal Area */}
-      <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+      <div className="fleet-viewport__terminal-area" style={{ flex: 1, minHeight: 0, position: "relative" }}>
         {isLoading ? (
           <div className="fleet-viewport__empty">
             <div className="fleet-viewport__empty-text">Connecting to terminal...</div>
@@ -158,6 +173,7 @@ export function Viewport({ session, onSendCommand }: ViewportProps) {
           </div>
         ) : ptyInfo ? (
           <Terminal
+            key={session.sessionId} // Force remount on session change to clear old content
             wsUrl={ptyInfo.wsUrl}
             wsToken={ptyInfo.wsToken}
             onConnect={() => setIsConnected(true)}

@@ -101,3 +101,69 @@ export function parsePlanSteps(session: {
 
   return steps;
 }
+
+// ============================================
+// Mission Card Helpers (Ops-first Bridge)
+// ============================================
+
+/** Get mission title (workChainName with fallback to originalPrompt) */
+export function getMissionText(session: {
+  workChainName?: string | null;
+  originalPrompt?: string;
+}): string {
+  if (session.workChainName) {
+    return session.workChainName;
+  }
+  if (session.originalPrompt) {
+    // Truncate to 60 chars and clean up
+    const cleaned = session.originalPrompt.replace(/\s+/g, " ").trim();
+    return cleaned.length > 60 ? cleaned.slice(0, 57) + "..." : cleaned;
+  }
+  return "Untitled";
+}
+
+/** Get "Now" text showing current state and action */
+export function getNowText(session: {
+  status: "working" | "waiting" | "idle";
+  hasPendingToolUse?: boolean;
+  pendingTool?: { tool: string; target: string } | null;
+}): string {
+  const stateMap = {
+    working: "Working",
+    waiting: "Waiting",
+    idle: "Idle",
+  } as const;
+
+  const state = stateMap[session.status];
+
+  if (session.hasPendingToolUse && session.pendingTool) {
+    const target = session.pendingTool.target;
+    // Truncate long targets
+    const shortTarget = target.length > 30 ? "..." + target.slice(-27) : target;
+    return `${state} → ${session.pendingTool.tool}: ${shortTarget}`;
+  }
+
+  return state;
+}
+
+/** Get "Last" text from recent output */
+export function getLastText(session: {
+  recentOutput?: Array<{ role: string; content: string }>;
+}): string {
+  if (!session.recentOutput?.length) return "";
+
+  // Find most recent assistant text
+  const lastAssistant = session.recentOutput
+    .filter(o => o.role === "assistant")
+    .slice(-1)[0];
+
+  if (lastAssistant?.content) {
+    const cleaned = lastAssistant.content.replace(/\s+/g, " ").trim();
+    if (cleaned.length > 40) {
+      return `"${cleaned.slice(0, 37)}..."`;
+    }
+    return `"${cleaned}"`;
+  }
+
+  return "";
+}

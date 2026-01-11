@@ -74,10 +74,9 @@ export function DataTable({
     [data, filter]
   )
 
-  // Default sorting: status priority, then most recent
+  // Default sorting: status priority (working first, then waiting, then idle)
   const [sorting, setSorting] = useState<SortingState>([
     { id: "status", desc: false },
-    { id: "lastActivityAt", desc: false },
   ])
 
   const table = useReactTable({

@@ -1,33 +1,56 @@
 /**
- * RosterItem - Individual agent row in the Roster
+ * RosterItem - Mission Card for operator cockpit
  *
- * Shows status, branch, and activity time
+ * Layout:
+ * ┌─────────────────────────────────────────────────────┐
+ * │ ● Mission Title                          main ↻2   │
+ * │   Now: Working → Edit: src/api.ts                  │
+ * │   Last: "Updating handler..."      Updated: 30s   │
+ * └─────────────────────────────────────────────────────┘
  */
 
-import { Activity, GitBranch } from "lucide-react";
+import { GitBranch } from "lucide-react";
 import { getEffectiveStatus } from "../../lib/sessionStatus";
-import { getAgentName, formatTimeAgo } from "./constants";
+import { getMissionText, getNowText, getLastText, formatTimeAgo } from "./constants";
 import type { RosterItemProps } from "./types";
 
-export function RosterItem({ session, isSelected, onSelect }: RosterItemProps) {
+export function RosterItem({ session, isSelected, onSelect, compact }: RosterItemProps) {
   const { status, fileStatusValue } = getEffectiveStatus(session);
 
-  // Determine status class
+  // Status indicator classes
   const getStatusClass = () => {
-    if (fileStatusValue === "error") return "fleet-roster-item__status--error";
+    if (fileStatusValue === "error") return "mission-card__status--error";
     switch (status) {
       case "working":
-        return "fleet-roster-item__status--working";
+        return "mission-card__status--working";
       case "waiting":
-        return "fleet-roster-item__status--waiting";
+        return "mission-card__status--waiting";
       default:
-        return "fleet-roster-item__status--idle";
+        return "mission-card__status--idle";
     }
   };
 
+  // Status icon
+  const getStatusIcon = () => {
+    if (fileStatusValue === "error") return "✖";
+    switch (status) {
+      case "working":
+        return "●";
+      case "waiting":
+        return "!";
+      default:
+        return "○";
+    }
+  };
+
+  const mission = getMissionText(session);
+  const nowText = getNowText(session);
+  const lastText = getLastText(session);
+  const updatedText = formatTimeAgo(session.lastActivityAt);
+
   return (
     <div
-      className={`fleet-roster-item ${isSelected ? "fleet-roster-item--selected" : ""}`}
+      className={`mission-card ${isSelected ? "mission-card--selected" : ""} ${getStatusClass()}`}
       onClick={onSelect}
       role="button"
       tabIndex={0}
@@ -38,28 +61,54 @@ export function RosterItem({ session, isSelected, onSelect }: RosterItemProps) {
         }
       }}
     >
-      <div className="fleet-roster-item__header">
-        <span className="fleet-roster-item__name">
-          {session.workChainName || getAgentName(session)}
+      {/* Line 1: Status + Mission + Chips */}
+      <div className="mission-card__header">
+        <span className={`mission-card__status-icon ${getStatusClass()}`}>
+          {getStatusIcon()}
+        </span>
+        <span className="mission-card__title" title={mission}>
+          {mission}
+        </span>
+        <div className="mission-card__chips">
+          {session.gitBranch && (
+            <span className="mission-card__chip" title={session.gitBranch}>
+              <GitBranch size={10} />
+              {session.gitBranch.length > 12
+                ? session.gitBranch.slice(0, 9) + "..."
+                : session.gitBranch}
+            </span>
+          )}
           {session.compactionCount > 0 && (
-            <span className="fleet-roster-item__compaction-badge" title={`Compacted ${session.compactionCount} time${session.compactionCount === 1 ? "" : "s"}`}>
+            <span
+              className="mission-card__chip mission-card__chip--compaction"
+              title={`Compacted ${session.compactionCount} time${session.compactionCount === 1 ? "" : "s"}`}
+            >
               ↻{session.compactionCount}
             </span>
           )}
-        </span>
-        <Activity size={12} className={`fleet-roster-item__status ${getStatusClass()}`} />
+        </div>
       </div>
 
-      <div className="fleet-roster-item__branch">
-        <GitBranch size={10} className="fleet-roster-item__branch-icon" />
-        <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-          {session.gitBranch || "no branch"}
-        </span>
-      </div>
+      {/* Line 2: Now (only if not compact) */}
+      {!compact && (
+        <div className="mission-card__now">
+          Now: {nowText}
+        </div>
+      )}
 
-      <div className="fleet-roster-item__activity">
-        {formatTimeAgo(session.lastActivityAt)}
-      </div>
+      {/* Line 3: Last + Updated (only if not compact) */}
+      {!compact && (
+        <div className="mission-card__footer">
+          {lastText && (
+            <span className="mission-card__last" title={lastText}>
+              Last: {lastText}
+            </span>
+          )}
+          <span className="mission-card__updated">
+            Updated: {updatedText}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

@@ -97,6 +97,44 @@ export class PtyManager {
       env: spawnEnv,
     });
 
+    // Stability check: wait briefly to see if process exits immediately
+    // This catches cases where `claude --resume` fails (e.g., session doesn't exist)
+    // Using 1 second to catch slow startup failures (claude may take time to check session)
+    const STABILITY_CHECK_MS = 1000;
+
+    console.log(`[PTY] Starting stability check for ${ptyId} (waiting ${STABILITY_CHECK_MS}ms)...`);
+
+    const exitPromise = new Promise<{ exitCode: number; signal?: number }>((resolve) => {
+      proc.onExit(({ exitCode, signal }) => {
+        resolve({ exitCode, signal });
+      });
+    });
+
+    const stabilityResult = await Promise.race([
+      exitPromise.then((exit) => ({ type: "exit" as const, ...exit })),
+      new Promise<{ type: "stable" }>((resolve) =>
+        setTimeout(() => resolve({ type: "stable" }), STABILITY_CHECK_MS)
+      ),
+    ]);
+
+    if (stabilityResult.type === "exit") {
+      console.log(
+        `[PTY] Process exited during stability check: ${ptyId} (code=${stabilityResult.exitCode}, signal=${stabilityResult.signal})`
+      );
+      // Clean up the process
+      try {
+        proc.kill();
+      } catch {
+        // Expected: process already exited
+      }
+      throw new Error(
+        `Claude process exited during startup (code=${stabilityResult.exitCode}). ` +
+        `Session "${sessionId}" may not be resumable - it may have been compacted or cleared.`
+      );
+    }
+
+    console.log(`[PTY] Stability check passed for ${ptyId}, process is running`);
+
     const session: PtySession = {
       id: ptyId,
       sessionId,
@@ -122,7 +160,8 @@ export class PtyManager {
       this.broadcast(ptyId, { type: "data", payload: data });
     });
 
-    // Handle PTY exit
+    // Handle PTY exit (for later exits, not initial stability check)
+    // Re-register exit handler since the promise consumed the first one
     proc.onExit(({ exitCode, signal }) => {
       console.log(
         `[PTY] Process exited: ${ptyId} (code=${exitCode}, signal=${signal})`

@@ -4,11 +4,23 @@
  * Connects to PTY via WebSocket for real-time terminal I/O.
  */
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useMemo } from "react";
 import { Terminal as XTerminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import { radixDarkTheme, terminalStyles } from "./theme";
+
+/** Debounce utility to prevent rapid successive calls */
+function debounce<T extends (...args: unknown[]) => void>(
+  fn: T,
+  ms: number
+): (...args: Parameters<T>) => void {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  return (...args: Parameters<T>) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), ms);
+  };
+}
 
 /** Known error patterns from Claude CLI output */
 const TERMINAL_ERROR_PATTERNS = [
@@ -150,26 +162,42 @@ export function Terminal({
   }, [segment, onSegmentRotated]);
 
   // Connect WebSocket
+  // Uses an abort flag to handle React StrictMode double-mounting gracefully
   useEffect(() => {
     const terminal = terminalRef.current;
     if (!terminal) return;
 
+    // Abort flag to prevent callbacks after unmount (handles StrictMode)
+    let aborted = false;
+
     const wsUrlWithToken = `${wsUrl}?token=${wsToken}`;
+    console.log("[Terminal] Connecting to WebSocket:", wsUrlWithToken);
     const ws = new WebSocket(wsUrlWithToken);
 
     ws.onopen = () => {
+      if (aborted) {
+        // Component unmounted during connection - close silently
+        console.log("[Terminal] WebSocket opened but component unmounted, closing");
+        ws.close(1000, "Component unmounted");
+        return;
+      }
       console.log("[Terminal] WebSocket connected");
       onConnect?.();
 
-      // Send initial resize
-      if (fitAddonRef.current) {
-        const { cols, rows } = terminal;
-        const msg: WsMessage = { type: "resize", cols, rows };
-        ws.send(JSON.stringify(msg));
-      }
+      // Delay initial resize until after fit() has run
+      // This ensures we send correct dimensions to the PTY
+      requestAnimationFrame(() => {
+        if (!aborted && fitAddonRef.current && terminalRef.current && ws.readyState === WebSocket.OPEN) {
+          fitAddonRef.current.fit();
+          const { cols, rows } = terminalRef.current;
+          const msg: WsMessage = { type: "resize", cols, rows };
+          ws.send(JSON.stringify(msg));
+        }
+      });
     };
 
     ws.onmessage = (event) => {
+      if (aborted) return;
       try {
         const msg: WsMessage = JSON.parse(event.data);
         if (msg.type === "data" && msg.payload) {
@@ -192,11 +220,13 @@ export function Terminal({
     };
 
     ws.onclose = (event) => {
+      if (aborted) return; // Ignore close events after unmount
       console.log("[Terminal] WebSocket closed:", event.code, event.reason);
       onDisconnect?.();
     };
 
     ws.onerror = () => {
+      if (aborted) return; // Ignore error events after unmount
       console.error("[Terminal] WebSocket error");
       onError?.("WebSocket connection failed");
     };
@@ -205,44 +235,47 @@ export function Terminal({
 
     // Send input to PTY
     const inputDisposable = terminal.onData((data) => {
-      if (ws.readyState === WebSocket.OPEN) {
+      if (!aborted && ws.readyState === WebSocket.OPEN) {
         const msg: WsMessage = { type: "input", payload: data };
         ws.send(JSON.stringify(msg));
       }
     });
 
     return () => {
+      aborted = true; // Mark as aborted first
       inputDisposable.dispose();
-      if (ws.readyState === WebSocket.OPEN) {
+      // Close WebSocket in any active state (CONNECTING or OPEN)
+      if (ws.readyState !== WebSocket.CLOSED && ws.readyState !== WebSocket.CLOSING) {
         ws.close(1000, "Component unmounting");
       }
       wsRef.current = null;
     };
   }, [wsUrl, wsToken, onConnect, onDisconnect, onError, onTerminalError]);
 
-  // Handle resize
-  const handleResize = useCallback(() => {
-    const terminal = terminalRef.current;
-    const fitAddon = fitAddonRef.current;
-    const ws = wsRef.current;
+  // Debounced resize handler to prevent rapid successive fit() calls
+  // This fixes flickering caused by ResizeObserver firing multiple times
+  const handleResize = useMemo(
+    () =>
+      debounce(() => {
+        const terminal = terminalRef.current;
+        const fitAddon = fitAddonRef.current;
+        const ws = wsRef.current;
 
-    if (!terminal || !fitAddon) return;
+        if (!terminal || !fitAddon) return;
 
-    // Defer fit() to next frame for safety (renderer may not be ready)
-    requestAnimationFrame(() => {
-      if (!terminalRef.current || !fitAddonRef.current) return;
-      fitAddonRef.current.fit();
-      const { cols, rows } = terminalRef.current;
+        fitAddon.fit();
+        const { cols, rows } = terminal;
 
-      // Notify server
-      if (ws?.readyState === WebSocket.OPEN) {
-        const msg: WsMessage = { type: "resize", cols, rows };
-        ws.send(JSON.stringify(msg));
-      }
+        // Notify server
+        if (ws?.readyState === WebSocket.OPEN) {
+          const msg: WsMessage = { type: "resize", cols, rows };
+          ws.send(JSON.stringify(msg));
+        }
 
-      onResize?.(cols, rows);
-    });
-  }, [onResize]);
+        onResize?.(cols, rows);
+      }, 100), // 100ms debounce - imperceptible to users
+    [onResize]
+  );
 
   // Resize on window resize
   useEffect(() => {
@@ -251,7 +284,7 @@ export function Terminal({
   }, [handleResize]);
 
   // Resize when container size changes (for layout changes)
-  // This also handles initial fit() when container gets dimensions
+  // ResizeObserver handles both initial sizing and subsequent resizes
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -261,11 +294,8 @@ export function Terminal({
 
     resizeObserver.observe(containerRef.current);
 
-    // Trigger initial fit - ResizeObserver doesn't fire on initial observation
-    // Use RAF to ensure terminal renderer is initialized first
-    requestAnimationFrame(() => {
-      handleResize();
-    });
+    // Note: ResizeObserver fires on initial observation when element has dimensions
+    // No need for extra RAF trigger - it causes duplicate fit() calls
 
     return () => resizeObserver.disconnect();
   }, [handleResize]);

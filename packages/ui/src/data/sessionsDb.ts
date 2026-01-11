@@ -5,7 +5,7 @@ import { sessionsStateSchema } from "../types/schema";
 const STREAM_URL = import.meta.env.VITE_STREAM_URL ?? "http://127.0.0.1:4450/sessions";
 
 /** API base URL for daemon endpoints */
-const API_BASE = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:4451/api/v1";
+const API_BASE = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:4451/api";
 
 /** Maximum retries for initialization */
 const MAX_RETRIES = 3;
@@ -111,11 +111,13 @@ async function initializeWithRetry(): Promise<SessionsDB> {
 
       // Check for corruption error - request daemon to reset stream
       if (isCorruptionError(lastError)) {
-        console.warn("[StreamDB] Detected possible corruption, requesting reset...");
+        console.warn("[StreamDB] Detected corruption, clearing cached instances...");
+        dbInstance = null;
+        dbPromise = null;
         const resetSuccess = await requestStreamReset();
         if (resetSuccess) {
-          // Wait a bit for daemon to rebuild before retrying
-          await sleep(RETRY_DELAY_MS);
+          // Wait for daemon to restart stream server and republish
+          await sleep(2000);
         }
       }
 

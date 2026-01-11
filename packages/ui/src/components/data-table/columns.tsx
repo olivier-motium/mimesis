@@ -1,46 +1,18 @@
 /**
  * TanStack Table column definitions for sessions DataTable
+ *
+ * Consolidated layout:
+ * | Status (40px) | Mission (flex) | Actions (60px) |
+ *
+ * Mission column shows: Mission title + Now + Last + Updated
  */
 
 import type { ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown } from "lucide-react"
 import type { Session, SessionStatus } from "@/types/schema"
 import { getEffectiveStatus } from "@/lib/sessionStatus"
 import { StatusCell } from "./cells/StatusCell"
-import { GoalCell } from "./cells/GoalCell"
-import { BranchCell } from "./cells/BranchCell"
-import { ToolCell } from "./cells/ToolCell"
-import { AgeCell } from "./cells/AgeCell"
-import { RepoCell } from "./cells/RepoCell"
+import { MissionCell } from "./cells/MissionCell"
 import { ActionsCell } from "./cells/ActionsCell"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
-
-// Sortable header component
-function SortableHeader({
-  column,
-  children,
-}: {
-  column: { getIsSorted: () => false | "asc" | "desc"; toggleSorting: (desc?: boolean) => void }
-  children: React.ReactNode
-}) {
-  return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="-ml-3 h-8 data-[state=open]:bg-accent"
-      onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-    >
-      {children}
-      <ArrowUpDown
-        className={cn(
-          "ml-2 h-4 w-4",
-          column.getIsSorted() && "text-foreground"
-        )}
-      />
-    </Button>
-  )
-}
 
 // Status priority for sorting
 const STATUS_PRIORITY: Record<SessionStatus, number> = {
@@ -65,60 +37,22 @@ export const columns: ColumnDef<Session>[] = [
     },
   },
 
-  // Goal/prompt - flex grow
+  // Mission - consolidated column (flex grow)
+  // Shows: Mission title + Now + Last + Updated + branch/repo chips
   {
-    accessorKey: "goal",
-    header: ({ column }) => <SortableHeader column={column}>Goal</SortableHeader>,
-    cell: ({ row }) => <GoalCell session={row.original} />,
+    id: "mission",
+    accessorFn: (row) => row.workChainName ?? row.originalPrompt ?? "",
+    header: () => <span className="text-muted-foreground text-xs">Mission</span>,
+    cell: ({ row }) => <MissionCell session={row.original} />,
     enableSorting: true,
   },
 
-  // Git branch - 120px
-  {
-    accessorKey: "gitBranch",
-    header: ({ column }) => <SortableHeader column={column}>Branch</SortableHeader>,
-    cell: ({ row }) => <BranchCell branch={row.getValue("gitBranch")} />,
-    size: 120,
-    enableSorting: true,
-  },
-
-  // Pending tool - 80px
-  {
-    accessorKey: "pendingTool",
-    header: "Tool",
-    cell: ({ row }) => <ToolCell pendingTool={row.getValue("pendingTool")} />,
-    size: 80,
-    enableSorting: false,
-  },
-
-  // Activity age - 60px
-  {
-    accessorKey: "lastActivityAt",
-    header: ({ column }) => <SortableHeader column={column}>Age</SortableHeader>,
-    cell: ({ row }) => <AgeCell timestamp={row.getValue("lastActivityAt")} />,
-    size: 60,
-    enableSorting: true,
-    sortingFn: (rowA, rowB) => {
-      const timeA = new Date(rowA.original.lastActivityAt).getTime()
-      const timeB = new Date(rowB.original.lastActivityAt).getTime()
-      return timeB - timeA // Most recent first
-    },
-  },
-
-  // Repository - 100px
-  {
-    accessorKey: "gitRepoId",
-    header: "Repo",
-    cell: ({ row }) => <RepoCell repoId={row.getValue("gitRepoId")} />,
-    size: 100,
-    enableSorting: true,
-  },
-
-  // Actions menu - 40px
+  // Actions menu - 60px
   {
     id: "actions",
+    header: () => <span className="text-muted-foreground text-xs">Actions</span>,
     cell: ({ row }) => <ActionsCell session={row.original} />,
-    size: 40,
+    size: 60,
     enableSorting: false,
   },
 ]
