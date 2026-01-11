@@ -8,9 +8,10 @@ Real-time monitoring dashboard for Claude Code sessions.
 |--------------|-----------|
 | Get started quickly | [Getting Started](getting-started.md) |
 | Run in production | [Deployment Guide](operations/deployment.md) |
-| Configure the app | [Configuration Reference](operations/configuration.md) |
+| Configure the app | [Configuration Reference](architecture/configuration-reference.md) |
 | Understand the CLI | [CLI Reference](cli-reference.md) |
 | Learn the architecture | [README](../README.md) |
+| Contribute to the project | [Contributing Guide](contributing.md) |
 
 ---
 
@@ -23,6 +24,7 @@ Real-time monitoring dashboard for Claude Code sessions.
 | [Getting Started](getting-started.md) | Setup and first run |
 | [README](../README.md) | Project overview and architecture |
 | [CLAUDE.md](../CLAUDE.md) | Coding guidelines and conventions |
+| [Contributing Guide](contributing.md) | How to contribute to the project |
 | [Testing Guide](guides/testing.md) | Manual testing strategies |
 
 ### For Operators
@@ -30,7 +32,8 @@ Real-time monitoring dashboard for Claude Code sessions.
 | Document | Purpose |
 |----------|---------|
 | [Deployment Guide](operations/deployment.md) | Running as a service |
-| [Configuration Reference](operations/configuration.md) | Environment variables and tunables |
+| [Configuration Reference](architecture/configuration-reference.md) | All configuration modules and tunables |
+| [Environment Variables](operations/configuration.md) | Runtime environment variables |
 | [CLI Reference](cli-reference.md) | Watcher flags and options |
 
 ### For Developers
@@ -38,7 +41,11 @@ Real-time monitoring dashboard for Claude Code sessions.
 | Document | Purpose |
 |----------|---------|
 | [Gateway Architecture](architecture/gateway.md) | WebSocket protocol and session management |
+| [Gateway Protocol](api/gateway-protocol.md) | WebSocket message reference |
+| [REST API Endpoints](api/endpoints.md) | HTTP endpoint reference |
+| [Session Lifecycle](architecture/session-lifecycle.md) | Session states, compaction, work chains |
 | [Fleet DB Schema](architecture/fleet-db.md) | SQLite persistence layer |
+| [Configuration Reference](architecture/configuration-reference.md) | All config modules |
 | [UI Components](ui-components.md) | React component hierarchy |
 | [Daemon APIs](api/daemon-api.md) | Internal service documentation |
 | [spec.md](../spec.md) | Log format specification and types |
@@ -70,6 +77,7 @@ Implementation specifications for Fleet Commander versions:
 |---------|-------------|----------|
 | **Session Watcher** | Monitors `~/.claude/projects/` for JSONL changes | [README](../README.md#daemon) |
 | **Fleet Gateway** | WebSocket server for PTY sessions and real-time events (port 4452) | [Gateway Architecture](architecture/gateway.md) |
+| **Session Lifecycle** | Session states, compaction, segment chains, work chains | [Session Lifecycle](architecture/session-lifecycle.md) |
 | **File-Based Status** | Claude Code hooks write status to `.claude/status.md` for goal/summary | [Daemon API](api/daemon-api.md#file-based-status-system-status-watcherts-status-parserts) |
 | **Fleet DB** | SQLite ledger for briefings, jobs, projects | [Fleet DB Schema](architecture/fleet-db.md) |
 

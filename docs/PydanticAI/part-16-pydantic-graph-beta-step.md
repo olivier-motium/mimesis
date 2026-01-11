@@ -3261,7 +3261,7 @@ class BaseNode(ABC, Generic[StateT, DepsT, NodeRunEndT]):
 
         !!! note "Return types used at runtime"
             The return type of this method are read by `pydantic_graph` at runtime and used to define which
-            nodes can be called next in the graph. This is displayed in [mermaid diagrams](mermaid.md)
+            nodes can be called next in the graph. This is displayed in mermaid diagrams
             and enforced when running the graph.
 
         Args:
@@ -3395,7 +3395,7 @@ async def run(self, ctx: GraphRunContext[StateT, DepsT]) -> BaseNode[StateT, Dep
 
     !!! note "Return types used at runtime"
         The return type of this method are read by `pydantic_graph` at runtime and used to define which
-        nodes can be called next in the graph. This is displayed in [mermaid diagrams](mermaid.md)
+        nodes can be called next in the graph. This is displayed in mermaid diagrams
         and enforced when running the graph.
 
     Args:

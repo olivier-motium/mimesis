@@ -38,17 +38,17 @@ Status is derived via state machine (not imperative if/else) to handle edge case
 - Clean event-driven transitions
 
 ### Gateway-Based Session Tracking (Jan 2026)
-Port 4452 WebSocket Gateway is the sole source of truth for sessions. Durable Streams (port 4450) was removed entirely.
+Port 4452 WebSocket Gateway is the primary source of truth for sessions. Durable Streams dependencies remain in the codebase for stream data persistence.
 
 **Architecture:**
 - SessionStore merges sessions from SessionWatcher (external) + PtyBridge (gateway-created)
 - Gateway broadcasts session events to all connected WebSocket clients
 - UI subscribes via useGateway hook, receives sessions.snapshot on connect
 
-**Why removed Durable Streams:**
-- Only gateway-created sessions were visible (external Claude Code sessions invisible)
-- Two competing sources of truth (Durable Streams + Gateway)
-- Simpler architecture: single WebSocket for all session data
+**Gateway as primary interface:**
+- Gateway WebSocket provides unified session tracking for both external and PTY sessions
+- Durable Streams still used for persistent stream data storage
+- SessionStore merges all sources into a single view
 
 **Protocol messages:**
 - `sessions.list` (client) → request current sessions
@@ -162,8 +162,8 @@ Kitty window IDs are ephemeral - they change on kitty restart or when other wind
 ### Entry Limit to Prevent Memory Leaks
 Sessions can have thousands of log entries over time. Without trimming, memory grows unbounded causing OOM kills (exit 137). Solution: `MAX_ENTRIES_PER_SESSION = 500` in config.ts, trimmed in watcher.ts. This is sufficient for status detection and summarization while preventing memory exhaustion.
 
-### StreamDB Corruption Recovery (DEPRECATED Jan 2026)
-**Note:** This section is historical. Durable Streams was removed in v5.2. Gateway WebSocket is now the sole source of truth for sessions. No stream data to corrupt.
+### StreamDB Corruption Recovery
+**Note:** Durable Streams persists stream data to `~/.mimesis/streams/`. If corruption occurs, delete the streams directory and restart the daemon. Gateway WebSocket handles session state in memory while Durable Streams provides persistence.
 
 ### File-Based Status System (Jan 2026)
 Alternative to AI summaries for session status. Claude Code writes status to `.claude/status.md` via hooks, daemon watches and streams to UI.
@@ -916,11 +916,14 @@ Major transformation from terminal-centric to timeline-centric UI.
 
 ### Dependencies Changed
 
-**Removed:**
+**Removed from UI:**
 - `@xterm/xterm`
 - `@xterm/addon-fit`
 - `@xterm/addon-web-links`
+
+**Still in use (daemon):**
 - `@durable-streams/client`
+- `@durable-streams/server`
 - `@durable-streams/state`
 
 **Added:**

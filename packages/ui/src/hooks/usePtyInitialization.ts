@@ -1,7 +1,7 @@
 /**
  * usePtyInitialization - Shared hook for PTY session management
  *
- * Consolidates the PTY initialization logic used by both TerminalDock and Viewport.
+ * Consolidates the PTY initialization logic used by Timeline and Fleet Command components.
  * Handles get-or-create PTY in a single API call.
  *
  * Supports optional tabId for segment rotation ("kitty effect"):
