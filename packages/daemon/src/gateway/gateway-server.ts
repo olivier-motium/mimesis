@@ -460,17 +460,92 @@ export class GatewayServer {
         status: trackedSession.status,
       });
 
-      // Send info message that this is an external session
+      // Send session info as events for Timeline display
+      const now = new Date().toISOString();
+      let seq = 0;
+
+      // Header: External session indicator
       this.send(ws, {
         type: "event",
         session_id: sessionId,
-        seq: 0,
+        seq: seq++,
         event: {
           type: "text",
-          text: "📡 External session - monitoring status only. Terminal interaction not available.",
-          timestamp: new Date().toISOString(),
+          data: `📡 Monitoring external session${trackedSession.gitBranch ? ` on ${trackedSession.gitBranch}` : ""}`,
+          timestamp: now,
         },
       });
+
+      // Show task/goal if available from status file
+      if (trackedSession.fileStatus?.task) {
+        this.send(ws, {
+          type: "event",
+          session_id: sessionId,
+          seq: seq++,
+          event: {
+            type: "text",
+            data: `📋 Task: ${trackedSession.fileStatus.task}`,
+            timestamp: now,
+          },
+        });
+      } else if (trackedSession.originalPrompt) {
+        // Fallback to original prompt
+        const truncated = trackedSession.originalPrompt.length > 200
+          ? trackedSession.originalPrompt.slice(0, 200) + "..."
+          : trackedSession.originalPrompt;
+        this.send(ws, {
+          type: "event",
+          session_id: sessionId,
+          seq: seq++,
+          event: {
+            type: "text",
+            data: `📋 Prompt: ${truncated}`,
+            timestamp: now,
+          },
+        });
+      }
+
+      // Show summary if available
+      if (trackedSession.fileStatus?.summary) {
+        this.send(ws, {
+          type: "event",
+          session_id: sessionId,
+          seq: seq++,
+          event: {
+            type: "text",
+            data: `📝 ${trackedSession.fileStatus.summary}`,
+            timestamp: now,
+          },
+        });
+      }
+
+      // Status indicator
+      const statusEmoji = trackedSession.status === "working" ? "🟢"
+        : trackedSession.status === "waiting" ? "🟡"
+        : "⚪";
+      this.send(ws, {
+        type: "event",
+        session_id: sessionId,
+        seq: seq++,
+        event: {
+          type: "text",
+          data: `${statusEmoji} Status: ${trackedSession.status.charAt(0).toUpperCase() + trackedSession.status.slice(1)}`,
+          timestamp: now,
+        },
+      });
+
+      // Working directory
+      this.send(ws, {
+        type: "event",
+        session_id: sessionId,
+        seq: seq++,
+        event: {
+          type: "text",
+          data: `📁 ${trackedSession.cwd}`,
+          timestamp: now,
+        },
+      });
+
       return;
     }
 

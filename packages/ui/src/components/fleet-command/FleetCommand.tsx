@@ -65,6 +65,9 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
       gateway.detachSession(gateway.attachedSession);
     }
 
+    // Clear events for this session before re-attaching (prevents duplicates)
+    gateway.clearSessionEvents(sessionId);
+
     setSelectedSessionId(sessionId);
 
     // Attach to new session (request events from seq 0 for full history)

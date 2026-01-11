@@ -1,32 +1,29 @@
 ---
 status: completed
-updated: 2026-01-11T19:40:00Z
-task: Fleet Commander v5.2 - Gateway as sole source of truth for sessions
+updated: 2026-01-11T20:00:00Z
+task: Fix external session display in Timeline
 ---
 
 ## Summary
-Implemented unified session tracking via Gateway WebSocket, removing Durable Streams dependency.
+Fixed the "External session - monitoring status only" message to show useful session info.
 
 ### Changes Made
-- Created `session-store.ts` module that merges watcher-detected + PTY sessions
-- Added protocol messages: `sessions.list`, `sessions.snapshot`, `session.discovered/updated/removed`
-- Wired SessionWatcher and StatusWatcher to GatewayServer
-- Gateway broadcasts session events to all connected clients
-- Removed @durable-streams/*, @tanstack/db dependencies from UI
-- Deleted sessionsDb.ts, updated useSessions.ts to use useGateway
+- Enhanced gateway-server.ts to send detailed events for external sessions:
+  - Session header with branch info
+  - Task from status file or truncated original prompt
+  - Summary from status file (if available)
+  - Status indicator with emoji
+  - Working directory
+- Fixed data vs text property mismatch in useSessionEvents.ts (daemon sends `data`, UI expected `text`)
+- Fixed duplicate events when switching sessions by clearing events before re-attaching
 
 ### Files Modified
 **Daemon:**
-- `src/gateway/session-store.ts` (new)
-- `src/gateway/protocol.ts` (new messages)
-- `src/gateway/gateway-server.ts` (watcher integration)
-- `src/serve.ts` (StatusWatcher startup)
+- `src/gateway/gateway-server.ts` - Enhanced watcher session attach with detailed info events
 
 **UI:**
-- `src/hooks/useGateway.ts` (TrackedSession, sessions map)
-- `src/hooks/useSessions.ts` (rewritten for gateway)
-- `src/data/sessionsDb.ts` (deleted)
-- `package.json` (removed durable-streams deps)
+- `src/hooks/useSessionEvents.ts` - Map `event.data` to `text` for Timeline rendering
+- `src/components/fleet-command/FleetCommand.tsx` - Clear session events before attaching
 
 ### Result
-203 sessions now visible in UI via Gateway, with live status updates flowing through WebSocket.
+External sessions now display meaningful information in Timeline instead of generic "monitoring status only" message.

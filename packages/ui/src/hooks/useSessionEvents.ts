@@ -254,12 +254,13 @@ function groupEventsForTimeline(events: SequencedSessionEvent[]): TimelineEvent[
           result.push(createGroupedToolEvent(pendingTool, null, null, null));
           pendingTool = null;
         }
+        // Note: daemon sends text events with 'data' property (per protocol.ts)
         result.push({
           type: "text",
           seq: event.seq,
           sessionId: event.sessionId,
           timestamp: event.timestamp,
-          text: event.text ?? "",
+          text: event.data ?? event.text ?? "",
         });
         break;
       }
