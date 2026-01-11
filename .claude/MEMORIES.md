@@ -670,6 +670,44 @@ UI filters out superseded sessions
 - `compaction-watcher.test.ts` - Unit tests for marker file detection
 - `compaction.test.ts` - Integration tests for predecessor selection and work chain inheritance
 
+## Fleet Commander Architecture (Jan 2026)
+
+**Problem:** Multiple Claude Code agents working across different projects lack centralized visibility. Users must check each terminal individually.
+
+**Solution:** Control-plane / data-plane split with meta-agent ("Fleet Commander") monitoring all workers.
+
+**Architecture:**
+- Workers (per-repo agents) = data plane: do work, write status, update project skills
+- Fleet Commander (in Mimesis) = control plane: watches worker outputs, single point of contact
+
+**Key design decisions (from spec review):**
+1. **Stable project_id** - Hash of git remote + repo name (not path decoding from `~/.claude/projects/`), stored in status frontmatter
+2. **Computed task_size** - Stop hook calculates from git diff (lines/files changed, duration), not agent declaration
+3. **AUTO markers in SKILL.md** - `<!-- BEGIN:AUTO:SECTION -->` markers protect human-authored sections from automation
+4. **Queue-based skill updates** - Stop hook writes request to JSONL, daemon processes async (avoids latency, re-entrancy)
+5. **Three artifacts**: Snapshot (status.md, mutable), Events (notifications.jsonl, append-only), Knowledge (SKILL.md, semi-stable)
+6. **Cursor-based reading** - Commander hook maintains cursor in notifications.jsonl for incremental reads
+7. **Debounce + dedupe** - Watcher debounces file changes, deduplicates events by `(project_id, updated, status, task_id)`
+
+**Spec location:** `FLEET_CMD_SPEC.md` in repo root
+
+**Files to create:**
+- `~/.claude/hooks/skill-updater.py` - Processes skill update requests
+- `~/.claude/commander/notifications.jsonl` - Cross-project event log
+- `~/.claude/skills/projects/<project_id>/SKILL.md` - Per-project skills
+
+**Status schema v2 (frontmatter):**
+```yaml
+schema: status.v2
+project_id: mimesis__a1b2c3d4
+repo_root: /path/to/project
+git_remote: git@github.com:org/repo.git
+base_commit: abc123
+status: working
+task_size_intent: big    # agent-declared
+task_size_actual: small  # hook-computed at stop
+```
+
 ## Segment Rotation Architecture (Jan 2026)
 
 **Problem:** When Claude Code compacts a session, the UI creates a new tab/view for the new session, breaking the user's mental model of continuous work. Users expect compaction to be invisible - same tab, new underlying file.
