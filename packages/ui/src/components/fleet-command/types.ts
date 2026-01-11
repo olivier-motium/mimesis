@@ -4,9 +4,6 @@
 
 import type { Session } from "../../types/schema";
 
-/** View mode for the Fleet Command layout */
-export type ViewMode = "ops" | "focus";
-
 /** Plan step from file status */
 export interface PlanStep {
   done: boolean;
@@ -64,11 +61,8 @@ export interface TacticalIntelProps {
 export interface CommandBarProps {
   sessionCount: number;
   workingCount: number;
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
-  /** Selected session in focus mode (null in ops mode) */
+  /** Selected session (for display in header) */
   selectedSession: Session | null;
-  onBackToOps: () => void;
   /** Gateway connection status */
   gatewayStatus?: "connecting" | "connected" | "disconnected";
   /** Toggle Commander tab */

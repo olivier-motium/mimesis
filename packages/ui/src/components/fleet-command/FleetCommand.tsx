@@ -20,7 +20,7 @@ import { StatusStrip } from "../StatusStrip";
 import { countSessionsByStatus } from "../ops-table/utils";
 import { useGateway } from "../../hooks/useGateway";
 import { useSessionEvents } from "../../hooks/useSessionEvents";
-import type { FleetCommandProps, ViewMode } from "./types";
+import type { FleetCommandProps } from "./types";
 import type { StatusFilter } from "../ops-table/types";
 import { cn } from "../../lib/utils";
 
@@ -33,7 +33,6 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
   const sessionEvents = useSessionEvents(gateway);
 
   // UI state
-  const [viewMode, setViewMode] = useState<ViewMode>("focus");
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filter, setFilter] = useState<StatusFilter>("all");
@@ -180,15 +179,12 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
   }, [sessions, selectedSessionId, showCommander, handleSelectSession]);
 
   return (
-    <div className="fleet-command fleet-command--focus">
+    <div className="fleet-command">
       {/* Header */}
       <CommandBar
         sessionCount={sessions.length}
         workingCount={statusCounts.working}
-        viewMode={viewMode}
-        onViewModeChange={setViewMode}
         selectedSession={selectedSession}
-        onBackToOps={() => setShowCommander(false)}
         gatewayStatus={gateway.status}
         onToggleCommander={() => setShowCommander((prev) => !prev)}
         showCommander={showCommander}

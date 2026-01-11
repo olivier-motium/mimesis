@@ -1,72 +1,31 @@
 /**
  * CommandBar - Top header for Fleet Command
  *
- * In Ops mode: Logo, mode toggle, agent counts
- * In Focus mode: Back button, session info
+ * Shows: Logo, session info (when selected), gateway status, agent counts
  */
 
-import { Cpu, Layers, ArrowLeft, GitBranch, Brain, Wifi, WifiOff, Loader2 } from "lucide-react";
+import { Cpu, Layers, GitBranch, Brain, Wifi, WifiOff, Loader2 } from "lucide-react";
 import { getEffectiveStatus } from "../../lib/sessionStatus";
 import type { CommandBarProps } from "./types";
 
 export function CommandBar({
   sessionCount,
   workingCount,
-  viewMode,
-  onViewModeChange,
   selectedSession,
-  onBackToOps,
   gatewayStatus = "disconnected",
   onToggleCommander,
   showCommander = false,
 }: CommandBarProps) {
-  // Focus mode: show session context with back button
-  if (viewMode === "focus" && selectedSession) {
-    const { status } = getEffectiveStatus(selectedSession);
-    const statusLabel = status === "working" ? "Working" : status === "waiting" ? "Waiting" : "Idle";
-    const statusClass = `fleet-command-bar__status-badge--${status}`;
+  // Get status if session is selected
+  const sessionStatus = selectedSession ? getEffectiveStatus(selectedSession) : null;
+  const statusLabel = sessionStatus?.status === "working" ? "Working"
+    : sessionStatus?.status === "waiting" ? "Waiting"
+    : "Idle";
 
-    return (
-      <header className="fleet-command-bar fleet-command-bar--focus">
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          <button
-            className="fleet-command-bar__back"
-            onClick={onBackToOps}
-            title="Back to Ops (Esc)"
-          >
-            <ArrowLeft size={16} />
-            <span>Back to Ops</span>
-          </button>
-
-          <div className="fleet-command-bar__divider" />
-
-          <div className="fleet-command-bar__session-info">
-            <span className="fleet-command-bar__session-name">
-              {selectedSession.gitBranch || selectedSession.sessionId.slice(-8)}
-            </span>
-            {selectedSession.gitBranch && (
-              <span className="fleet-command-bar__branch">
-                <GitBranch size={12} />
-                {selectedSession.gitBranch}
-              </span>
-            )}
-            <span className={`fleet-command-bar__status-badge ${statusClass}`}>
-              {statusLabel}
-            </span>
-          </div>
-        </div>
-
-        <div className="fleet-command-bar__meta">
-          <div className="fleet-command-bar__version">v2.0.0</div>
-        </div>
-      </header>
-    );
-  }
-
-  // Ops mode: show logo, mode toggle, agent counts
   return (
     <header className="fleet-command-bar">
       <div style={{ display: "flex", alignItems: "center" }}>
+        {/* Logo */}
         <div className="fleet-command-bar__logo">
           <Cpu size={18} />
           <span>MIMESIS</span>
@@ -74,24 +33,28 @@ export function CommandBar({
 
         <div className="fleet-command-bar__divider" />
 
-        {/* Mode toggle */}
-        <div className="fleet-command-bar__mode-toggle">
-          <button
-            className={`fleet-command-bar__mode-btn ${viewMode === "ops" ? "fleet-command-bar__mode-btn--active" : ""}`}
-            onClick={() => onViewModeChange("ops")}
-          >
-            Ops
-          </button>
-          <button
-            className={`fleet-command-bar__mode-btn ${viewMode === "focus" ? "fleet-command-bar__mode-btn--active" : ""}`}
-            onClick={() => onViewModeChange("focus")}
-          >
-            Focus
-          </button>
-        </div>
+        {/* Session info (when selected) */}
+        {selectedSession && (
+          <>
+            <div className="fleet-command-bar__session-info">
+              <span className="fleet-command-bar__session-name">
+                {selectedSession.gitBranch || selectedSession.sessionId.slice(-8)}
+              </span>
+              {selectedSession.gitBranch && (
+                <span className="fleet-command-bar__branch">
+                  <GitBranch size={12} />
+                  {selectedSession.gitBranch}
+                </span>
+              )}
+              <span className={`fleet-command-bar__status-badge fleet-command-bar__status-badge--${sessionStatus?.status}`}>
+                {statusLabel}
+              </span>
+            </div>
+            <div className="fleet-command-bar__divider" />
+          </>
+        )}
 
-        <div className="fleet-command-bar__divider" />
-
+        {/* Gateway + Agent status */}
         <div className="fleet-command-bar__status">
           <span className={`fleet-command-bar__gateway fleet-command-bar__gateway--${gatewayStatus}`}>
             {gatewayStatus === "connected" && <Wifi size={12} />}

@@ -113,26 +113,13 @@ body {
   font-family: var(--font-mono);
   overflow: hidden;
   user-select: none;
-}
-
-/* Ops Mode (default): OpsTable center, TerminalDock bottom */
-.fleet-command--ops {
+  /* Standard 3-column layout: Roster | Timeline | TacticalIntel */
   grid-template-areas:
     "header header header"
-    "filters filters filters"
-    "roster table intel"
-    "dock dock dock";
-  grid-template-columns: 220px 1fr 280px;
-  grid-template-rows: 48px 40px 1fr 280px;
-}
-
-/* Focus Mode: Terminal center, mini roster */
-.fleet-command--focus {
-  grid-template-areas:
-    "header header header"
-    "roster viewport intel";
-  grid-template-columns: 180px 1fr 280px;
-  grid-template-rows: 48px 1fr;
+    "roster viewport intel"
+    "filters filters filters";
+  grid-template-columns: 200px 1fr 280px;
+  grid-template-rows: 48px 1fr 40px;
 }
 
 /* StatusStrip filter bar */
@@ -266,62 +253,7 @@ body {
   font-size: 10px;
 }
 
-/* Mode Toggle */
-.fleet-command-bar__mode-toggle {
-  display: flex;
-  background: var(--nb-terminal);
-  border: 1px solid var(--nb-border);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.fleet-command-bar__mode-btn {
-  padding: 4px 12px;
-  background: transparent;
-  border: none;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  color: var(--nb-text-dim);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.fleet-command-bar__mode-btn:hover {
-  color: var(--nb-text);
-}
-
-.fleet-command-bar__mode-btn--active {
-  background: var(--nb-yellow);
-  color: var(--nb-black);
-}
-
-/* Focus Mode Header */
-.fleet-command-bar--focus {
-  background: var(--nb-sidebar);
-}
-
-.fleet-command-bar__back {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  background: var(--nb-terminal);
-  border: 1px solid var(--nb-border);
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--nb-text);
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.fleet-command-bar__back:hover {
-  background: var(--nb-black-light);
-  border-color: var(--nb-yellow);
-  color: var(--nb-yellow);
-}
-
+/* Session info in header */
 .fleet-command-bar__session-info {
   display: flex;
   align-items: center;

@@ -404,43 +404,81 @@ export class GatewayServer {
 
   /**
    * Handle session.attach message.
+   *
+   * Two-tier attach:
+   * 1. PTY sessions: Full functionality - events, stdin, signals
+   * 2. Watcher sessions: Limited - status only, no terminal interaction
    */
   private handleSessionAttach(
     ws: WebSocket,
     state: ClientState,
     message: { session_id: string; from_seq?: number }
   ): void {
-    const session = this.ptyBridge.getSession(message.session_id);
-    if (!session) {
+    const sessionId = message.session_id;
+
+    // Check PTY first (full functionality)
+    const ptySession = this.ptyBridge.getSession(sessionId);
+
+    if (ptySession) {
+      // Full PTY attach - events, stdin, signals available
+      state.attachedSession = sessionId;
+
+      // Replay events from sequence
+      const merger = this.mergerManager.get(sessionId);
+      if (merger) {
+        const events = merger.getEventsFrom(message.from_seq ?? 0);
+        for (const { seq, event } of events) {
+          this.send(ws, {
+            type: "event",
+            session_id: sessionId,
+            seq,
+            event,
+          });
+        }
+      }
+
+      // Send current status
       this.send(ws, {
-        type: "error",
-        code: "SESSION_NOT_FOUND",
-        message: `Session ${message.session_id} not found`,
+        type: "session.status",
+        session_id: sessionId,
+        status: "working", // TODO: Infer actual status
       });
       return;
     }
 
-    state.attachedSession = message.session_id;
+    // Check sessionStore for watcher sessions (read-only mode)
+    const trackedSession = this.sessionStore.get(sessionId);
 
-    // Replay events from sequence
-    const merger = this.mergerManager.get(message.session_id);
-    if (merger) {
-      const events = merger.getEventsFrom(message.from_seq ?? 0);
-      for (const { seq, event } of events) {
-        this.send(ws, {
-          type: "event",
-          session_id: message.session_id,
-          seq,
-          event,
-        });
-      }
+    if (trackedSession) {
+      // Limited attach for watcher sessions - status only, no stdin/signals
+      state.attachedSession = sessionId;
+
+      // Send session status
+      this.send(ws, {
+        type: "session.status",
+        session_id: sessionId,
+        status: trackedSession.status,
+      });
+
+      // Send info message that this is an external session
+      this.send(ws, {
+        type: "event",
+        session_id: sessionId,
+        seq: 0,
+        event: {
+          type: "text",
+          text: "📡 External session - monitoring status only. Terminal interaction not available.",
+          timestamp: new Date().toISOString(),
+        },
+      });
+      return;
     }
 
-    // Send current status
+    // Neither PTY nor watcher has this session
     this.send(ws, {
-      type: "session.status",
-      session_id: message.session_id,
-      status: "working", // TODO: Infer actual status
+      type: "error",
+      code: "SESSION_NOT_FOUND",
+      message: `Session ${sessionId} not found`,
     });
   }
 
@@ -459,23 +497,39 @@ export class GatewayServer {
 
   /**
    * Handle session.stdin message.
+   * Only PTY sessions support stdin - watcher sessions are read-only.
    */
   private handleSessionStdin(state: ClientState, message: { session_id: string; data: string }): void {
-    if (state.attachedSession === message.session_id) {
-      this.ptyBridge.write(message.session_id, message.data);
+    if (state.attachedSession !== message.session_id) return;
+
+    // Only PTY sessions support stdin
+    const ptySession = this.ptyBridge.getSession(message.session_id);
+    if (!ptySession) {
+      // Silently ignore - watcher sessions don't have stdin
+      return;
     }
+
+    this.ptyBridge.write(message.session_id, message.data);
   }
 
   /**
    * Handle session.signal message.
+   * Only PTY sessions support signals - watcher sessions are read-only.
    */
   private handleSessionSignal(
     state: ClientState,
     message: { session_id: string; signal: "SIGINT" | "SIGTERM" | "SIGKILL" }
   ): void {
-    if (state.attachedSession === message.session_id) {
-      this.ptyBridge.signal(message.session_id, message.signal);
+    if (state.attachedSession !== message.session_id) return;
+
+    // Only PTY sessions support signals
+    const ptySession = this.ptyBridge.getSession(message.session_id);
+    if (!ptySession) {
+      // Silently ignore - watcher sessions don't have signals
+      return;
     }
+
+    this.ptyBridge.signal(message.session_id, message.signal);
   }
 
   /**
