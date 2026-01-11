@@ -971,7 +971,13 @@ Removed Focus/Ops mode toggle. Consolidated to single standard 3-column layout.
 
 ### Documentation Staleness (Jan 2026)
 
-`docs/ui-components.md` is significantly outdated - still references xterm.js, Agent Command, 4-zone layout, TerminalDock. Needs comprehensive rewrite to reflect v5 Timeline-based architecture. Not blocking for development.
+**UPDATE:** `docs/ui-components.md` has been updated to v5 (Timeline, 3-column layout, useGateway hook).
+
+**Still stale:**
+- `README.md` - Still references port 4450, xterm.js, Durable Streams, @durable-streams/*, Ops/Focus mode toggle, Terminal Dock, 4-zone layout
+- `docs/operations/configuration.md` - Documents STREAM_HOST, PORT, VITE_STREAM_URL env vars that are unused (Durable Streams removed)
+
+**Correct architecture:** Only ports 4451 (REST) and 4452 (Gateway WebSocket) are active. UI uses Timeline component with @tanstack/react-virtual, not xterm.js.
 
 ### WebSocket Singleton Pattern for HMR/StrictMode (Jan 2026)
 
