@@ -952,6 +952,27 @@ Major transformation from terminal-centric to timeline-centric UI.
 
 **Spec:** `FLEET_CMD_SPEC_V5.md` (headless architecture)
 
+### UI Simplification - Single Layout (Jan 2026)
+
+Removed Focus/Ops mode toggle. Consolidated to single standard 3-column layout.
+
+**Why:**
+- Focus/Ops mode was partially implemented but only Focus mode was actually used
+- Ops mode grid referenced zones (`table`, `dock`) without corresponding components
+- Simpler codebase: one layout, no mode state management
+
+**Changes:**
+- Removed `ViewMode` type from `types.ts`
+- Simplified `CommandBar.tsx` - removed mode toggle, always shows standard header
+- Removed `viewMode` state from `FleetCommand.tsx`
+- Consolidated CSS to single `.fleet-command` grid (was `.fleet-command--focus` / `.fleet-command--ops`)
+
+**Final layout:** Roster (left) | Timeline (center) | TacticalIntel (right) | StatusStrip (bottom)
+
+### Documentation Staleness (Jan 2026)
+
+`docs/ui-components.md` is significantly outdated - still references xterm.js, Agent Command, 4-zone layout, TerminalDock. Needs comprehensive rewrite to reflect v5 Timeline-based architecture. Not blocking for development.
+
 ### WebSocket Singleton Pattern for HMR/StrictMode (Jan 2026)
 
 **Problem:** useGateway hook caused rapid WebSocket connect/disconnect loops during development. React StrictMode double-mounts plus Vite HMR reloads created race conditions where multiple WebSocket connections competed.
