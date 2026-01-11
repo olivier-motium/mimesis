@@ -97,6 +97,16 @@ export {
   API_PREFIX,
 } from "./paths.js";
 
+// Server lifecycle
+export {
+  PORT_CHECK_SOCKET_TIMEOUT_MS,
+  DAEMON_HEALTH_CHECK_TIMEOUT_MS,
+  PORT_RELEASE_WAIT_MS,
+  WATCHER_DEBOUNCE_MS,
+  STATUS_WATCHER_DEBOUNCE_MS,
+  SHUTDOWN_TIMEOUT_MS,
+} from "./server.js";
+
 // Fleet Commander
 export {
   FLEET_BASE_DIR,

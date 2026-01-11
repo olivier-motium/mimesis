@@ -235,6 +235,54 @@ export class StreamServer {
   }
 
   // ===========================================================================
+  // Private: Session Building Helpers
+  // ===========================================================================
+
+  /**
+   * Get file status for a session, with optional override.
+   */
+  private getFileStatusForSession(
+    cwd: string,
+    override?: FileStatus | null
+  ): FileStatus | null {
+    return override !== undefined ? override : this.statusWatcher.getStatus(cwd);
+  }
+
+  /**
+   * Get terminal link for a session, with optional override.
+   */
+  private getTerminalLinkForSession(
+    sessionId: string,
+    override?: TerminalLink | null
+  ): TerminalLink | null {
+    if (override !== undefined) return override;
+    const link = this.linkRepo.get(sessionId);
+    return link
+      ? {
+          kittyWindowId: link.kittyWindowId,
+          linkedAt: link.linkedAt,
+          stale: link.stale,
+        }
+      : null;
+  }
+
+  /**
+   * Get work chain info for a session.
+   */
+  private getWorkChainForSession(sessionId: string): {
+    workChainId: string;
+    workChainName: string | null;
+    compactionCount: number;
+  } {
+    const workChainId = this.getOrCreateWorkChainId(sessionId);
+    return {
+      workChainId,
+      workChainName: this.workChainNames.get(workChainId) ?? null,
+      compactionCount: this.workChainCompactionCounts.get(workChainId) ?? 0,
+    };
+  }
+
+  // ===========================================================================
   // Private: Session Building
   // ===========================================================================
 
@@ -249,37 +297,15 @@ export class StreamServer {
       terminalLink?: TerminalLink | null;
     } = {}
   ): Promise<Session> {
-    // Get file status first (needed for goal/summary)
-    const fileStatus = overrides.fileStatus !== undefined
-      ? overrides.fileStatus
-      : this.statusWatcher.getStatus(sessionState.cwd);
+    // Use helper methods for lookups
+    const fileStatus = this.getFileStatusForSession(sessionState.cwd, overrides.fileStatus);
+    const terminalLink = this.getTerminalLinkForSession(sessionState.sessionId, overrides.terminalLink);
+    const { workChainId, workChainName, compactionCount } = this.getWorkChainForSession(sessionState.sessionId);
 
-    // Use file status for goal/summary (from hooks), fallback to original prompt
+    // Derive goal/summary from file status
     const goal = fileStatus?.task ?? sessionState.originalPrompt ?? "";
     const summary = fileStatus?.summary ?? "";
-
-    // Get terminal link: use override if provided, otherwise fetch from DB
-    let terminalLink: TerminalLink | null;
-    if (overrides.terminalLink !== undefined) {
-      terminalLink = overrides.terminalLink;
-    } else {
-      const link = this.linkRepo.get(sessionState.sessionId);
-      terminalLink = link
-        ? {
-            kittyWindowId: link.kittyWindowId,
-            linkedAt: link.linkedAt,
-            stale: link.stale,
-          }
-        : null;
-    }
-
-    // Get createdAt from cache or use lastActivityAt as fallback
     const createdAt = this.sessionCreatedAt.get(sessionState.sessionId) ?? sessionState.status.lastActivityAt;
-
-    // Get work chain info
-    const workChainId = this.getOrCreateWorkChainId(sessionState.sessionId);
-    const workChainName = this.workChainNames.get(workChainId) ?? null;
-    const compactionCount = this.workChainCompactionCounts.get(workChainId) ?? 0;
 
     return {
       sessionId: sessionState.sessionId,
@@ -454,6 +480,66 @@ export class StreamServer {
   }
 
   // ===========================================================================
+  // Private: Compaction Helpers
+  // ===========================================================================
+
+  /**
+   * Inherit work chain from predecessor to new session.
+   * Returns the inherited work chain ID (or undefined if none).
+   */
+  private inheritWorkChain(predecessorId: string, newSessionId: string): string | undefined {
+    const predecessorWorkChainId = this.sessionWorkChainId.get(predecessorId);
+    if (!predecessorWorkChainId) return undefined;
+
+    this.setWorkChainId(newSessionId, predecessorWorkChainId);
+    console.log(`[COMPACTION] Inherited workChainId ${predecessorWorkChainId.slice(0, 8)} to new session`);
+
+    // Increment compaction count for this work chain
+    const currentCount = this.workChainCompactionCounts.get(predecessorWorkChainId) ?? 0;
+    this.workChainCompactionCounts.set(predecessorWorkChainId, currentCount + 1);
+    console.log(`[COMPACTION] Incremented compaction count to ${currentCount + 1}`);
+
+    return predecessorWorkChainId;
+  }
+
+  /**
+   * Inherit terminal link from predecessor to new session.
+   */
+  private inheritTerminalLink(predecessorId: string, newSessionId: string): void {
+    const predecessorLink = this.linkRepo.get(predecessorId);
+    if (!predecessorLink) return;
+
+    // Update link repo to point to new session
+    this.linkRepo.upsert({
+      ...predecessorLink,
+      sessionId: newSessionId,
+      linkedAt: new Date().toISOString(),
+    });
+    // Remove old link
+    this.linkRepo.delete(predecessorId);
+    console.log(`[COMPACTION] Inherited terminal link (kitty:${predecessorLink.kittyWindowId}) to new session`);
+  }
+
+  /**
+   * Mark predecessor as superseded and publish the update.
+   */
+  private async markPredecessorSuperseded(
+    predecessorState: SessionState,
+    newSessionId: string,
+    compactedAt: string
+  ): Promise<void> {
+    if (!this.stream) return;
+
+    const session = await this.buildSession(predecessorState);
+    session.superseded = true;
+    session.supersededBy = newSessionId;
+    session.supersededAt = compactedAt;
+
+    const updateEvent = sessionsStateSchema.sessions.update({ value: session });
+    await this.stream.append(updateEvent);
+  }
+
+  // ===========================================================================
   // Private: Compaction Handling
   // ===========================================================================
 
@@ -469,58 +555,27 @@ export class StreamServer {
     if (this.stopping || this.paused || !this.stream) return;
 
     const { newSessionId, cwd, compactedAt } = event;
-
     console.log(`[COMPACTION] Session ${newSessionId.slice(0, 8)} compacted at ${compactedAt}`);
 
-    // Find the DIRECT predecessor (not all sessions in cwd)
+    // Find predecessor and validate
     const predecessor = this.findPredecessor(newSessionId, cwd);
-
     if (!predecessor) {
       console.log(`[COMPACTION] No predecessor found for ${newSessionId.slice(0, 8)}`);
       return;
     }
 
     const [predecessorId, predecessorState] = predecessor;
-    const predecessorWorkChainId = this.sessionWorkChainId.get(predecessorId);
+    console.log(`[COMPACTION] Found predecessor ${predecessorId.slice(0, 8)}`);
 
-    console.log(`[COMPACTION] Found predecessor ${predecessorId.slice(0, 8)}, workChain: ${predecessorWorkChainId?.slice(0, 8) ?? 'none'}`);
+    // Inherit state from predecessor
+    this.inheritWorkChain(predecessorId, newSessionId);
+    this.inheritTerminalLink(predecessorId, newSessionId);
 
-    // Inherit workChainId from predecessor to new session
-    if (predecessorWorkChainId) {
-      this.setWorkChainId(newSessionId, predecessorWorkChainId);
-      console.log(`[COMPACTION] Inherited workChainId ${predecessorWorkChainId.slice(0, 8)} to new session`);
-
-      // Increment compaction count for this work chain
-      const currentCount = this.workChainCompactionCounts.get(predecessorWorkChainId) ?? 0;
-      this.workChainCompactionCounts.set(predecessorWorkChainId, currentCount + 1);
-      console.log(`[COMPACTION] Incremented compaction count to ${currentCount + 1}`);
-    }
-
-    // Inherit terminal link from predecessor (if user was in Kitty)
-    const predecessorLink = this.linkRepo.get(predecessorId);
-    if (predecessorLink) {
-      // Update link repo to point to new session
-      this.linkRepo.upsert({
-        ...predecessorLink,
-        sessionId: newSessionId,
-        linkedAt: new Date().toISOString(),
-      });
-      // Remove old link
-      this.linkRepo.delete(predecessorId);
-      console.log(`[COMPACTION] Inherited terminal link (kitty:${predecessorLink.kittyWindowId}) to new session`);
-    }
-
-    // Only supersede the predecessor (not all sessions in cwd!)
+    // Mark predecessor as superseded
     console.log(`[COMPACTION] Superseding predecessor ${predecessorId.slice(0, 8)}`);
-    const session = await this.buildSession(predecessorState);
-    session.superseded = true;
-    session.supersededBy = newSessionId;
-    session.supersededAt = compactedAt;
+    await this.markPredecessorSuperseded(predecessorState, newSessionId, compactedAt);
 
-    const updateEvent = sessionsStateSchema.sessions.update({ value: session });
-    await this.stream.append(updateEvent);
-
-    // Publish the new session with inherited workChainId
+    // Republish new session with inherited data
     const newSessionState = this.sessionCache.get(newSessionId);
     if (newSessionState) {
       const newSession = await this.buildSession(newSessionState);

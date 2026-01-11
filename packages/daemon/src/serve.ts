@@ -43,6 +43,12 @@ import {
   FLEET_GATEWAY_HOST,
   FLEET_GATEWAY_PORT,
   FLEET_BASE_DIR,
+  PORT_CHECK_SOCKET_TIMEOUT_MS,
+  DAEMON_HEALTH_CHECK_TIMEOUT_MS,
+  PORT_RELEASE_WAIT_MS,
+  WATCHER_DEBOUNCE_MS,
+  STATUS_WATCHER_DEBOUNCE_MS,
+  SHUTDOWN_TIMEOUT_MS,
 } from "./config/index.js";
 import { colors } from "./utils/colors.js";
 import { createApiRouter } from "./api/router.js";
@@ -77,7 +83,7 @@ function isRecentSession(session: SessionState): boolean {
 async function isPortInUse(port: number, host: string): Promise<boolean> {
   return new Promise((resolve) => {
     const socket = createConnection({ port, host });
-    socket.setTimeout(1000);
+    socket.setTimeout(PORT_CHECK_SOCKET_TIMEOUT_MS);
     socket.on("connect", () => {
       socket.destroy();
       resolve(true);
@@ -128,7 +134,7 @@ async function ensurePortAvailable(port: number, host: string): Promise<void> {
     // Try to ping existing daemon's API health endpoint
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 2000);
+      const timeout = setTimeout(() => controller.abort(), DAEMON_HEALTH_CHECK_TIMEOUT_MS);
       const response = await fetch(`http://${host}:${API_PORT}/api/v1/health`, {
         signal: controller.signal,
       }).finally(() => clearTimeout(timeout));
@@ -146,7 +152,7 @@ async function ensurePortAvailable(port: number, host: string): Promise<void> {
     console.log(`${colors.yellow}[STARTUP]${colors.reset} Daemon not responding, attempting to clear stale process...`);
     if (killProcessOnPort(port)) {
       // Wait a moment for port to be released
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, PORT_RELEASE_WAIT_MS));
 
       // Verify port is now free
       if (await isPortInUse(port, host)) {
@@ -186,10 +192,10 @@ async function main(): Promise<void> {
   await ensurePortAvailable(FLEET_GATEWAY_PORT, FLEET_GATEWAY_HOST);
 
   // Start the session watcher early so Gateway can use it
-  const watcher = new SessionWatcher({ debounceMs: 300 });
+  const watcher = new SessionWatcher({ debounceMs: WATCHER_DEBOUNCE_MS });
 
   // Start status watcher for file-based status updates
-  const statusWatcher = new StatusWatcher({ debounceMs: 100 });
+  const statusWatcher = new StatusWatcher({ debounceMs: STATUS_WATCHER_DEBOUNCE_MS });
 
   // Start the Fleet Gateway server with watchers (replaces Durable Streams and PTY server)
   const gatewayServer = new GatewayServer({
@@ -297,7 +303,7 @@ async function main(): Promise<void> {
     const shutdownTimeout = setTimeout(() => {
       console.error(`${colors.yellow}[WARN]${colors.reset} Shutdown timed out, forcing exit`);
       process.exit(1);
-    }, 5000);
+    }, SHUTDOWN_TIMEOUT_MS);
 
     try {
       watcher.stop();

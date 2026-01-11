@@ -10,7 +10,10 @@ The daemon provides multiple ways to watch Claude Code sessions.
 pnpm start
 ```
 
-Runs both the daemon server (port 4450) and UI dev server (port 5173) concurrently.
+Runs both the daemon and UI dev server concurrently:
+- REST API on port 4451
+- Gateway WebSocket on port 4452
+- UI on port 5173
 
 ### Daemon Server Only
 
@@ -18,7 +21,7 @@ Runs both the daemon server (port 4450) and UI dev server (port 5173) concurrent
 pnpm serve
 ```
 
-Starts the Durable Streams server on port 4450. The UI can connect to this endpoint for live updates.
+Starts the daemon with REST API (port 4451) and Gateway WebSocket (port 4452). The UI connects to the Gateway for live session updates.
 
 ### CLI Watcher (No Server)
 
@@ -26,7 +29,7 @@ Starts the Durable Streams server on port 4450. The UI can connect to this endpo
 pnpm watch
 ```
 
-Runs a terminal-based watcher that outputs session status to stdout with ANSI colors. Does not start the Durable Streams server.
+Runs a terminal-based watcher that outputs session status to stdout with ANSI colors. Does not start HTTP or WebSocket servers.
 
 ---
 

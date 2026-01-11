@@ -20,6 +20,16 @@ export const config = {
   },
 
   /**
+   * Event buffer limits - prevent unbounded memory growth
+   */
+  events: {
+    /** Maximum fleet events to keep in memory (oldest evicted first) */
+    maxFleetEvents: 1000,
+    /** Maximum session events per session (oldest evicted first) */
+    maxSessionEvents: 5000,
+  },
+
+  /**
    * REST API configuration
    */
   api: {

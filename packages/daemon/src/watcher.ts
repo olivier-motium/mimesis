@@ -1,5 +1,7 @@
 import { watch, type FSWatcher } from "chokidar";
 import { unlinkSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { EventEmitter } from "node:events";
 import {
   tailJSONL,
@@ -12,7 +14,7 @@ import { getGitInfoCached, type GitInfo } from "./git.js";
 import type { LogEntry, SessionMetadata, StatusResult, SessionStateInternal } from "./types.js";
 import { MAX_ENTRIES_PER_SESSION } from "./config/index.js";
 
-const DEFAULT_PROJECTS_DIR = `${process.env.HOME}/.claude/projects`;
+const DEFAULT_PROJECTS_DIR = path.join(os.homedir(), ".claude", "projects");
 
 /**
  * Resolve git info for a session - reuses cached info for existing sessions.

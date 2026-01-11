@@ -5,6 +5,7 @@
  * This pattern improves testability and reduces cognitive load.
  */
 
+import { config } from "../config";
 import type {
   FleetEvent,
   SessionState,
@@ -65,7 +66,13 @@ export function handleFleetEvent(
     briefingId: (message.event as Record<string, unknown>).briefing_id as number | undefined,
     data: (message.event as Record<string, unknown>).data,
   };
-  setters.setFleetEvents((prev) => [...prev, event]);
+  // Limit fleet events to prevent unbounded memory growth
+  setters.setFleetEvents((prev) => {
+    const next = [...prev, event];
+    return next.length > config.events.maxFleetEvents
+      ? next.slice(-config.events.maxFleetEvents)
+      : next;
+  });
   setters.setLastEventId(event.eventId);
   refs.lastEventIdRef.current = event.eventId;
 }
@@ -140,13 +147,18 @@ export function handleEvent(
     const existing = updated.get(sessionId) ?? [];
     // Insert in order by seq (events may arrive out of order during replay)
     const insertIndex = existing.findIndex((e) => e.seq > seq);
+    let newEvents: SequencedSessionEvent[];
     if (insertIndex === -1) {
-      updated.set(sessionId, [...existing, sequencedEvent]);
+      newEvents = [...existing, sequencedEvent];
     } else {
-      const newEvents = [...existing];
+      newEvents = [...existing];
       newEvents.splice(insertIndex, 0, sequencedEvent);
-      updated.set(sessionId, newEvents);
     }
+    // Limit session events per session to prevent unbounded memory growth
+    if (newEvents.length > config.events.maxSessionEvents) {
+      newEvents = newEvents.slice(-config.events.maxSessionEvents);
+    }
+    updated.set(sessionId, newEvents);
     return updated;
   });
 }

@@ -24,8 +24,9 @@ pnpm install
 pnpm start
 ```
 
-This starts both:
-- **Daemon** on port 4450 (watches for session changes)
+This starts:
+- **Daemon REST API** on port 4451 (session management)
+- **Daemon Gateway** on port 4452 (WebSocket for live updates)
 - **UI** on port 5173 (Vite dev server)
 
 ### 4. Open the Dashboard
@@ -112,7 +113,7 @@ pnpm watch --active   # Only non-idle sessions
 - Note: Only sessions with `.claude/status.md` files (hook system) are shown
 
 **Port already in use?**
-- Check what's using port 4450: `lsof -i :4450`
-- Use a different port: `PORT=4451 pnpm serve`
+- Check what's using daemon ports: `lsof -i :4451 -i :4452`
+- Use different ports: `API_PORT=4461 GATEWAY_PORT=4462 pnpm serve`
 
 See [Deployment Guide](operations/deployment.md) for more troubleshooting tips.

@@ -14,4 +14,5 @@ export type {
   RecentOutput,
   TerminalLink,
   EmbeddedPty,
+  PendingTool,
 } from "@mimesis/daemon/schema";

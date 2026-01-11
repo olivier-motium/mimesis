@@ -44,7 +44,7 @@ The meta index contains a **Document Map** showing exactly when to read each doc
 
 ## Project Overview
 
-Mimesis - A real-time dashboard for monitoring Claude Code sessions across multiple projects. Watches `~/.claude/projects/` for session log changes, derives status, and streams updates to a React UI via Durable Streams. Goals and summaries come from file-based status (`.claude/status.md`) written by Claude Code hooks.
+Mimesis - A real-time dashboard for monitoring Claude Code sessions across multiple projects. Watches `~/.claude/projects/` for session log changes, derives status, and streams updates to a React UI via the Fleet Gateway WebSocket. Goals and summaries come from file-based status (`.claude/status.md`) written by Claude Code hooks.
 
 ## Development Commands
 
@@ -56,8 +56,8 @@ pnpm install
 pnpm start
 
 # Run separately:
-pnpm serve           # Start daemon on port 4450
-pnpm dev             # Start UI dev server
+pnpm serve           # Start daemon (REST API 4451, Gateway 4452)
+pnpm dev             # Start UI dev server (port 5173)
 
 # Daemon watch modes:
 pnpm watch           # CLI watcher (no streaming server)
@@ -80,7 +80,7 @@ cd packages/daemon && pnpm build       # TypeScript compile
 │  Claude Code    │     │     Daemon      │     │       UI        │
 │   Sessions      │────▶│   (Watcher)     │────▶│   (React)       │
 │  ~/.claude/     │     │                 │     │                 │
-│   projects/     │     │  Durable Stream │     │  TanStack DB    │
+│   projects/     │     │  Fleet Gateway  │     │  Timeline View  │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
@@ -88,11 +88,11 @@ cd packages/daemon && pnpm build       # TypeScript compile
 
 - **`watcher.ts`** - Chokidar file watcher for `~/.claude/projects/**/*.jsonl`. Emits session events (created/updated/deleted). Tracks byte positions for incremental reads.
 - **`parser.ts`** - JSONL parser with incremental reading (`tailJSONL`). Extracts session metadata and handles partial lines.
-- **`status-machine.ts`** - XState state machine for session status detection:
-  - States: `idle`, `working`, `waiting_for_approval`, `waiting_for_input`
-  - Events: `USER_PROMPT`, `TOOL_RESULT`, `ASSISTANT_STREAMING`, `ASSISTANT_TOOL_USE`, `TURN_END`, timeout events
-  - Maps 4 internal states to 3 UI states (working/waiting/idle)
-- **`server.ts`** - Durable Streams server wrapper. Publishes `Session` state to stream.
+- **`gateway/`** - Fleet Gateway module for real-time session management:
+  - `gateway-server.ts` - WebSocket connection manager (port 4452)
+  - `session-store.ts` - Unified session tracking
+  - `pty-bridge.ts` - PTY spawn and I/O
+  - `event-merger.ts` - Merge PTY stdout + hook events
 - **`status-watcher.ts`** - Watches `.claude/status.md` files for goal/summary from hooks
 - **`git.ts`** - Git repo info extraction (branch, remote URL)
 - **`schema.ts`** - Zod schemas for session state, exported via `@mimesis/daemon/schema`
@@ -102,10 +102,10 @@ cd packages/daemon && pnpm build       # TypeScript compile
 - **TanStack Router** for routing with file-based routes in `src/routes/`
 - **shadcn/ui + Tailwind CSS v4** for components (Radix primitives + Tailwind utilities)
 - **TanStack Table** for DataTable component
-- **TanStack DB** for reactive local state from Durable Streams
-- **`src/data/sessionsDb.ts`** - Singleton StreamDB connection to daemon
-- **`src/hooks/useSessions.ts`** - React hook for session data
-- **`src/components/`** - Fleet Command (Roster, Viewport, TacticalIntel, EventTicker), DataTable
+- **@tanstack/react-virtual** for virtualized Timeline scrolling
+- **`src/hooks/useGateway.ts`** - Gateway WebSocket connection and session management
+- **`src/components/timeline/`** - Timeline components (tool steps, text, thinking, stdout)
+- **`src/components/fleet-command/`** - Fleet Command (Roster, TacticalIntel, EventTicker)
 
 ## Key Data Types
 
@@ -158,10 +158,11 @@ The JSONL files contain discriminated union entries (`type` field):
 
 The daemon tracks byte positions per file to avoid re-reading entire logs. On file change, only new bytes are read and parsed. Partial lines (incomplete writes) are detected and skipped until complete.
 
-### Durable Streams Integration
+### Gateway Integration
 
-- Daemon runs server on port 4450 at `/sessions` endpoint
-- UI connects via `@durable-streams/client` with SSE for live updates
+- Daemon runs Gateway WebSocket server on port 4452
+- UI connects via `useGateway` hook with automatic reconnection
+- Protocol supports session lifecycle, PTY I/O, and fleet events
 - Schema exported from `@mimesis/daemon/schema` for type safety
 
 ### Status Detection
@@ -171,7 +172,8 @@ Uses XState for deterministic state transitions. The machine processes all log e
 ## File Locations
 
 - Claude session logs: `~/.claude/projects/<encoded-dir>/<session-id>.jsonl`
-- Daemon stream data: `~/.mimesis/streams/`
+- SQLite database: `~/.mimesis/data.db`
+- Fleet briefing ledger: `~/.claude/commander/fleet.db`
 - Encoded directory format: `/Users/foo/bar` → `-Users-foo-bar`
 
 ## Tech Stack
@@ -181,11 +183,12 @@ Uses XState for deterministic state transitions. The machine processes all log e
 | Runtime | Node.js 22.13.1 |
 | Package Manager | pnpm 10.26.0 |
 | File Watching | chokidar v5 (ESM-only) |
-| State Machine | XState v5 |
-| Streaming | @durable-streams/* |
+| Database | SQLite (better-sqlite3, Drizzle ORM) |
+| Streaming | Fleet Gateway WebSocket |
 | UI Framework | React 19 |
 | Routing | TanStack Router |
 | UI Components | shadcn/ui + Tailwind CSS v4 |
 | Tables | TanStack Table v8 |
+| Virtualization | @tanstack/react-virtual |
 | Validation | Zod |
 | Build | Vite |

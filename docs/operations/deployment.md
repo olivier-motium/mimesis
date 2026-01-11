@@ -15,15 +15,17 @@ How to run Mimesis in production.
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `STREAM_HOST` | No | `127.0.0.1` | Host to bind stream server |
-| `PORT` | No | `4450` | Port for stream server |
+| `API_HOST` | No | `127.0.0.1` | Host to bind REST API server |
+| `API_PORT` | No | `4451` | Port for REST API server |
+| `GATEWAY_PORT` | No | `4452` | Port for Gateway WebSocket server |
 | `MAX_AGE_HOURS` | No | `24` | Filter sessions older than this |
 
 ### UI (packages/ui)
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `VITE_STREAM_URL` | No | `http://127.0.0.1:4450/sessions` | URL to daemon stream endpoint |
+| `VITE_API_URL` | No | `http://127.0.0.1:4451` | URL to daemon REST API |
+| `VITE_GATEWAY_URL` | No | `ws://127.0.0.1:4452` | URL to Gateway WebSocket |
 
 See [Configuration Reference](configuration.md) for all internal constants.
 
@@ -39,7 +41,7 @@ pnpm install
 pnpm start
 
 # Or run separately:
-pnpm serve  # Daemon on port 4450
+pnpm serve  # Daemon: REST API on port 4451, Gateway on port 4452
 pnpm dev    # UI on port 5173
 ```
 
@@ -133,7 +135,8 @@ systemctl --user start mimesis
 | Path | Purpose | Managed By |
 |------|---------|------------|
 | `~/.claude/projects/` | Session log files | Claude Code (read-only) |
-| `~/.mimesis/streams/` | Durable Streams persistence | Daemon |
+| `~/.mimesis/data.db` | SQLite database | Daemon |
+| `~/.claude/commander/fleet.db` | Fleet briefing ledger | Daemon |
 
 ### Log Retention
 
@@ -151,7 +154,8 @@ Claude Code retains logs for 30 days by default. Extend via `~/.claude/settings.
 
 | Port | Service | Configurable |
 |------|---------|--------------|
-| 4450 | Durable Streams server | Yes (`PORT` env var) |
+| 4451 | REST API (Hono) | Yes (`API_PORT` env var) |
+| 4452 | Gateway WebSocket | Yes (`GATEWAY_PORT` env var) |
 | 5173 | UI dev server (Vite) | Yes (vite.config.ts) |
 
 ---
@@ -163,8 +167,13 @@ Claude Code retains logs for 30 days by default. Extend via `~/.claude/settings.
 Check if daemon is responding:
 
 ```bash
-curl http://127.0.0.1:4450/sessions
-# Should return SSE stream
+# Check REST API
+curl http://127.0.0.1:4451/api/health
+# Should return {"status":"ok"}
+
+# Check Gateway WebSocket (requires wscat or similar)
+wscat -c ws://127.0.0.1:4452
+# Should connect successfully
 ```
 
 ### UI Health
@@ -187,7 +196,7 @@ curl http://localhost:5173
    - Daemon pings existing health endpoint at startup
    - If healthy daemon exists, exits gracefully with message
    - If stale process detected, automatically kills and restarts
-3. Manual cleanup if needed: `lsof -i :4450 | grep LISTEN | awk '{print $2}' | xargs kill`
+3. Manual cleanup if needed: `lsof -i :4451 -i :4452 | grep LISTEN | awk '{print $2}' | xargs kill`
 
 ### Sessions not appearing
 

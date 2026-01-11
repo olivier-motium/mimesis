@@ -9,7 +9,7 @@
  * Connects to Fleet Gateway via WebSocket for realtime updates.
  */
 
-import { useState, useCallback, useMemo, useEffect } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { CommandBar } from "./CommandBar";
 import { Roster } from "./Roster";
 import { TacticalIntel } from "./TacticalIntel";
@@ -20,9 +20,9 @@ import { StatusStrip } from "../StatusStrip";
 import { countSessionsByStatus } from "../ops-table/utils";
 import { useGateway } from "../../hooks/useGateway";
 import { useSessionEvents } from "../../hooks/useSessionEvents";
+import { useFleetKeyboard } from "../../hooks/useFleetKeyboard";
 import type { FleetCommandProps } from "./types";
 import type { StatusFilter } from "../ops-table/types";
-import { cn } from "../../lib/utils";
 
 // ============================================================================
 // Component
@@ -97,89 +97,17 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
     });
   }, [gateway]);
 
-  // Keyboard navigation
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      if (
-        target.tagName === "INPUT" ||
-        target.tagName === "TEXTAREA" ||
-        target.isContentEditable
-      ) {
-        return;
-      }
-
-      const getChainId = (s: typeof sessions[0]) => s.workChainId ?? s.sessionId;
-      const currentIndex = sessions.findIndex(
-        (s) => getChainId(s) === selectedSessionId
-      );
-
-      switch (e.key) {
-        case "ArrowUp": {
-          e.preventDefault();
-          if (sessions.length === 0) return;
-          if (currentIndex <= 0) {
-            handleSelectSession(getChainId(sessions[sessions.length - 1]));
-          } else {
-            handleSelectSession(getChainId(sessions[currentIndex - 1]));
-          }
-          break;
-        }
-        case "ArrowDown": {
-          e.preventDefault();
-          if (sessions.length === 0) return;
-          if (currentIndex < 0 || currentIndex >= sessions.length - 1) {
-            handleSelectSession(getChainId(sessions[0]));
-          } else {
-            handleSelectSession(getChainId(sessions[currentIndex + 1]));
-          }
-          break;
-        }
-        case "Escape": {
-          e.preventDefault();
-          if (showCommander) {
-            setShowCommander(false);
-          } else {
-            setSelectedSessionId(null);
-          }
-          break;
-        }
-        // Tab toggle
-        case "Tab": {
-          if (e.ctrlKey || e.metaKey) {
-            e.preventDefault();
-            setShowCommander((prev) => !prev);
-          }
-          break;
-        }
-        // Filter shortcuts
-        case "a":
-        case "A":
-          if (!e.metaKey && !e.ctrlKey) {
-            e.preventDefault();
-            setFilter("all");
-          }
-          break;
-        case "w":
-        case "W":
-          if (!e.metaKey && !e.ctrlKey) {
-            e.preventDefault();
-            setFilter("working");
-          }
-          break;
-        case "i":
-        case "I":
-          if (!e.metaKey && !e.ctrlKey) {
-            e.preventDefault();
-            setFilter("waiting");
-          }
-          break;
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [sessions, selectedSessionId, showCommander, handleSelectSession]);
+  // Keyboard navigation (extracted to hook)
+  useFleetKeyboard({
+    sessions,
+    selectedSessionId,
+    onSelectSession: handleSelectSession,
+    onDeselectSession: useCallback(() => setSelectedSessionId(null), []),
+    showCommander,
+    onToggleCommander: useCallback(() => setShowCommander((prev) => !prev), []),
+    onCloseCommander: useCallback(() => setShowCommander(false), []),
+    onFilterChange: setFilter,
+  });
 
   return (
     <div className="fleet-command">

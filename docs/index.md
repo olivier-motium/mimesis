@@ -37,16 +37,28 @@ Real-time monitoring dashboard for Claude Code sessions.
 
 | Document | Purpose |
 |----------|---------|
+| [Gateway Architecture](architecture/gateway.md) | WebSocket protocol and session management |
+| [Fleet DB Schema](architecture/fleet-db.md) | SQLite persistence layer |
 | [UI Components](ui-components.md) | React component hierarchy |
 | [Daemon APIs](api/daemon-api.md) | Internal service documentation |
 | [spec.md](../spec.md) | Log format specification and types |
 
-### Reference Documentation
+### Specifications
 
-External knowledge bases for related technologies:
+Implementation specifications for Fleet Commander versions:
+
+| Document | Version | Status |
+|----------|---------|--------|
+| [SPEC_6.md](../SPEC_6.md) | v5.1 | **Current Implementation** |
+| [FLEET_CMD_SPEC_V5.md](../FLEET_CMD_SPEC_V5.md) | v5 | Design spec |
+| [FLEET_CMD_SPEC_V3.md](../FLEET_CMD_SPEC_V3.md) | v3 | Historical |
+| [FLEET_CMD_SPEC.md](../FLEET_CMD_SPEC.md) | v1 | Historical |
+
+### Reference Documentation
 
 | Guide | Description |
 |-------|-------------|
+| [Claude Code Toolkit](claude-code/README.md) | Commands, skills, and hooks for Claude Code |
 | [PydanticAI Reference](PydanticAI/INDEX.md) | AI agent framework documentation |
 | [Logfire Guide](Logfire_cleaned/Index.md) | Observability platform guide |
 
@@ -57,9 +69,9 @@ External knowledge bases for related technologies:
 | Concept | Description | Location |
 |---------|-------------|----------|
 | **Session Watcher** | Monitors `~/.claude/projects/` for JSONL changes | [README](../README.md#daemon) |
-| **Status Machine** | XState state machine for session status | [README](../README.md#session-status-state-machine) |
+| **Fleet Gateway** | WebSocket server for PTY sessions and real-time events (port 4452) | [Gateway Architecture](architecture/gateway.md) |
 | **File-Based Status** | Claude Code hooks write status to `.claude/status.md` for goal/summary | [Daemon API](api/daemon-api.md#file-based-status-system-status-watcherts-status-parserts) |
-| **Durable Streams** | Real-time state sync between daemon and UI | [CLAUDE.md](../CLAUDE.md#durable-streams-integration) |
+| **Fleet DB** | SQLite ledger for briefings, jobs, projects | [Fleet DB Schema](architecture/fleet-db.md) |
 
 ---
 
@@ -68,16 +80,26 @@ External knowledge bases for related technologies:
 ```
 mimesis/
 ├── packages/
-│   ├── daemon/     # Node.js file watcher + stream server
+│   ├── daemon/     # Node.js watcher + Gateway server
 │   └── ui/         # React dashboard
 ├── docs/           # Extended documentation (you are here)
-│   ├── api/        # Internal API documentation
-│   ├── guides/     # How-to guides
-│   ├── operations/ # Deployment and configuration
+│   ├── architecture/     # System design (Gateway, Fleet DB)
+│   ├── api/              # Internal API documentation
+│   ├── guides/           # How-to guides
+│   ├── operations/       # Deployment and configuration
+│   ├── claude-code/      # Claude Code Toolkit (commands, skills, hooks)
 │   ├── Logfire_cleaned/  # Logfire knowledge base
-│   └── PydanticAI/ # PydanticAI knowledge base
-└── *.md            # Root-level docs
+│   └── PydanticAI/       # PydanticAI knowledge base
+└── *.md            # Root-level docs and specs
 ```
+
+## Port Allocation
+
+| Port | Service |
+|------|---------|
+| 4451 | REST API (Hono) |
+| 4452 | Gateway WebSocket |
+| 5173 | UI dev server |
 
 ---
 

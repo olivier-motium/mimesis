@@ -1,255 +1,32 @@
 # UI Components
 
-The React UI is built with TanStack Router, shadcn/ui (Radix primitives + Tailwind CSS v4), TanStack Table, and custom Mimesis styling.
+The React UI is built with TanStack Router, shadcn/ui (Radix primitives + Tailwind CSS v4), and custom Mimesis styling. Real-time updates come from the Fleet Gateway via WebSocket.
 
-## Component Hierarchy (Agent Command)
-
-```
-__root.tsx (dark theme wrapper)
-└── index.tsx (Agent Command Page)
-    └── AgentCommand (3-zone operator console)
-        ├── CommandBar (top header)
-        ├── ProjectNavigator (left sidebar)
-        │   └── ProjectGroup[] (grouped by repo)
-        │       └── AgentItem[] (individual agents)
-        ├── TerminalView (center terminal)
-        │   └── Terminal (xterm.js instance)
-        └── LiveStatePanel (right sidebar)
-            ├── StatusBadge
-            ├── NowSection
-            ├── CwdSection
-            └── RecentOutput
-```
-
-> **Design Philosophy:** Agent-focused, not Git-focused. We monitor agents running in terminals, not diffs or PRs. The sidebar shows projects with active agents as clickable "tabs". Clicking an agent opens its terminal in the center. No tab bar above terminal - the sidebar IS the tab system.
-
----
-
-## Agent Command Module
-
-**Location:** `packages/ui/src/components/agent-command/`
-
-| File | Purpose |
-|------|---------|
-| `AgentCommand.tsx` | Main container with 3-zone layout |
-| `ProjectNavigator.tsx` | Left sidebar with project tree |
-| `ProjectGroup.tsx` | Collapsible project section |
-| `AgentItem.tsx` | Individual agent entry (the "tab") |
-| `TerminalView.tsx` | Center terminal wrapper |
-| `LiveStatePanel.tsx` | Right sidebar with live state |
-| `types.ts` | TypeScript interfaces |
-| `index.ts` | Barrel exports |
-
----
-
-## 3-Zone Grid Layout
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ COMMAND BAR: Logo, Online Status, Agent Counts                      │
-├───────────────┬────────────────────────────────────┬────────────────┤
-│ PROJECT NAV   │ TERMINAL                           │ LIVE STATE     │
-│ (280px)       │ (flex: 1)                          │ (320px)        │
-│               │                                    │                │
-│ ▼ mimesis     │                                    │ STATUS         │
-│   ● agent-1   │  > Terminal output here...         │ ● Working      │
-│   ○ agent-2   │  > claude working on task...       │                │
-│               │  > Let me read the file.           │ NOW            │
-│ ▼ conductor   │  >                                 │ Editing api.ts │
-│   ● agent-3   │                                    │                │
-│   ● agent-4   │                                    │ CWD            │
-│               │                                    │ ~/mimesis      │
-│ ▼ fleet-api   │                                    │                │
-│   ○ agent-5   │                                    │ RECENT OUTPUT  │
-│               │                                    │ AI: "Perfect!" │
-│               │                                    │ Tool: Edit...  │
-│               │                                    │ User: "fix it" │
-└───────────────┴────────────────────────────────────┴────────────────┘
-```
-
-**Grid Configuration:**
-```css
-grid-template-areas:
-  "header header header"
-  "sidebar terminal intel";
-grid-template-columns: 280px 1fr 320px;
-grid-template-rows: 48px 1fr;
-```
-
----
-
-## Left Sidebar: Project Navigator
-
-Groups sessions by `gitRepoId` (or `cwd` fallback). Each agent is a clickable "tab".
-
-### `ProjectNavigator`
-
-**Props:**
-- `sessions: Session[]` - All sessions
-- `selectedSessionId: string | null` - Currently selected
-- `onSelectSession: (id: string) => void` - Selection callback
-
-**Features:**
-- Groups sessions by gitRepoId or cwd
-- Renders ProjectGroup for each project
-
-### `ProjectGroup`
-
-**Props:**
-- `projectName: string` - Display name
-- `sessions: Session[]` - Sessions in this project
-- `selectedSessionId: string | null` - Currently selected
-- `onSelectSession: (sessionId: string) => void` - Selection callback
-- `defaultExpanded?: boolean` - Initial expanded state
-
-**Features:**
-- Collapsible with chevron toggle
-- Shows working count badge
-- Shows total count badge
-
-### `AgentItem`
-
-**Props:**
-- `session: Session` - Session data
-- `isSelected: boolean` - Selection state
-- `onSelect: () => void` - Click handler
-
-**Displays:**
-- Status indicator (●/○/!/✖)
-- Agent name (branch or session ID)
-- Git branch icon
-
-**Status Indicators:**
-| Status | Symbol | Class |
-|--------|--------|-------|
-| working | ● | `--working` |
-| waiting | ! | `--waiting` |
-| idle | ○ | `--idle` |
-| error | ✖ | `--error` |
-
----
-
-## Center: Terminal View
-
-Shows the terminal for the selected agent.
-
-### `TerminalView`
-
-**Props:**
-- `session: Session | null` - Selected session
-
-**Features:**
-- Wraps existing Terminal component
-- PTY initialization with retry logic
-- Empty state when no agent selected
-- Auto-retry on "Session not found" errors
-
-**PTY Lifecycle:**
-1. Session selected → check for existing PTY
-2. Call `ensurePty(sessionId)` to get-or-create
-3. Connect Terminal component to WebSocket
-4. Handle connection/disconnection states
-
----
-
-## Right Sidebar: Live State Panel
-
-Shows live state for the selected agent.
-
-### `LiveStatePanel`
-
-**Props:**
-- `session: Session | null` - Selected session
-
-**Sections:**
-1. **STATUS** - Working/Waiting/Idle/Error badge
-2. **NOW** - Current action text
-3. **CWD** - Working directory (truncated)
-4. **LAST ACTIVITY** - Time since last activity
-5. **RECENT OUTPUT** - Last 10 output entries (role + content)
-
-**Status Badge Colors:**
-| Status | Color |
-|--------|-------|
-| working | Green |
-| waiting | Yellow |
-| idle | Gray |
-| error | Red |
-
----
-
-## Keyboard Navigation
-
-| Key | Action |
-|-----|--------|
-| `↑` / `↓` | Navigate agents |
-| `Escape` | Deselect agent |
-
-**Implementation:**
-- Global `keydown` listener in `AgentCommand`
-- Skipped when focus is in input/textarea
-- Cycles through all agents across projects
-
----
-
-## Legacy: Component Hierarchy (Fleet Command)
+## Component Hierarchy (Fleet Command v5)
 
 ```
 __root.tsx (dark theme wrapper)
 └── index.tsx (Fleet Command Page)
-    └── FleetCommand (4-zone operator console)
+    └── FleetCommand (3-column Melty-style layout)
         ├── CommandBar (top header)
-        ├── Roster (Zone A - left sidebar)
-        │   └── RosterItem (individual agent)
-        ├── Viewport (Zone B - center terminal)
-        │   └── Terminal (xterm.js instance)
-        ├── TacticalIntel (Zone C - right sidebar)
-        │   ├── ExecutionPlan
-        │   └── ArtifactsList
-        └── EventTicker (Zone D - bottom bar)
+        ├── StatusStrip (filter bar)
+        ├── Roster (left sidebar)
+        │   └── RosterItem[] (individual agents)
+        ├── Timeline + SessionInput (center viewport)
+        │   ├── Timeline (virtualized event stream)
+        │   │   ├── TimelineToolStep (tool use cards)
+        │   │   ├── TimelineText (text output)
+        │   │   ├── TimelineThinking (thinking blocks)
+        │   │   ├── TimelineStdout (terminal output)
+        │   │   ├── TimelineProgress (progress events)
+        │   │   └── TimelineStatusChange (status transitions)
+        │   └── SessionInput (command input)
+        └── TacticalIntel (right sidebar)
+            ├── Fleet Events
+            └── Session Details
 ```
 
-> **Design Philosophy:** The UI follows a "Fleet Command" pattern inspired by RTS games (StarCraft, Civ). Agents are "units" to be monitored, not "tasks" to be moved. The terminal is always visible, and clicking an agent instantly tunes the viewport to their frequency.
-
----
-
-## Core Layout
-
-### 4-Zone Grid
-
-The Fleet Command uses a CSS Grid layout with 4 static zones:
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│ COMMAND BAR: [MIMESIS] [ONLINE] [AGENTS: 3/5]                 [v2] │
-├──────────────┬─────────────────────────────────────┬────────────────┤
-│ ROSTER       │ VIEWPORT                            │ TACTICAL INTEL │
-│ (Zone A)     │ (Zone B)                            │ (Zone C)       │
-│              │                                     │                │
-│ [agent-1] ●  │ ┌─ HUD ─────────────────────────┐  │ EXECUTION PLAN │
-│ [agent-2] ○  │ │ Goal: Refactor JWT refresh... │  │ ☑ Analyze flow │
-│ [agent-3] ○  │ └───────────────────────────────┘  │ ☐ Update API   │
-│              │                                     │                │
-│              │ > Terminal output here...           │ ARTIFACTS      │
-│              │ > Working on auth module...         │ src/auth.ts    │
-│              │                                     │ tests/auth.ts  │
-│              │ ┌─ Command Input ──────────────┐   │                │
-│              │ │ Send command to agent...     │   │                │
-│              │ └──────────────────────────────┘   │                │
-├──────────────┴─────────────────────────────────────┴────────────────┤
-│ TICKER: [13:14:02] agent-1 started working | [13:14:05] agent-2... │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-**Grid Configuration:**
-```css
-grid-template-areas:
-  "header header header"
-  "roster viewport intel"
-  "ticker ticker ticker";
-grid-template-columns: 288px 1fr 320px;
-grid-template-rows: 48px 1fr 28px;
-```
+> **Design Philosophy:** The v5 UI uses a Melty-style 3-column layout. The center viewport shows a structured Timeline of session events rather than a raw terminal. This provides better readability and enables virtualized rendering for performance.
 
 ---
 
@@ -259,22 +36,185 @@ grid-template-rows: 48px 1fr 28px;
 
 | File | Purpose |
 |------|---------|
-| `FleetCommand.tsx` | Main container with 4-zone layout |
+| `FleetCommand.tsx` | Main container with 3-column layout |
 | `CommandBar.tsx` | Top header with logo and status |
-| `Roster.tsx` | Left sidebar agent list |
-| `RosterItem.tsx` | Individual agent row |
-| `Viewport.tsx` | Center terminal with HUD |
-| `TacticalIntel.tsx` | Right sidebar with plan/artifacts |
-| `EventTicker.tsx` | Bottom event stream |
+| `Roster.tsx` | Left sidebar session list |
+| `RosterItem.tsx` | Individual session entry |
+| `TacticalIntel.tsx` | Right sidebar with fleet events |
 | `types.ts` | TypeScript interfaces |
 | `constants.ts` | Utilities and formatters |
 | `index.ts` | Barrel exports |
 
 ---
 
-## Zone A: The Roster
+## 3-Column Grid Layout
 
-High-density vertical list of active agents ("Control Group").
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ COMMAND BAR: Logo, Gateway Status, Agent Counts, Commander Toggle   │
+├─────────────────────────────────────────────────────────────────────┤
+│ STATUS STRIP: [All: 5] [Working: 2] [Waiting: 1] [Idle: 2]         │
+├───────────────┬────────────────────────────────────────┬────────────┤
+│ ROSTER        │ VIEWPORT                               │ TACTICAL   │
+│ (288px)       │ (flex: 1)                              │ (320px)    │
+│               │                                        │            │
+│ 🔍 Search...  │ ┌─ Timeline ─────────────────────┐    │ FLEET      │
+│               │ │                                │    │ EVENTS     │
+│ ▼ mimesis     │ │ [Tool] Edit api.ts             │    │            │
+│   ● session-1 │ │ 📝 Modified lines 45-67        │    │ briefing   │
+│   ○ session-2 │ │                                │    │ skill      │
+│               │ │ [Text] Let me fix that...      │    │ updated    │
+│ ▼ conductor   │ │                                │    │            │
+│   ● session-3 │ │ [Thinking] Analyzing the       │    │ SESSION    │
+│               │ │ error pattern...               │    │ DETAILS    │
+│               │ └────────────────────────────────┘    │            │
+│               │                                        │ Status     │
+│               │ ┌─ Session Input ────────────────┐    │ Branch     │
+│               │ │ Send command to session...     │    │ CWD        │
+│               │ └────────────────────────────────┘    │            │
+└───────────────┴────────────────────────────────────────┴────────────┘
+```
+
+**Grid Configuration:**
+```css
+grid-template-areas:
+  "header header header"
+  "filters filters filters"
+  "roster viewport intel";
+grid-template-columns: 288px 1fr 320px;
+grid-template-rows: 48px 40px 1fr;
+```
+
+---
+
+## Timeline Module
+
+**Location:** `packages/ui/src/components/timeline/`
+
+The Timeline replaces the terminal view with structured event rendering using `@tanstack/react-virtual` for performance.
+
+| File | Purpose |
+|------|---------|
+| `Timeline.tsx` | Main virtualized container |
+| `TimelineToolStep.tsx` | Tool use cards (pre/post phases) |
+| `TimelineText.tsx` | Text content blocks |
+| `TimelineThinking.tsx` | Thinking/reasoning blocks |
+| `TimelineStdout.tsx` | Raw terminal output |
+| `TimelineProgress.tsx` | Progress indicators |
+| `TimelineStatusChange.tsx` | Status transition markers |
+
+### `Timeline`
+
+**Props:**
+- `events: TimelineEvent[]` - Session events to render
+- `isScrolledAway: boolean` - User has scrolled up
+- `onScrolledAwayChange: (away: boolean) => void` - Scroll state callback
+- `className?: string` - Additional CSS classes
+
+**Features:**
+- Virtualized rendering for large event streams
+- Auto-scroll to bottom on new events (when at bottom)
+- "Scroll to bottom" button when scrolled away
+- Event-specific row heights for accurate virtualization
+
+### Event Types
+
+```typescript
+type TimelineEvent =
+  | ToolGroupEvent    // Tool use with pre/post phases
+  | TextEvent         // Claude text output
+  | ThinkingEvent     // Thinking/reasoning block
+  | StdoutEvent       // Raw terminal output
+  | ProgressEvent     // Progress percentage/message
+  | StatusChangeEvent // Status transition (working → idle)
+```
+
+### `TimelineToolStep`
+
+Renders tool invocations with expandable details.
+
+**Displays:**
+- Tool name with icon
+- Phase indicator (pre/post)
+- Success/failure status
+- Expandable input/output JSON
+
+### `TimelineText`
+
+Renders Claude's text responses.
+
+**Displays:**
+- Formatted text content
+- Timestamp
+
+### `TimelineThinking`
+
+Renders thinking/reasoning blocks.
+
+**Displays:**
+- Collapsible thinking content
+- Visual distinction from regular text
+
+---
+
+## Session Input Module
+
+**Location:** `packages/ui/src/components/session-input/`
+
+| File | Purpose |
+|------|---------|
+| `SessionInput.tsx` | Command input with signal buttons |
+| `InputHistory.tsx` | Input history dropdown |
+
+### `SessionInput`
+
+**Props:**
+- `sessionId: string | null` - Active session
+- `sessionStatus: "working" | "waiting" | "idle"` - Session state
+- `onSendStdin: (sessionId: string, data: string) => void` - Input callback
+- `onSendSignal: (sessionId: string, signal: string) => void` - Signal callback
+
+**Features:**
+- Text input for sending commands
+- Submit button (appends Enter)
+- SIGINT button (Ctrl+C)
+- Disabled when no session selected
+- Input history (up arrow)
+
+---
+
+## Commander Module
+
+**Location:** `packages/ui/src/components/commander/`
+
+The Commander provides a chat interface for headless Claude jobs.
+
+| File | Purpose |
+|------|---------|
+| `CommanderTab.tsx` | Main Commander view |
+| `CommanderHistory.tsx` | Conversation history |
+| `CommanderInput.tsx` | Message input |
+| `CommanderStreamDisplay.tsx` | Streaming response display |
+
+### `CommanderTab`
+
+**Props:**
+- `activeJob: JobState | null` - Current running job
+- `onCreateJob: (prompt: string) => void` - Create job callback
+- `onCancelJob: () => void` - Cancel job callback
+
+**Features:**
+- Toggle via Cmd+Tab
+- Shows streaming job output
+- Job history display
+
+---
+
+## Left Sidebar: Roster
+
+**Location:** `packages/ui/src/components/fleet-command/Roster.tsx`
+
+Session list with search and filtering.
 
 ### `Roster`
 
@@ -284,6 +224,7 @@ High-density vertical list of active agents ("Control Group").
 - `onSelectSession: (id: string) => void` - Selection callback
 - `searchQuery: string` - Filter query
 - `onSearchChange: (query: string) => void` - Search callback
+- `compact?: boolean` - Compact display mode
 
 **Features:**
 - Search/filter input
@@ -293,8 +234,8 @@ High-density vertical list of active agents ("Control Group").
 ### `RosterItem`
 
 **Displays:**
-- Agent name (branch or session ID)
-- Status icon (working/waiting/idle/error)
+- Session name (branch or session ID)
+- Status indicator (working/waiting/idle)
 - Git branch
 - Last activity time
 
@@ -304,130 +245,205 @@ High-density vertical list of active agents ("Control Group").
 | working | Green (`#10b981`) |
 | waiting | Yellow (`#eab308`) |
 | idle | Gray (`#3f3f46`) |
-| error | Red (`#ef4444`) |
 
 ---
 
-## Zone B: The Viewport
+## Right Sidebar: Tactical Intel
 
-Persistent terminal that "tunes" to the selected agent.
+**Location:** `packages/ui/src/components/fleet-command/TacticalIntel.tsx`
 
-### `Viewport`
-
-**Props:**
-- `session: Session | null` - Selected session
-- `onSendCommand: (text: string) => void` - Command callback
-
-**Components:**
-1. **HUD Overlay** - Shows goal and status badge with gradient fade
-2. **Terminal** - xterm.js instance connected to PTY
-3. **Command Input** - Text input for sending commands
-
-**PTY Lifecycle:**
-1. When session changes → check for existing PTY
-2. If none exists → create via `createPty(sessionId)`
-3. Connect Terminal component to WebSocket
-4. Commands sent via `sendText()` API
-
-### Empty State
-
-When no session selected:
-```
-┌────────────────────────┐
-│         📺            │
-│   No agent selected   │
-│   Click an agent to   │
-│       connect         │
-└────────────────────────┘
-```
-
----
-
-## Zone C: Tactical Intel
-
-Shows "why" (the plan) and "where" (artifacts) for the selected agent.
+Shows fleet events and session details.
 
 ### `TacticalIntel`
 
+**Props:**
+- `session: Session | null` - Selected session
+- `fleetEvents: FleetEvent[]` - Fleet event stream
+- `gatewayStatus: GatewayStatus` - Connection status
+
 **Sections:**
-1. **Execution Plan** - Step-by-step task list with checkmarks
-2. **Modified Artifacts** - List of files being worked on
-
-**Plan Data Sources:**
-- `session.fileStatus?.nextSteps` (if available)
-- Fallback: synthesize from `session.goal` and `session.summary`
-
-**Artifact Extraction:**
-- `session.pendingTool?.target` (current tool target)
-- File paths parsed from `session.recentOutput`
+1. **Fleet Events** - Recent fleet events (briefings, skill updates)
+2. **Session Details** - Selected session metadata
 
 ---
 
-## Zone D: The Event Ticker
+## Status Strip
 
-Global event bus for cross-agent awareness.
+**Location:** `packages/ui/src/components/StatusStrip.tsx`
 
-### `EventTicker`
+Filter bar showing session counts by status.
+
+### `StatusStrip`
 
 **Props:**
-- `events: AgentEvent[]` - Recent events (max 50)
+- `counts: { working: number; waiting: number; idle: number; total: number }` - Session counts
+- `activeFilter: StatusFilter` - Current filter
+- `onFilterChange: (filter: StatusFilter) => void` - Filter callback
 
-**Event Types:**
-| Type | Color | Example |
-|------|-------|---------|
-| `started` | Green | "started working" |
-| `completed` | Green | "finished task" |
-| `waiting` | Yellow | "requires input" |
-| `error` | Red | "encountered an error" |
+**Filters:**
+- All (default)
+- Working
+- Waiting
+- Idle
 
-**Format:** `[HH:MM:SS] agent-name message`
-
-**Event Detection:**
-- Compare previous session status to current
-- Emit events for meaningful state changes
-- Skip uninteresting transitions
-
----
-
-## Command Bar
-
-Top header with branding and status.
-
-### `CommandBar`
-
-**Props:**
-- `sessionCount: number` - Total sessions
-- `workingCount: number` - Active sessions
-
-**Displays:**
-- Logo: "MIMESIS"
-- Online indicator (green pulsing dot)
-- Agent count: "AGENTS: X/Y Active"
-- Version badge
-
----
-
-## Keyboard Navigation
-
-RTS-style shortcuts for muscle-memory interaction.
-
-**Keybindings:**
-| Key | Action |
+**Keyboard Shortcuts:**
+| Key | Filter |
 |-----|--------|
-| `↑` / `↓` | Navigate Roster |
-| `Escape` | Deselect agent |
+| `A` | All |
+| `W` | Working |
+| `I` | Waiting (Input) |
 
-**Implementation:**
-- Global `keydown` listener in `FleetCommand`
-- Skipped when focus is in input/textarea
+---
+
+## Data Layer
+
+### `useGateway` Hook
+
+**Location:** `packages/ui/src/hooks/useGateway.ts`
+
+Primary hook for Gateway WebSocket communication.
+
+**Returns:**
+```typescript
+interface UseGatewayResult {
+  // Connection
+  status: "connecting" | "connected" | "disconnected";
+  lastError: string | null;
+
+  // Fleet events
+  fleetEvents: FleetEvent[];
+  lastEventId: number;
+
+  // Session tracking (v5.2 unified store)
+  trackedSessions: Map<string, TrackedSession>;
+  requestSessionList: () => void;
+
+  // Session operations
+  sessions: Map<string, SessionState>;
+  attachedSession: string | null;
+  sessionEvents: Map<string, SequencedSessionEvent[]>;
+  attachSession: (sessionId: string, fromSeq?: number) => void;
+  detachSession: (sessionId: string) => void;
+  createSession: (projectId: string, repoRoot: string) => void;
+  sendStdin: (sessionId: string, data: string) => void;
+  sendSignal: (sessionId: string, signal: string) => void;
+  resizeSession: (sessionId: string, cols: number, rows: number) => void;
+  clearSessionEvents: (sessionId: string) => void;
+
+  // Jobs (Commander)
+  activeJob: JobState | null;
+  createJob: (request: JobCreateRequest) => void;
+  cancelJob: () => void;
+}
+```
+
+**Usage:**
+```tsx
+function FleetCommandPage() {
+  const gateway = useGateway();
+
+  return (
+    <FleetCommand
+      sessions={Array.from(gateway.trackedSessions.values())}
+    />
+  );
+}
+```
+
+**Features:**
+- Singleton WebSocket connection (survives HMR)
+- Automatic reconnection with backoff
+- Fleet event subscription
+- Session lifecycle management
+- Job management for Commander
+
+### `useSessionEvents` Hook
+
+**Location:** `packages/ui/src/hooks/useSessionEvents.ts`
+
+Processes raw session events into Timeline-ready format.
+
+**Props:**
+- `gateway: UseGatewayResult` - Gateway hook result
+
+**Returns:**
+```typescript
+interface UseSessionEventsResult {
+  events: TimelineEvent[];          // Processed events for Timeline
+  isScrolledAway: boolean;          // User has scrolled up
+  setScrolledAway: (away: boolean) => void;
+}
+```
+
+**Features:**
+- Converts raw events to Timeline format
+- Groups tool events (pre + post)
+- Maintains scroll state
+
+---
+
+## Component Library
+
+The UI uses shadcn/ui components built on Radix primitives:
+
+| Component | Location | Usage |
+|-----------|----------|-------|
+| Button | `components/ui/button.tsx` | All buttons |
+| Dialog | `components/ui/dialog.tsx` | Modal dialogs |
+| DropdownMenu | `components/ui/dropdown-menu.tsx` | Menus |
+| Checkbox | `components/ui/checkbox.tsx` | Form checkboxes |
+| Textarea | `components/ui/textarea.tsx` | Text inputs |
+| Table | `components/ui/table.tsx` | DataTable base |
+| Badge | `components/ui/badge.tsx` | Status badges |
+| Tooltip | `components/ui/tooltip.tsx` | Hover tooltips |
+| ScrollArea | `components/ui/scroll-area.tsx` | Custom scrollbars |
+
+---
+
+## Dialog Components
+
+### `SendTextDialog`
+
+**Location:** `packages/ui/src/components/SendTextDialog.tsx`
+
+Modal for sending text to a session.
+
+**Props:**
+- `sessionId: string` - Target session
+- `open: boolean` - Dialog visibility
+- `onOpenChange: (open: boolean) => void` - Visibility callback
+
+### `RenameWorkChainDialog`
+
+**Location:** `packages/ui/src/components/RenameWorkChainDialog.tsx`
+
+Modal for renaming work chains.
+
+**Props:**
+- `workChainId: string` - Work chain to rename
+- `currentName: string` - Current name
+- `open: boolean` - Dialog visibility
+- `onOpenChange: (open: boolean) => void` - Visibility callback
+
+---
+
+## DataTable
+
+**Location:** `packages/ui/src/components/data-table/`
+
+TanStack Table v8 implementation for tabular session views.
+
+| File | Purpose |
+|------|---------|
+| `DataTable.tsx` | Main table component |
+| `columns.tsx` | Column definitions |
+| `cells/*.tsx` | Individual cell renderers |
 
 ---
 
 ## Styling (Mimesis Theme)
 
-Custom CSS variables for the dark operator console aesthetic.
-
-**Location:** `packages/ui/src/index.css` (Fleet Command section)
+**Location:** `packages/ui/src/index.css`
 
 ### Color Palette
 
@@ -435,7 +451,6 @@ Custom CSS variables for the dark operator console aesthetic.
 :root {
   --nb-black: #09090b;       /* Deep OLED black */
   --nb-black-light: #0c0c0e; /* Elevated surfaces */
-  --nb-terminal: #050505;    /* Terminal background */
   --nb-sidebar: #0a0a0c;     /* Sidebar background */
   --nb-yellow: #eab308;      /* Banana yellow accent */
   --nb-green: #10b981;       /* Working status */
@@ -445,7 +460,6 @@ Custom CSS variables for the dark operator console aesthetic.
   --nb-text: #a1a1aa;        /* Primary text */
   --nb-text-bright: #fafafa; /* Bright text */
   --nb-text-dim: #52525b;    /* Dim text */
-  --nb-text-muted: #3f3f46;  /* Muted text */
 }
 ```
 
@@ -455,188 +469,25 @@ Custom CSS variables for the dark operator console aesthetic.
 |-------|---------|
 | `.fleet-command` | Main grid container |
 | `.fleet-command-bar` | Top header |
+| `.fleet-filters` | Status strip area |
 | `.fleet-roster` | Left sidebar |
-| `.fleet-roster-item` | Agent row |
+| `.fleet-roster-item` | Session row |
 | `.fleet-roster-item--selected` | Selected state |
-| `.fleet-viewport` | Center terminal area |
-| `.fleet-viewport__hud` | Gradient HUD overlay |
+| `.fleet-viewport` | Center timeline area |
 | `.fleet-intel` | Right sidebar |
-| `.fleet-ticker` | Bottom event bar |
 
 ---
 
-## Data Layer
+## Keyboard Navigation
 
-Same as before - uses Durable Streams for real-time sync.
-
-### `useSessions` Hook
-
-**Location:** `packages/ui/src/hooks/useSessions.ts`
-
-**Usage:**
-```tsx
-function FleetCommandPage() {
-  const { sessions } = useSessions();
-  return <FleetCommand sessions={sessions} />;
-}
-```
-
-### `usePtyInitialization` Hook
-
-**Location:** `packages/ui/src/hooks/usePtyInitialization.ts`
-
-Manages PTY initialization for a session. Consolidates PTY logic used by TerminalDock and Viewport.
-
-**Signature:**
-```tsx
-function usePtyInitialization(
-  sessionId: string | null,
-  options?: { tabId?: string; cols?: number; rows?: number }
-): {
-  state: PtyState;
-  setConnected: (connected: boolean) => void;
-  reset: () => void;
-}
-```
-
-**Returns:**
-- `state.ptyInfo` - PTY connection info (ptyId, wsUrl, wsToken)
-- `state.isLoading` - Whether PTY is initializing
-- `state.error` - Error message if initialization failed
-- `state.isConnected` - Whether terminal is connected to WebSocket
-- `setConnected` - Update connection status
-- `reset` - Reset state for new session
-
-**Features:**
-- Get-or-create PTY in single API call
-- Optional `tabId` for segment tracking ("kitty effect")
-- Prevents duplicate initialization for same session
-
-### `useTabManager` Hook
-
-**Location:** `packages/ui/src/hooks/useTabs.ts`
-
-Manages terminal tabs for session compaction (segment rotation).
-
-**Signature:**
-```tsx
-function useTabManager(): {
-  tabs: Map<string, TerminalTab>;
-  tabsByRepo: Map<string, string[]>;
-  isLoading: boolean;
-  error: string | null;
-  createOrGetTab: (repoRoot: string) => Promise<TerminalTab>;
-  getTab: (tabId: string) => TerminalTab | undefined;
-  deleteTab: (tabId: string) => Promise<void>;
-  refresh: () => Promise<void>;
-}
-```
-
-**Tab Concept:**
-- A "tab" is a stable container that survives session compaction
-- When a session compacts, the new segment rotates into the same tab
-- This enables the "kitty effect" - compaction is invisible to the user
-- Each tab is scoped to a repository root
-
-**Usage:**
-```tsx
-const { createOrGetTab, tabs } = useTabManager();
-
-// Open terminal for a repo
-const tab = await createOrGetTab("/path/to/repo");
-// Pass tab.tabId to createPty() for segment tracking
-```
-
----
-
-## Component Library
-
-The UI uses shadcn/ui components built on Radix primitives with Tailwind styling:
-
-| Component | Location | Usage |
-|-----------|----------|-------|
-| Button | `components/ui/button.tsx` | All buttons (actions, navigation) |
-| Dialog | `components/ui/dialog.tsx` | SendTextDialog modal |
-| DropdownMenu | `components/ui/dropdown-menu.tsx` | SessionActions menu |
-| Checkbox | `components/ui/checkbox.tsx` | Form checkboxes |
-| Textarea | `components/ui/textarea.tsx` | Text input areas |
-| Table | `components/ui/table.tsx` | DataTable base |
-
-### DataTable (TanStack Table)
-
-**Location:** `components/data-table/`
-
-The DataTable replaces the old OpsTable with TanStack Table v8 architecture:
-
-| File | Purpose |
-|------|---------|
-| `DataTable.tsx` | Main table component with sorting |
-| `columns.tsx` | Column definitions |
-| `cells/*.tsx` | Individual cell renderers |
-
----
-
-## Terminal Dock
-
-**Location:** `components/terminal-dock/`
-
-Persistent terminal panel for the Fleet Command center.
-
-### `TerminalDock`
-
-**Props:**
-- `session: Session | null` - Selected session
-- `onClose: () => void` - Close callback
-
-**Features:**
-- Shows terminal for selected session
-- Creates PTY on first attach via `ensurePty()`
-- Preserves terminal state when switching sessions (CSS show/hide)
-- Header with session info and controls (via `SessionHeader`)
-
-**PTY Lifecycle:**
-1. Session selected → check `initializedSessionRef`
-2. If new session → call `ensurePty(sessionId)`
-3. Connect `Terminal` component to WebSocket
-4. Terminal persists until dock closes
-
----
-
-## Dialog Components
-
-**Location:** `components/`
-
-Modal dialogs for user interactions.
-
-### `SendTextDialog`
-
-Modal for sending text to a Claude Code session without full terminal attachment.
-
-**Props:**
-- `sessionId: string` - Target session
-- `open: boolean` - Dialog visibility
-- `onOpenChange: (open: boolean) => void` - Visibility callback
-
-**Features:**
-- Text input area
-- "Submit" checkbox (appends Enter key)
-- Cmd+Enter shortcut to send
-- Works with both embedded PTY and kitty terminals
-
-### `RenameWorkChainDialog`
-
-Modal for renaming work chains (session groups).
-
-**Props:**
-- `workChainId: string` - Work chain to rename
-- `currentName: string` - Current display name
-- `open: boolean` - Dialog visibility
-- `onOpenChange: (open: boolean) => void` - Visibility callback
-
-**Features:**
-- Text input pre-populated with current name
-- Empty input clears the name (reverts to default)
-- API call to `renameWorkChain()`
+| Key | Action |
+|-----|--------|
+| `↑` / `↓` | Navigate sessions |
+| `Escape` | Deselect / close Commander |
+| `Cmd+Tab` | Toggle Commander |
+| `A` | Filter: All |
+| `W` | Filter: Working |
+| `I` | Filter: Waiting |
 
 ---
 
@@ -644,28 +495,25 @@ Modal for renaming work chains (session groups).
 
 ### `ErrorBoundary`
 
-**Location:** `components/ErrorBoundary.tsx`
+**Location:** `packages/ui/src/components/ErrorBoundary.tsx`
 
-React error boundary to catch and display errors gracefully, preventing app crashes.
+React error boundary for graceful error display.
 
 **Props:**
 - `children: ReactNode` - Components to wrap
-- `fallback?: ReactNode` - Optional custom error UI
-
-**Features:**
-- Catches JavaScript errors in child component tree
-- Logs error details to console
-- Shows user-friendly error message
-- "Reload" button to recover
+- `fallback?: ReactNode` - Custom error UI
 
 **Usage:**
 ```tsx
 <ErrorBoundary>
   <FleetCommand />
 </ErrorBoundary>
-
-// With custom fallback
-<ErrorBoundary fallback={<CustomErrorPage />}>
-  <App />
-</ErrorBoundary>
 ```
+
+---
+
+## Related Documentation
+
+- [Gateway Architecture](architecture/gateway.md) - WebSocket protocol
+- [Fleet DB Schema](architecture/fleet-db.md) - Persistence layer
+- [Configuration](operations/configuration.md) - Environment variables
