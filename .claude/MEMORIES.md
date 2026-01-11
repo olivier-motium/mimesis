@@ -1040,3 +1040,32 @@ TextEvent[], ToolEvent[], ThinkingEvent[] sent to UI
 - `packages/daemon/src/gateway/entry-converter.ts` (NEW) - Conversion functions
 - `packages/daemon/src/gateway/session-store.ts` - Added `entries?: LogEntry[]`
 - `packages/daemon/src/gateway/gateway-server.ts` - Uses converter on watcher attach
+
+## QA Audit (Jan 2026)
+
+Full audit completed. Overall health: **HEALTHY**. 11 findings (1 critical).
+
+### Critical: Unbounded fleetEvents Array
+`packages/ui/src/hooks/gateway-handlers.ts:68` — `setFleetEvents((prev) => [...prev, event])` grows without limit. Long-running UI sessions will accumulate events indefinitely causing memory leak.
+
+**Fix required:**
+```typescript
+const MAX_FLEET_EVENTS = 1000;
+setFleetEvents((prev) => {
+  const next = [...prev, event];
+  return next.length > MAX_FLEET_EVENTS ? next.slice(-MAX_FLEET_EVENTS) : next;
+});
+```
+
+### High Priority Technical Debt
+1. `server.ts:handleCompaction()` — 62 lines mixing 4 concerns. Extract helpers.
+2. `FleetCommand.tsx` — Mixes data fetching, state, keyboard nav, presentation. Split container/view.
+3. `outbox-tailer.ts:73` — Async `poll()` in setInterval without error handling. Add try/catch.
+
+### Architecture Strengths Confirmed
+- Zero circular dependencies
+- Clean layer separation (daemon: config → utils → core → gateway → serve)
+- Consistent naming conventions (100% compliance)
+- Comprehensive error handling (no empty catches)
+- Type safety discipline (only 2 `any` usages, both justified)
+- Proper resource cleanup (all timers, WebSockets, listeners cleaned up)
