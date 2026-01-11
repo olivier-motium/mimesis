@@ -5,7 +5,7 @@
  * In Focus mode: Back button, session info
  */
 
-import { Cpu, Layers, ArrowLeft, GitBranch } from "lucide-react";
+import { Cpu, Layers, ArrowLeft, GitBranch, Brain, Wifi, WifiOff, Loader2 } from "lucide-react";
 import { getEffectiveStatus } from "../../lib/sessionStatus";
 import type { CommandBarProps } from "./types";
 
@@ -16,6 +16,9 @@ export function CommandBar({
   onViewModeChange,
   selectedSession,
   onBackToOps,
+  gatewayStatus = "disconnected",
+  onToggleCommander,
+  showCommander = false,
 }: CommandBarProps) {
   // Focus mode: show session context with back button
   if (viewMode === "focus" && selectedSession) {
@@ -90,9 +93,11 @@ export function CommandBar({
         <div className="fleet-command-bar__divider" />
 
         <div className="fleet-command-bar__status">
-          <span className="fleet-command-bar__online">
-            <div className="fleet-command-bar__online-dot" />
-            ONLINE
+          <span className={`fleet-command-bar__gateway fleet-command-bar__gateway--${gatewayStatus}`}>
+            {gatewayStatus === "connected" && <Wifi size={12} />}
+            {gatewayStatus === "connecting" && <Loader2 size={12} className="animate-spin" />}
+            {gatewayStatus === "disconnected" && <WifiOff size={12} />}
+            {gatewayStatus === "connected" ? "ONLINE" : gatewayStatus === "connecting" ? "CONNECTING" : "OFFLINE"}
           </span>
           <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
             <Layers size={12} />
@@ -102,7 +107,18 @@ export function CommandBar({
       </div>
 
       <div className="fleet-command-bar__meta">
-        <div className="fleet-command-bar__version">v2.0.0</div>
+        {/* Commander toggle */}
+        {onToggleCommander && (
+          <button
+            className={`fleet-command-bar__commander-btn ${showCommander ? "fleet-command-bar__commander-btn--active" : ""}`}
+            onClick={onToggleCommander}
+            title="Toggle Commander (Ctrl+Tab)"
+          >
+            <Brain size={14} />
+            Commander
+          </button>
+        )}
+        <div className="fleet-command-bar__version">v5.0.0</div>
       </div>
     </header>
   );

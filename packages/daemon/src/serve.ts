@@ -1,13 +1,19 @@
 #!/usr/bin/env node
 /**
- * Starts the session watcher and durable streams server.
- * Sessions are published to the stream for the UI to consume.
+ * Fleet Commander Daemon
+ *
+ * Starts the Fleet Gateway (WebSocket) and REST API server.
+ * The gateway provides:
+ * - PTY session management
+ * - Event streaming (PTY output + hook events)
+ * - Fleet events (outbox broadcast)
+ * - Headless job management (Commander, maintenance)
  */
 
 import dotenv from "dotenv";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { createConnection } from "node:net";
 import { execSync } from "node:child_process";
 
@@ -27,9 +33,17 @@ for (const envPath of envPaths) {
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { SessionWatcher, type SessionEvent, type SessionState } from "./watcher.js";
-import { StreamServer } from "./server.js";
 import { formatStatus } from "./status-derivation.js";
-import { STREAM_PORT, STREAM_HOST, API_PORT, API_PREFIX, MAX_AGE_HOURS, MAX_AGE_MS, PTY_WS_HOST, PTY_WS_PORT } from "./config/index.js";
+import {
+  STREAM_HOST,
+  API_PORT,
+  API_PREFIX,
+  MAX_AGE_HOURS,
+  MAX_AGE_MS,
+  FLEET_GATEWAY_HOST,
+  FLEET_GATEWAY_PORT,
+  FLEET_BASE_DIR,
+} from "./config/index.js";
 import { colors } from "./utils/colors.js";
 import { createApiRouter } from "./api/router.js";
 import { KittyRc } from "./kitty-rc.js";
@@ -37,8 +51,8 @@ import { TerminalLinkRepo } from "./db/terminal-link-repo.js";
 import { closeDb } from "./db/index.js";
 import { setupKitty, getKittyStatus } from "./kitty-setup.js";
 import { getErrorMessage } from "./utils/type-guards.js";
-import { PtyManager, createPtyWsServer, closePtyWsServer } from "./pty/index.js";
 import { tabManager } from "./tab-manager.js";
+import { GatewayServer } from "./gateway/index.js";
 
 // Validate required environment variables at startup
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -159,32 +173,26 @@ async function main(): Promise<void> {
     process.exit(1);  // Exit cleanly on uncaught exceptions
   });
 
-  console.log(`${colors.bold}Claude Code Session Daemon${colors.reset}`);
+  console.log(`${colors.bold}Fleet Commander Daemon${colors.reset}`);
   console.log(`${colors.dim}Showing sessions from last ${MAX_AGE_HOURS} hours${colors.reset}`);
   console.log();
 
+  // Ensure Fleet Commander base directory exists
+  mkdirSync(FLEET_BASE_DIR, { recursive: true });
+
   // Ensure ports are available before starting servers
-  await ensurePortAvailable(STREAM_PORT, STREAM_HOST);
   await ensurePortAvailable(API_PORT, STREAM_HOST);
-  await ensurePortAvailable(PTY_WS_PORT, PTY_WS_HOST);
+  await ensurePortAvailable(FLEET_GATEWAY_PORT, FLEET_GATEWAY_HOST);
 
-  // Start the durable streams server
-  const streamServer = new StreamServer({ port: STREAM_PORT });
-  await streamServer.start();
+  // Start the Fleet Gateway server (replaces Durable Streams and PTY server)
+  const gatewayServer = new GatewayServer();
+  await gatewayServer.start();
 
-  console.log(`Stream URL: ${colors.cyan}${streamServer.getStreamUrl()}${colors.reset}`);
+  console.log(`Gateway URL: ${colors.cyan}ws://${FLEET_GATEWAY_HOST}:${FLEET_GATEWAY_PORT}${colors.reset}`);
 
   // Initialize kitty remote control and link repository
   const kittyRc = new KittyRc();
   const linkRepo = new TerminalLinkRepo();
-
-  // Initialize PTY manager and WebSocket server for embedded terminals
-  const ptyManager = new PtyManager();
-  const ptyWsServer = createPtyWsServer({
-    ptyManager,
-    host: PTY_WS_HOST,
-    port: PTY_WS_PORT,
-  });
 
   // Auto-setup kitty remote control if needed
   const kittyStatus = await getKittyStatus();
@@ -219,8 +227,6 @@ async function main(): Promise<void> {
     createApiRouter({
       kittyRc,
       linkRepo,
-      streamServer,
-      ptyManager,
       tabManager,
       getSession: (id) => watcher.getSessions().get(id),
       getAllSessions: () => watcher.getSessions(),
@@ -249,7 +255,7 @@ async function main(): Promise<void> {
   watcher.on("session", async (event: SessionEvent) => {
     const { type, session } = event;
 
-    // Only publish recent sessions
+    // Only log recent sessions
     if (!isRecentSession(session) && type !== "deleted") {
       return;
     }
@@ -267,13 +273,8 @@ async function main(): Promise<void> {
       `${statusStr}`
     );
 
-    // Publish to stream
-    try {
-      const operation = type === "created" ? "insert" : type === "deleted" ? "delete" : "update";
-      await streamServer.publishSession(session, operation);
-    } catch (error) {
-      console.error(`${colors.yellow}[ERROR]${colors.reset} Failed to publish:`, getErrorMessage(error));
-    }
+    // Note: Sessions are now managed by the Gateway server
+    // The watcher is kept for backward compatibility logging only
   });
 
   watcher.on("error", (error: Error) => {
@@ -294,10 +295,8 @@ async function main(): Promise<void> {
     try {
       watcher.stop();
       apiServer.close();
-      ptyManager.destroyAll();
-      await closePtyWsServer(ptyWsServer);
+      await gatewayServer.stop();
       closeDb();
-      await streamServer.stop();
     } finally {
       clearTimeout(shutdownTimeout);
       process.exit(0);

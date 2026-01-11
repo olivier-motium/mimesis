@@ -8,7 +8,6 @@ export { FleetCommand } from "./FleetCommand";
 export { CommandBar } from "./CommandBar";
 export { Roster } from "./Roster";
 export { RosterItem } from "./RosterItem";
-export { Viewport } from "./Viewport";
 export { TacticalIntel } from "./TacticalIntel";
 
 export * from "./types";

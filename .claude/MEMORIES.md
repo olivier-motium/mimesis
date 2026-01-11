@@ -869,3 +869,89 @@ When segment changes, Terminal component writes a visual marker:
 **Key insight:** Bet on model intelligence for *content*, bet on determinism for *execution*. The runner is dumb code that invokes smart models.
 
 **Specs:** `FLEET_CMD_SPEC_V3.md` (subagents), `FLEET_CMD_SPEC_V4.md` (headless)
+
+## Fleet Commander v5 - Headless Architecture (Jan 2026)
+
+Major transformation from terminal-centric to timeline-centric UI.
+
+### Key Architectural Changes
+
+1. **Gateway replaces PTY server** - Single WebSocket on port 4452 handles:
+   - Session lifecycle (create/attach/detach)
+   - PTY I/O forwarding
+   - Hook event merging
+   - Fleet event streaming (outbox tail)
+   - Headless job execution (Commander)
+
+2. **xterm.js removed entirely** - Replaced by Timeline component:
+   - Structured event rendering (tool steps, text, thinking, stdout)
+   - @tanstack/react-virtual for virtualized scrolling
+   - Event grouping: stdout events associate with surrounding tool executions
+
+3. **SQLite briefing ledger** - `~/.claude/commander/fleet.db` stores:
+   - Projects (stable project_id from git remote hash)
+   - Briefings (semantic status from workers)
+   - Outbox events (push queue for realtime)
+   - Jobs (Commander history, headless tasks)
+
+4. **Hook-based event forwarding** - Unix socket IPC:
+   - PostToolUse hooks emit to `~/.claude/commander/gateway.sock`
+   - Gateway merges hook events into session stream
+   - Non-blocking: hook failure doesn't block worker
+
+### UI Components
+
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| `Timeline` | `timeline/Timeline.tsx` | Virtualized event stream |
+| `TimelineToolStep` | `timeline/` | Expandable tool use cards |
+| `SessionInput` | `session-input/` | stdin composer + history |
+| `CommanderTab` | `commander/` | Cross-project Opus queries |
+
+### Removed Components
+
+- `Viewport.tsx` - xterm.js wrapper (replaced by Timeline)
+- `terminal/Terminal.tsx` - xterm.js component
+- `terminal-dock/` - Terminal dock container
+- `agent-command/` - Old terminal-based layout
+- `usePtySession.ts` - PTY hook (replaced by useGateway)
+
+### Dependencies Changed
+
+**Removed:**
+- `@xterm/xterm`
+- `@xterm/addon-fit`
+- `@xterm/addon-web-links`
+- `@durable-streams/client`
+- `@durable-streams/state`
+
+**Added:**
+- `@tanstack/react-virtual` (virtualized scrolling)
+
+### Protocol (WebSocket)
+
+**Client → Gateway:**
+```typescript
+{ type: 'session.attach', session_id, from_seq }
+{ type: 'session.stdin', session_id, data }
+{ type: 'session.signal', session_id, signal: 'SIGINT' | 'SIGTERM' | 'SIGKILL' }
+{ type: 'job.create', job: { type, model, request } }
+```
+
+**Gateway → Client:**
+```typescript
+{ type: 'event', session_id, seq, event: { type: 'stdout' | 'tool' | 'text' | ... } }
+{ type: 'session.status', session_id, status: 'working' | 'waiting' | 'idle' }
+{ type: 'job.stream', job_id, chunk }
+{ type: 'fleet.event', event_id, event }
+```
+
+### Design Principles (from spec)
+
+1. **Bet on model intelligence for content, bet on determinism for execution**
+2. **PTY stream is not source of truth** - SQLite briefings are authoritative
+3. **Hooks are best-effort enrichment** - Failure doesn't break core flow
+4. **Always virtualize** - Sessions can have 1000+ events
+5. **Collapse thinking, expand output** - Clean but informative defaults
+
+**Spec:** `FLEET_CMD_SPEC_V5.md` (headless architecture)

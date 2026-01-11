@@ -59,9 +59,6 @@
   }
 }
 
-/* Import xterm.js styles */
-@import "@xterm/xterm/css/xterm.css";
-
 :root {
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -1419,15 +1416,6 @@ body > div[style*="position: fixed"]:last-child {
   padding-top: 80px; /* Space for HUD overlay */
 }
 
-/* Terminal within viewport - NO padding so FitAddon calculates correctly */
-.fleet-viewport .xterm {
-  height: 100%;
-}
-
-.fleet-viewport .xterm-viewport {
-  overflow-y: auto !important;
-}
-
 /* ===========================================
    Rename Work Chain Dialog
    =========================================== */
@@ -1990,15 +1978,6 @@ body > div[style*="position: fixed"]:last-child {
   background: var(--nb-black-light);
   border-color: var(--nb-yellow);
   color: var(--nb-yellow);
-}
-
-/* Terminal fills container */
-.terminal-view .xterm {
-  height: 100%;
-}
-
-.terminal-view .xterm-viewport {
-  overflow-y: auto !important;
 }
 
 /* ===========================================

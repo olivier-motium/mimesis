@@ -17,12 +17,12 @@
  * └─────────────────────────┘
  */
 
-import { GitBranch, AlertTriangle, CheckCircle2, Clock, Terminal, FolderOpen, MessageSquare } from "lucide-react";
+import { GitBranch, AlertTriangle, CheckCircle2, Clock, Terminal, FolderOpen, MessageSquare, Wifi, WifiOff, Loader2, Bell } from "lucide-react";
 import { getMissionText, getNowText, formatTimeAgo } from "./constants";
 import { getEffectiveStatus } from "@/lib/sessionStatus";
 import type { TacticalIntelProps } from "./types";
 
-export function TacticalIntel({ session }: TacticalIntelProps) {
+export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disconnected" }: TacticalIntelProps) {
   // Empty state
   if (!session) {
     return (
@@ -194,6 +194,41 @@ export function TacticalIntel({ session }: TacticalIntelProps) {
           </div>
         </div>
       )}
+
+      {/* Fleet Events (recent) */}
+      {fleetEvents.length > 0 && (
+        <div className="inspector-fleet-events">
+          <div className="inspector-fleet-events__header">
+            <Bell size={12} />
+            Fleet Events
+          </div>
+          <div className="inspector-fleet-events__content">
+            {fleetEvents.slice(-5).reverse().map((event) => (
+              <div key={event.eventId} className="inspector-fleet-events__entry">
+                <span className="inspector-fleet-events__type">{event.type}</span>
+                {event.projectId && (
+                  <span className="inspector-fleet-events__project">
+                    {event.projectId.split("__")[0]}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Gateway Status */}
+      <div className="inspector-gateway">
+        <div className="inspector-gateway__header">
+          {gatewayStatus === "connected" && <Wifi size={12} />}
+          {gatewayStatus === "connecting" && <Loader2 size={12} className="animate-spin" />}
+          {gatewayStatus === "disconnected" && <WifiOff size={12} />}
+          Gateway
+        </div>
+        <div className={`inspector-gateway__status inspector-gateway__status--${gatewayStatus}`}>
+          {gatewayStatus === "connected" ? "Connected" : gatewayStatus === "connecting" ? "Connecting..." : "Disconnected"}
+        </div>
+      </div>
     </aside>
   );
 }

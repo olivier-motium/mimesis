@@ -1,22 +1,24 @@
 /**
- * Agent Command - Terminal-Focused Dashboard
+ * Fleet Command - Fleet Commander v5 Layout
  *
- * 3-zone layout:
- * - Left: Project Navigator - agents grouped by project (the "tabs")
- * - Center: Terminal View - single terminal for selected agent
- * - Right: Live State Panel - status, now, cwd, recent output
+ * 3-column layout (Melty-style):
+ * - Left: Roster (session list with spawn button)
+ * - Center: Timeline (structured events) + SessionInput
+ * - Right: TacticalIntel (status, file changes)
+ *
+ * Connects to Fleet Gateway via WebSocket for realtime updates.
  */
 
 import { createFileRoute } from "@tanstack/react-router";
-import { AgentCommand } from "../components/agent-command";
+import { FleetCommand } from "../components/fleet-command";
 import { useSessions } from "../hooks/useSessions";
 
 export const Route = createFileRoute("/")({
-  component: AgentCommandPage,
+  component: FleetCommandPage,
 });
 
-function AgentCommandPage() {
+function FleetCommandPage() {
   const { sessions } = useSessions();
 
-  return <AgentCommand sessions={sessions} />;
+  return <FleetCommand sessions={sessions} />;
 }

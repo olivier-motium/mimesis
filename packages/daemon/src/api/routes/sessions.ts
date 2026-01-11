@@ -214,9 +214,15 @@ export function createSessionRoutes(deps: RouterDependencies): Hono {
   });
 
   // Rename work chain (set user-defined name)
+  // @deprecated Work chains are deprecated in Fleet Commander v5
   router.patch("/workchains/:id/name", async (c) => {
     const workChainId = c.req.param("id");
     const body = await c.req.json<{ name: string | null }>();
+
+    // Stream server required for work chain management
+    if (!streamServer) {
+      return c.json({ error: "Work chains are deprecated. Use the gateway instead." }, 410);
+    }
 
     const sessionId = await streamServer.renameWorkChain(workChainId, body.name);
 

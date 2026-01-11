@@ -47,6 +47,17 @@ export interface ViewportProps {
 /** Props for TacticalIntel */
 export interface TacticalIntelProps {
   session: Session | null;
+  /** Fleet events from gateway */
+  fleetEvents?: Array<{
+    eventId: number;
+    ts: string;
+    type: string;
+    projectId?: string;
+    briefingId?: number;
+    data: unknown;
+  }>;
+  /** Gateway connection status */
+  gatewayStatus?: "connecting" | "connected" | "disconnected";
 }
 
 /** Props for CommandBar */
@@ -58,4 +69,10 @@ export interface CommandBarProps {
   /** Selected session in focus mode (null in ops mode) */
   selectedSession: Session | null;
   onBackToOps: () => void;
+  /** Gateway connection status */
+  gatewayStatus?: "connecting" | "connected" | "disconnected";
+  /** Toggle Commander tab */
+  onToggleCommander?: () => void;
+  /** Whether Commander tab is shown */
+  showCommander?: boolean;
 }

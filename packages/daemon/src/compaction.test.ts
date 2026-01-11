@@ -10,7 +10,7 @@ import { mkdir, writeFile, rm } from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import type { SessionState } from "./watcher.js";
-import type { SessionStatus, Status } from "./types.js";
+import type { StatusResult } from "./types.js";
 
 // Test directory
 const TEST_BASE_DIR = path.join(os.tmpdir(), `mimesis-compaction-integration-${Date.now()}`);
@@ -25,12 +25,11 @@ function createTestSessionState(overrides: Partial<SessionState> = {}): SessionS
   const sessionId = overrides.sessionId ?? generateSessionId();
   const now = new Date().toISOString();
 
-  const status: SessionStatus = {
-    status: "working" as Status,
+  const status: StatusResult = {
+    status: "working",
     lastActivityAt: overrides.status?.lastActivityAt ?? now,
     messageCount: overrides.status?.messageCount ?? 1,
     hasPendingToolUse: overrides.status?.hasPendingToolUse ?? false,
-    pendingToolIds: overrides.status?.pendingToolIds ?? [],
     lastRole: overrides.status?.lastRole ?? "user",
   };
 
@@ -43,6 +42,11 @@ function createTestSessionState(overrides: Partial<SessionState> = {}): SessionS
     originalPrompt: overrides.originalPrompt ?? "Test prompt",
     entries: overrides.entries ?? [],
     status,
+    // Internal fields required by SessionStateInternal
+    filepath: overrides.filepath ?? "/test/project/.claude/sessions/test.jsonl",
+    encodedDir: overrides.encodedDir ?? "-test-project",
+    bytePosition: overrides.bytePosition ?? 0,
+    startedAt: overrides.startedAt ?? now,
   };
 }
 
@@ -87,9 +91,9 @@ describe("Compaction Logic", () => {
       const t3 = new Date(Date.now() - 10000).toISOString(); // 10 sec ago
 
       const sessions: [string, SessionState][] = [
-        [generateSessionId(), createTestSessionState({ cwd, status: { lastActivityAt: t1 } as SessionStatus })],
-        [generateSessionId(), createTestSessionState({ cwd, status: { lastActivityAt: t2 } as SessionStatus })],
-        [generateSessionId(), createTestSessionState({ cwd, status: { lastActivityAt: t3 } as SessionStatus })],
+        [generateSessionId(), createTestSessionState({ cwd, status: { lastActivityAt: t1, status: "working", lastRole: "user", hasPendingToolUse: false, messageCount: 1 } })],
+        [generateSessionId(), createTestSessionState({ cwd, status: { lastActivityAt: t2, status: "working", lastRole: "user", hasPendingToolUse: false, messageCount: 1 } })],
+        [generateSessionId(), createTestSessionState({ cwd, status: { lastActivityAt: t3, status: "working", lastRole: "user", hasPendingToolUse: false, messageCount: 1 } })],
       ];
 
       // Simulate findPredecessor logic
