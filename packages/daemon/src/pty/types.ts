@@ -30,6 +30,8 @@ export interface PtySession {
   rows: number;
   /** Connected WebSocket clients */
   clients: Set<WebSocket>;
+  /** Circular buffer of PTY output for replay on reconnect */
+  outputBuffer: string[];
 }
 
 /**

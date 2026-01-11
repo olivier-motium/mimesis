@@ -275,6 +275,28 @@ if (currentRef.current !== sessionId) return; // Stale, ignore
 setPtyInfo(info);
 ```
 
+### PTY Output Buffering for Terminal Reconnection
+
+When WebSocket clients disconnect and reconnect to a PTY (e.g., when switching between terminals in UI), they miss any output that was broadcast while disconnected. The `claude --resume` command outputs conversation history only once at startup.
+
+**Solution:** Circular buffer in PtyManager:
+```typescript
+// Store output (circular buffer, 5000 chunks max)
+proc.onData((data) => {
+  session.outputBuffer.push(data);
+  if (session.outputBuffer.length > 5000) session.outputBuffer.shift();
+  this.broadcast(ptyId, { type: "data", payload: data });
+});
+
+// Replay on client connect
+addClient(ptyId, client) {
+  const historical = session.outputBuffer.join("");
+  client.send(JSON.stringify({ type: "data", payload: historical }));
+}
+```
+
+This ensures terminal history is preserved when switching between agents in the UI.
+
 ### React StrictMode and WebSocket Connections
 
 React StrictMode double-mounts components in development. For WebSocket connections (like Terminal.tsx), this causes:

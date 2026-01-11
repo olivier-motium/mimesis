@@ -1,21 +1,17 @@
 ---
 status: completed
-updated: 2026-01-09T21:25:00Z
-task: Implement segment rotation architecture for compaction
+updated: 2026-01-11T11:50:00Z
+task: Add PTY output buffer for terminal history preservation
 ---
 
 ## Summary
-Completed the "kitty effect" segment rotation architecture where compaction rotates sessions within a stable UI tab rather than creating new tabs.
+Implemented circular output buffer in PtyManager to preserve terminal history when switching between terminals:
 
-### Changes Made
-- Created `emit-hook-event.py` bridge script for hook events
-- Added `ClaudeSegment`, `TerminalTab`, `HookEventPayload` types to schema
-- Created `tab-manager.ts` module for managing tabs and segment chains
-- Created `/hooks` API endpoint for receiving hook events
-- Modified PTY to inject `COMMAND_CENTER_TAB_ID` environment variable
-- Updated `~/.claude/settings.json` with PreCompact and SessionStart:compact hooks
-- Created `useTabs` React hook for UI tab management
-- Updated Terminal component with segment rotation markers
+- Added `outputBuffer: string[]` field to PtySession interface
+- Buffer stores last 5000 output chunks from PTY process
+- On WebSocket client connect, buffer is replayed to show historical content
+- Fixes issue where switching away and back to a terminal showed empty content
 
-### Architecture
-Tab ID is stable (UI-generated UUID), segments are append-only, PTY stream is continuous across rotations, hooks fail open for resilience.
+## Files Modified
+- `src/pty/types.ts` - Added outputBuffer field
+- `src/pty/pty-manager.ts` - Buffer initialization, storage, and replay logic

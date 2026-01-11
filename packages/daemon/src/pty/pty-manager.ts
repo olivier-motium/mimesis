@@ -19,6 +19,9 @@ import {
   PTY_IDLE_CHECK_INTERVAL_MS,
   getPtyWsUrl,
 } from "../config/index.js";
+
+/** Max number of output chunks to buffer for replay on reconnect */
+const PTY_OUTPUT_BUFFER_SIZE = 5000;
 import type {
   PtySession,
   CreatePtyOptions,
@@ -147,6 +150,7 @@ export class PtyManager {
       cols: termCols,
       rows: termRows,
       clients: new Set(),
+      outputBuffer: [],
     };
 
     // Store references
@@ -154,9 +158,16 @@ export class PtyManager {
     this.sessionToPty.set(sessionId, ptyId);
     this.processes.set(ptyId, proc);
 
-    // Handle PTY output - broadcast to all connected clients
+    // Handle PTY output - buffer and broadcast to all connected clients
     proc.onData((data) => {
       session.lastActivityAt = new Date().toISOString();
+
+      // Store in circular buffer for replay on reconnect
+      session.outputBuffer.push(data);
+      if (session.outputBuffer.length > PTY_OUTPUT_BUFFER_SIZE) {
+        session.outputBuffer.shift();
+      }
+
       this.broadcast(ptyId, { type: "data", payload: data });
     });
 
@@ -248,6 +259,7 @@ export class PtyManager {
 
   /**
    * Add a WebSocket client to a PTY session.
+   * Replays buffered output to new clients so they see terminal history.
    */
   addClient(ptyId: string, client: WebSocket): boolean {
     const session = this.sessions.get(ptyId);
@@ -255,6 +267,16 @@ export class PtyManager {
 
     session.clients.add(client);
     session.lastActivityAt = new Date().toISOString();
+
+    // Replay buffered output to new client
+    if (session.outputBuffer.length > 0) {
+      const historicalData = session.outputBuffer.join("");
+      const msg = serializeWsMessage({ type: "data", payload: historicalData });
+      client.send(msg);
+      console.log(
+        `[PTY] Replayed ${session.outputBuffer.length} buffer chunks to new client on ${ptyId}`
+      );
+    }
 
     console.log(
       `[PTY] Client connected to ${ptyId} (total: ${session.clients.size})`
