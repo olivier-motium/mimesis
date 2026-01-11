@@ -1,26 +1,22 @@
 /**
- * Fleet Command - Operator Console
+ * Agent Command - Terminal-Focused Dashboard
  *
- * The main dashboard view. A paradigm shift from project management
- * (Kanban boards) to fleet command (operating units).
- *
- * 4-zone layout:
- * - Zone A: Roster - high-density agent list
- * - Zone B: Viewport - persistent terminal
- * - Zone C: Tactical Intel - plan + artifacts
- * - Zone D: Event Ticker - global event stream
+ * 3-zone layout:
+ * - Left: Project Navigator - agents grouped by project (the "tabs")
+ * - Center: Terminal View - single terminal for selected agent
+ * - Right: Live State Panel - status, now, cwd, recent output
  */
 
 import { createFileRoute } from "@tanstack/react-router";
-import { FleetCommand } from "../components/fleet-command";
+import { AgentCommand } from "../components/agent-command";
 import { useSessions } from "../hooks/useSessions";
 
 export const Route = createFileRoute("/")({
-  component: FleetCommandPage,
+  component: AgentCommandPage,
 });
 
-function FleetCommandPage() {
+function AgentCommandPage() {
   const { sessions } = useSessions();
 
-  return <FleetCommand sessions={sessions} />;
+  return <AgentCommand sessions={sessions} />;
 }

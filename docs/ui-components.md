@@ -2,7 +2,197 @@
 
 The React UI is built with TanStack Router, shadcn/ui (Radix primitives + Tailwind CSS v4), TanStack Table, and custom Mimesis styling.
 
-## Component Hierarchy (Fleet Command)
+## Component Hierarchy (Agent Command)
+
+```
+__root.tsx (dark theme wrapper)
+└── index.tsx (Agent Command Page)
+    └── AgentCommand (3-zone operator console)
+        ├── CommandBar (top header)
+        ├── ProjectNavigator (left sidebar)
+        │   └── ProjectGroup[] (grouped by repo)
+        │       └── AgentItem[] (individual agents)
+        ├── TerminalView (center terminal)
+        │   └── Terminal (xterm.js instance)
+        └── LiveStatePanel (right sidebar)
+            ├── StatusBadge
+            ├── NowSection
+            ├── CwdSection
+            └── RecentOutput
+```
+
+> **Design Philosophy:** Agent-focused, not Git-focused. We monitor agents running in terminals, not diffs or PRs. The sidebar shows projects with active agents as clickable "tabs". Clicking an agent opens its terminal in the center. No tab bar above terminal - the sidebar IS the tab system.
+
+---
+
+## Agent Command Module
+
+**Location:** `packages/ui/src/components/agent-command/`
+
+| File | Purpose |
+|------|---------|
+| `AgentCommand.tsx` | Main container with 3-zone layout |
+| `ProjectNavigator.tsx` | Left sidebar with project tree |
+| `ProjectGroup.tsx` | Collapsible project section |
+| `AgentItem.tsx` | Individual agent entry (the "tab") |
+| `TerminalView.tsx` | Center terminal wrapper |
+| `LiveStatePanel.tsx` | Right sidebar with live state |
+| `types.ts` | TypeScript interfaces |
+| `index.ts` | Barrel exports |
+
+---
+
+## 3-Zone Grid Layout
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ COMMAND BAR: Logo, Online Status, Agent Counts                      │
+├───────────────┬────────────────────────────────────┬────────────────┤
+│ PROJECT NAV   │ TERMINAL                           │ LIVE STATE     │
+│ (280px)       │ (flex: 1)                          │ (320px)        │
+│               │                                    │                │
+│ ▼ mimesis     │                                    │ STATUS         │
+│   ● agent-1   │  > Terminal output here...         │ ● Working      │
+│   ○ agent-2   │  > claude working on task...       │                │
+│               │  > Let me read the file.           │ NOW            │
+│ ▼ conductor   │  >                                 │ Editing api.ts │
+│   ● agent-3   │                                    │                │
+│   ● agent-4   │                                    │ CWD            │
+│               │                                    │ ~/mimesis      │
+│ ▼ fleet-api   │                                    │                │
+│   ○ agent-5   │                                    │ RECENT OUTPUT  │
+│               │                                    │ AI: "Perfect!" │
+│               │                                    │ Tool: Edit...  │
+│               │                                    │ User: "fix it" │
+└───────────────┴────────────────────────────────────┴────────────────┘
+```
+
+**Grid Configuration:**
+```css
+grid-template-areas:
+  "header header header"
+  "sidebar terminal intel";
+grid-template-columns: 280px 1fr 320px;
+grid-template-rows: 48px 1fr;
+```
+
+---
+
+## Left Sidebar: Project Navigator
+
+Groups sessions by `gitRepoId` (or `cwd` fallback). Each agent is a clickable "tab".
+
+### `ProjectNavigator`
+
+**Props:**
+- `sessions: Session[]` - All sessions
+- `selectedSessionId: string | null` - Currently selected
+- `onSelectSession: (id: string) => void` - Selection callback
+
+**Features:**
+- Groups sessions by gitRepoId or cwd
+- Renders ProjectGroup for each project
+
+### `ProjectGroup`
+
+**Props:**
+- `projectName: string` - Display name
+- `sessions: Session[]` - Sessions in this project
+- `selectedSessionId: string | null` - Currently selected
+- `onSelectSession: (sessionId: string) => void` - Selection callback
+- `defaultExpanded?: boolean` - Initial expanded state
+
+**Features:**
+- Collapsible with chevron toggle
+- Shows working count badge
+- Shows total count badge
+
+### `AgentItem`
+
+**Props:**
+- `session: Session` - Session data
+- `isSelected: boolean` - Selection state
+- `onSelect: () => void` - Click handler
+
+**Displays:**
+- Status indicator (●/○/!/✖)
+- Agent name (branch or session ID)
+- Git branch icon
+
+**Status Indicators:**
+| Status | Symbol | Class |
+|--------|--------|-------|
+| working | ● | `--working` |
+| waiting | ! | `--waiting` |
+| idle | ○ | `--idle` |
+| error | ✖ | `--error` |
+
+---
+
+## Center: Terminal View
+
+Shows the terminal for the selected agent.
+
+### `TerminalView`
+
+**Props:**
+- `session: Session | null` - Selected session
+
+**Features:**
+- Wraps existing Terminal component
+- PTY initialization with retry logic
+- Empty state when no agent selected
+- Auto-retry on "Session not found" errors
+
+**PTY Lifecycle:**
+1. Session selected → check for existing PTY
+2. Call `ensurePty(sessionId)` to get-or-create
+3. Connect Terminal component to WebSocket
+4. Handle connection/disconnection states
+
+---
+
+## Right Sidebar: Live State Panel
+
+Shows live state for the selected agent.
+
+### `LiveStatePanel`
+
+**Props:**
+- `session: Session | null` - Selected session
+
+**Sections:**
+1. **STATUS** - Working/Waiting/Idle/Error badge
+2. **NOW** - Current action text
+3. **CWD** - Working directory (truncated)
+4. **LAST ACTIVITY** - Time since last activity
+5. **RECENT OUTPUT** - Last 10 output entries (role + content)
+
+**Status Badge Colors:**
+| Status | Color |
+|--------|-------|
+| working | Green |
+| waiting | Yellow |
+| idle | Gray |
+| error | Red |
+
+---
+
+## Keyboard Navigation
+
+| Key | Action |
+|-----|--------|
+| `↑` / `↓` | Navigate agents |
+| `Escape` | Deselect agent |
+
+**Implementation:**
+- Global `keydown` listener in `AgentCommand`
+- Skipped when focus is in input/textarea
+- Cycles through all agents across projects
+
+---
+
+## Legacy: Component Hierarchy (Fleet Command)
 
 ```
 __root.tsx (dark theme wrapper)

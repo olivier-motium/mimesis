@@ -1,15 +1,29 @@
 ---
 status: completed
-updated: 2026-01-09T18:45:00Z
-task: Fix terminal gray screen rendering and remove footer
+updated: 2026-01-11T11:30:00Z
+task: Implement Agent Command UI redesign
 ---
 
 ## Summary
-Fixed two UI issues:
+Implemented new Agent Command UI layout replacing Fleet Command:
+- 3-column grid layout (sidebar, terminal, live state)
+- Left sidebar: Projects grouped by repo with agents as clickable "tabs"
+- Center: Single terminal for selected agent (no tab bar)
+- Right: Live state panel (status, now, cwd, recent output)
+- Keyboard navigation (arrow keys, escape)
+- All components created with TypeScript interfaces
+- ~470 lines of CSS added to index.css
 
-1. **Terminal Gray Screen**: Fixed rendering issue where terminal stayed gray until window resize. Root cause was RAF firing before flex layout was calculated. Solution: moved initial fit() to ResizeObserver effect.
+## Files Created
+- `src/components/agent-command/types.ts`
+- `src/components/agent-command/AgentCommand.tsx`
+- `src/components/agent-command/ProjectNavigator.tsx`
+- `src/components/agent-command/ProjectGroup.tsx`
+- `src/components/agent-command/AgentItem.tsx`
+- `src/components/agent-command/TerminalView.tsx`
+- `src/components/agent-command/LiveStatePanel.tsx`
+- `src/components/agent-command/index.ts`
 
-2. **Footer Removed**: Completely removed EventTicker footer component per user request. Cleaned up CSS grid layouts, types, constants, and exports.
-
-Files modified: Terminal.tsx, FleetCommand.tsx, types.ts, constants.ts, index.ts, index.css
-Files deleted: EventTicker.tsx
+## Files Modified
+- `src/routes/index.tsx` - Switched from FleetCommand to AgentCommand
+- `src/index.css` - Added Agent Command CSS styles
