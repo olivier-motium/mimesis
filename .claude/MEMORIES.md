@@ -1111,3 +1111,82 @@ Lines 36-51 describe obsolete "Kanban-style board" with session cards. Reality: 
 - 98 total .md files (~128k lines)
 - ~40% of code modules have corresponding docs
 - Daemon: ~33% coverage, UI: ~48% coverage
+
+## Comprehensive E2E Test Results (Jan 2026)
+
+Full E2E testing completed including browser automation and unit tests.
+
+### Browser Automation Tests (via /webtest)
+
+| Test | Result |
+|------|--------|
+| UI Load & Gateway Connection | ✅ PASS |
+| Session Selection (click) | ✅ PASS |
+| Timeline Event Rendering | ✅ PASS |
+| Tool Card Expansion | ✅ PASS |
+| Commander Tab Toggle | ✅ PASS |
+| Status File → TacticalIntel | ✅ PASS |
+| StatusStrip Filters | ✅ PASS |
+| SessionInput Visible | ✅ PASS |
+| Keyboard Navigation (↑/↓) | ✅ PASS |
+| Real-time Event Updates | ✅ PASS |
+
+**Two-way interaction verified:**
+- UI displays real-time tool events from Claude Code sessions
+- Status file content propagates to TacticalIntel panel
+- Gateway WebSocket connection shows "ONLINE" status
+- Keyboard shortcuts (ArrowUp/ArrowDown) switch sessions correctly
+
+### Unit Test Coverage
+
+**Daemon tests:** 267 passed, 2 skipped (baseline: 248 passed)
+
+**New test file added:**
+- `packages/daemon/src/gateway/session-store.test.ts` (19 tests)
+  - `addFromWatcher` - session creation, event emission, status mapping
+  - `addFromPty` - PTY session creation, watcher data preservation
+  - `updateFileStatus` - status file integration, UI status mapping
+  - `updateStatus` - status updates, lastActivityAt tracking
+  - `remove` - session removal, event emission
+  - `subscribe` - listener pattern, unsubscribe, error handling
+
+### Verified Features
+
+1. **Gateway WebSocket (port 4452)**
+   - Session lifecycle events (discovered, updated, removed)
+   - Real-time event streaming
+   - Two-tier session model (PTY vs watcher)
+
+2. **Timeline Component**
+   - Virtualized scrolling with @tanstack/react-virtual
+   - Tool step cards with expandable Input/Result sections
+   - Thinking blocks (collapsed by default)
+   - Auto-scroll on new events
+
+3. **Session Store**
+   - Unified tracking from SessionWatcher + PtyBridge
+   - File status integration
+   - Event-driven architecture with pub/sub
+
+4. **Keyboard Navigation**
+   - Arrow keys (↑/↓) for session switching
+   - Session state updates across all panels on switch
+
+### Test Environment
+
+```bash
+# Services running during tests
+pnpm start  # Daemon (4451, 4452) + UI (5173)
+
+# Test commands
+cd packages/daemon && pnpm test  # 267 passed, 2 skipped
+```
+
+### Remaining Test Gaps
+
+| Area | Status |
+|------|--------|
+| UI unit tests (Vitest) | Not implemented |
+| PTY stdin/stdout E2E | Manual only |
+| Commander job streaming | Manual only |
+| Hook event injection | Manual only |
