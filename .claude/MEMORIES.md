@@ -249,6 +249,32 @@ requestAnimationFrame(() => {
 });
 ```
 
+### Callback Memoization for WebSocket Components
+
+When passing callbacks to components that use them in useEffect dependencies (like Terminal.tsx), always use `useCallback`. Without memoization:
+
+1. Parent re-renders (e.g., from StreamDB updates every ~1s)
+2. New callback function objects created
+3. Child useEffect sees dependency changes → re-runs
+4. WebSocket closes and reopens repeatedly
+
+**Pattern:**
+```typescript
+// Bad: inline callbacks
+<Terminal onConnect={() => setConnected(true)} />
+
+// Good: memoized callbacks
+const handleConnect = useCallback(() => setConnected(true), []);
+<Terminal onConnect={handleConnect} />
+```
+
+For async operations (like `ensurePty`), also add staleness checks to prevent race conditions when switching quickly between items:
+```typescript
+const info = await ensurePty(sessionId);
+if (currentRef.current !== sessionId) return; // Stale, ignore
+setPtyInfo(info);
+```
+
 ### React StrictMode and WebSocket Connections
 
 React StrictMode double-mounts components in development. For WebSocket connections (like Terminal.tsx), this causes:

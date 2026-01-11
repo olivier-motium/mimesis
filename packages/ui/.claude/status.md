@@ -1,29 +1,20 @@
 ---
 status: completed
-updated: 2026-01-11T11:30:00Z
-task: Implement Agent Command UI redesign
+updated: 2026-01-11T11:45:00Z
+task: Fix terminal WebSocket reconnection latency
 ---
 
 ## Summary
-Implemented new Agent Command UI layout replacing Fleet Command:
-- 3-column grid layout (sidebar, terminal, live state)
-- Left sidebar: Projects grouped by repo with agents as clickable "tabs"
-- Center: Single terminal for selected agent (no tab bar)
-- Right: Live state panel (status, now, cwd, recent output)
-- Keyboard navigation (arrow keys, escape)
-- All components created with TypeScript interfaces
-- ~470 lines of CSS added to index.css
+Fixed terminal latency issues in Agent Command UI:
 
-## Files Created
-- `src/components/agent-command/types.ts`
-- `src/components/agent-command/AgentCommand.tsx`
-- `src/components/agent-command/ProjectNavigator.tsx`
-- `src/components/agent-command/ProjectGroup.tsx`
-- `src/components/agent-command/AgentItem.tsx`
-- `src/components/agent-command/TerminalView.tsx`
-- `src/components/agent-command/LiveStatePanel.tsx`
-- `src/components/agent-command/index.ts`
+1. **Memoized callbacks** - Added `useCallback` for `handleConnect`, `handleDisconnect`, `handleError` to prevent WebSocket reconnection spam during StreamDB updates
+
+2. **Race condition fix** - Added staleness checks in `initializePty` after async `ensurePty` call to properly handle fast terminal switching
+
+## Root Cause
+- Unmemoized inline callbacks created new function objects on every render
+- Terminal's useEffect depends on callbacks → new refs triggered WebSocket close/reopen
+- Race condition when switching terminals: stale async results overwrote current state
 
 ## Files Modified
-- `src/routes/index.tsx` - Switched from FleetCommand to AgentCommand
-- `src/index.css` - Added Agent Command CSS styles
+- `src/components/agent-command/TerminalView.tsx`

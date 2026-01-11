@@ -17,6 +17,13 @@ export function TerminalView({ session }: TerminalViewProps) {
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
+  // Memoize callbacks to prevent Terminal WebSocket reconnections
+  // Without this, every parent re-render (from StreamDB updates) creates new
+  // function objects, triggering Terminal's useEffect to close/reopen WebSocket
+  const handleConnect = useCallback(() => setIsConnected(true), []);
+  const handleDisconnect = useCallback(() => setIsConnected(false), []);
+  const handleError = useCallback((err: string) => setError(err), []);
+
   // Track which session we've initialized
   const initializedSessionRef = useRef<string | null>(null);
   const prevSessionIdRef = useRef<string | null>(null);
@@ -35,9 +42,22 @@ export function TerminalView({ session }: TerminalViewProps) {
 
     try {
       const info = await ensurePty(sessionId);
+
+      // Check if this session is still selected after async operation
+      // This prevents race conditions when switching terminals quickly
+      if (initializedSessionRef.current !== sessionId) {
+        console.log(`[TerminalView] Ignoring stale PTY info for ${sessionId}`);
+        return;
+      }
+
       setPtyInfo(info);
       retryCountRef.current = 0;
     } catch (err) {
+      // Check staleness before handling error
+      if (initializedSessionRef.current !== sessionId) {
+        return;
+      }
+
       const errorMessage = err instanceof Error ? err.message : "Failed to create terminal";
       console.error("[TerminalView] Failed to initialize PTY:", errorMessage);
 
@@ -56,7 +76,10 @@ export function TerminalView({ session }: TerminalViewProps) {
       initializedSessionRef.current = null;
       retryCountRef.current = 0;
     } finally {
-      setIsLoading(false);
+      // Only update loading state if this session is still current
+      if (initializedSessionRef.current === sessionId) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
@@ -126,10 +149,10 @@ export function TerminalView({ session }: TerminalViewProps) {
             key={session.sessionId}
             wsUrl={ptyInfo.wsUrl}
             wsToken={ptyInfo.wsToken}
-            onConnect={() => setIsConnected(true)}
-            onDisconnect={() => setIsConnected(false)}
-            onError={(err) => setError(err)}
-            onTerminalError={(err) => setError(err)}
+            onConnect={handleConnect}
+            onDisconnect={handleDisconnect}
+            onError={handleError}
+            onTerminalError={handleError}
           />
         ) : (
           <div className="terminal-view__empty">
