@@ -37,9 +37,27 @@ Status is derived via state machine (not imperative if/else) to handle edge case
 - Timeout fallbacks for older Claude Code versions
 - Clean event-driven transitions
 
-### Durable Streams for Real-time Sync
-Port 4450 serves SSE stream that UI subscribes to via `@durable-streams/state`.
-This allows multiple UI clients to stay in sync without polling.
+### Gateway-Based Session Tracking (Jan 2026)
+Port 4452 WebSocket Gateway is the sole source of truth for sessions. Durable Streams (port 4450) was removed entirely.
+
+**Architecture:**
+- SessionStore merges sessions from SessionWatcher (external) + PtyBridge (gateway-created)
+- Gateway broadcasts session events to all connected WebSocket clients
+- UI subscribes via useGateway hook, receives sessions.snapshot on connect
+
+**Why removed Durable Streams:**
+- Only gateway-created sessions were visible (external Claude Code sessions invisible)
+- Two competing sources of truth (Durable Streams + Gateway)
+- Simpler architecture: single WebSocket for all session data
+
+**Protocol messages:**
+- `sessions.list` (client) → request current sessions
+- `sessions.snapshot` (gateway) → full session list
+- `session.discovered/updated/removed` (gateway) → incremental updates
+
+**Files:**
+- `src/gateway/session-store.ts` - Unified session tracking
+- `src/hooks/useGateway.ts` - TrackedSession map + handlers
 
 ### Centralized Configuration (config.ts)
 All daemon constants live in `packages/daemon/src/config.ts`:
@@ -74,12 +92,12 @@ Use `execFile` with array args instead of `exec` with template strings:
 // Good: execFileAsync("gh", ["pr", "list", "--head", branch])
 ```
 
-### Kitty Terminal Control (Dual Port Architecture)
-Daemon runs two HTTP servers on different ports:
-- Port 4450: Durable Streams SSE (existing, one-way daemon→UI)
-- Port 4451: Hono API for terminal control (new, request/response)
+### Kitty Terminal Control (Port Architecture)
+Daemon runs HTTP/WebSocket servers on two ports:
+- Port 4451: Hono API for terminal control and REST endpoints
+- Port 4452: Gateway WebSocket for real-time session data + PTY I/O
 
-This separation was chosen because DurableStreamTestServer binds its own HTTP server, making port sharing impractical. The UI API client at `packages/ui/src/lib/api.ts` points to port 4451.
+The UI API client at `packages/ui/src/lib/api.ts` points to port 4451. WebSocket connections go to port 4452 via useGateway hook.
 
 SQLite (better-sqlite3) chosen over in-memory storage for:
 - Concurrent access from multiple UI clients
@@ -142,30 +160,8 @@ Kitty window IDs are ephemeral - they change on kitty restart or when other wind
 ### Entry Limit to Prevent Memory Leaks
 Sessions can have thousands of log entries over time. Without trimming, memory grows unbounded causing OOM kills (exit 137). Solution: `MAX_ENTRIES_PER_SESSION = 500` in config.ts, trimmed in watcher.ts. This is sufficient for status detection and summarization while preventing memory exhaustion.
 
-### StreamDB Corruption Recovery (Auto-Recovery Jan 2026)
-If durable-streams client shows `Symbol(liveQueryInternal)` errors, the stream data is corrupted. The system now automatically recovers:
-
-**Auto-recovery flow:**
-1. UI detects corruption error during `createStreamDB()` or `preload()`
-2. UI calls `POST /api/stream/reset` to daemon (note: `/api` not `/api/v1`)
-3. Daemon pauses publishing, clears `~/.mimesis/streams/`, restarts stream server
-4. Daemon calls `resume()` to restart publishing after successful reset
-5. Daemon republishes all cached sessions
-6. UI clears cached dbInstance/dbPromise before retry
-7. UI waits 2 seconds (not 1s) for daemon restart
-8. UI retries connection (up to 3 attempts with exponential backoff)
-
-**Key files:**
-- `packages/ui/src/data/sessionsDb.ts` - Retry logic and corruption detection
-- `packages/daemon/src/api/routes/stream.ts` - Reset endpoint
-- `packages/daemon/src/server.ts` - `pause()`, `restart()`, `clearStreamData()` methods
-- `packages/ui/src/routes/__root.tsx` - Error boundary and fallback UI
-
-**Manual recovery (if auto-recovery fails):**
-```bash
-rm -rf ~/.mimesis/streams/
-# Restart daemon
-```
+### StreamDB Corruption Recovery (DEPRECATED Jan 2026)
+**Note:** This section is historical. Durable Streams was removed in v5.2. Gateway WebSocket is now the sole source of truth for sessions. No stream data to corrupt.
 
 ### File-Based Status System (Jan 2026)
 Alternative to AI summaries for session status. Claude Code writes status to `.claude/status.md` via hooks, daemon watches and streams to UI.

@@ -5,6 +5,8 @@
  * Based on Fleet Commander v5 specification.
  */
 
+import type { TrackedSession } from "./session-store.js";
+
 // =============================================================================
 // Client → Gateway Messages
 // =============================================================================
@@ -79,6 +81,10 @@ export interface PingMessage {
   type: "ping";
 }
 
+export interface SessionsListMessage {
+  type: "sessions.list";
+}
+
 export type ClientMessage =
   | FleetSubscribeMessage
   | SessionCreateMessage
@@ -89,7 +95,8 @@ export type ClientMessage =
   | SessionResizeMessage
   | JobCreateMessage
   | JobCancelMessage
-  | PingMessage;
+  | PingMessage
+  | SessionsListMessage;
 
 // =============================================================================
 // Gateway → Client Messages
@@ -217,12 +224,38 @@ export interface ErrorMessage {
   message: string;
 }
 
+// Session tracking messages (v5.2 - unified session store)
+export interface SessionsSnapshotMessage {
+  type: "sessions.snapshot";
+  sessions: TrackedSession[];
+}
+
+export interface SessionDiscoveredMessage {
+  type: "session.discovered";
+  session: TrackedSession;
+}
+
+export interface SessionUpdatedMessage {
+  type: "session.updated";
+  session_id: string;
+  updates: Partial<TrackedSession>;
+}
+
+export interface SessionRemovedMessage {
+  type: "session.removed";
+  session_id: string;
+}
+
 export type GatewayMessage =
   | FleetEventMessage
   | SessionCreatedMessage
   | SessionStatusMessage
   | SessionEndedMessage
   | SessionEventMessage
+  | SessionsSnapshotMessage
+  | SessionDiscoveredMessage
+  | SessionUpdatedMessage
+  | SessionRemovedMessage
   | JobStartedMessage
   | JobStreamMessage
   | JobCompletedMessage

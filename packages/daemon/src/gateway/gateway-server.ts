@@ -8,6 +8,7 @@
  * - Fleet events (outbox broadcast)
  * - Job management (Commander, maintenance)
  * - Unix socket listener for hook IPC
+ * - Unified session tracking (v5.2)
  */
 
 import { WebSocketServer, WebSocket } from "ws";
@@ -34,12 +35,25 @@ import { RingBufferManager } from "./ring-buffer.js";
 import { EventMergerManager } from "./event-merger.js";
 import { OutboxTailer } from "./outbox-tailer.js";
 import { JobManager, type JobEventListener } from "./job-manager.js";
+import { SessionStore, type SessionStoreEvent } from "./session-store.js";
+import type { SessionWatcher, SessionEvent as WatcherSessionEvent } from "../watcher.js";
+import type { StatusWatcher, StatusUpdateEvent } from "../status-watcher.js";
 
 interface ClientState {
   ws: WebSocket;
   attachedSession: string | null;
   fleetSubscribed: boolean;
   fleetCursor: number;
+}
+
+/**
+ * Gateway server options.
+ */
+export interface GatewayServerOptions {
+  /** SessionWatcher for detecting external Claude Code sessions */
+  sessionWatcher?: SessionWatcher;
+  /** StatusWatcher for tracking session status files */
+  statusWatcher?: StatusWatcher;
 }
 
 /**
@@ -57,7 +71,18 @@ export class GatewayServer {
   private outboxTailer: OutboxTailer;
   private jobManager: JobManager;
 
-  constructor() {
+  // Session tracking (v5.2)
+  private sessionStore: SessionStore;
+  private sessionWatcher?: SessionWatcher;
+  private statusWatcher?: StatusWatcher;
+
+  constructor(options: GatewayServerOptions = {}) {
+    // Store watchers
+    this.sessionWatcher = options.sessionWatcher;
+    this.statusWatcher = options.statusWatcher;
+
+    // Initialize session store
+    this.sessionStore = new SessionStore();
     // Initialize buffer manager
     this.bufferManager = new RingBufferManager(RING_BUFFER_SIZE_BYTES);
 
@@ -96,6 +121,42 @@ export class GatewayServer {
     this.outboxTailer.subscribe((event) => {
       this.broadcastFleetEvent(event);
     });
+
+    // Subscribe to session store events for broadcasting
+    this.sessionStore.subscribe((event) => {
+      this.handleSessionStoreEvent(event);
+    });
+
+    // Subscribe to session watcher (external sessions)
+    if (this.sessionWatcher) {
+      this.sessionWatcher.on("session", (event: WatcherSessionEvent) => {
+        this.handleWatcherSession(event);
+      });
+
+      // Load existing sessions from watcher
+      const existingSessions = this.sessionWatcher.getSessions();
+      for (const [, session] of existingSessions) {
+        this.sessionStore.addFromWatcher({
+          sessionId: session.sessionId,
+          cwd: session.cwd,
+          status: session.status,
+          gitBranch: session.gitBranch,
+          gitRepoUrl: session.gitRepoUrl,
+          originalPrompt: session.originalPrompt,
+          startedAt: session.startedAt,
+        });
+      }
+
+      console.log(`[GATEWAY] Loaded ${existingSessions.size} sessions from watcher`);
+    }
+
+    // Subscribe to status watcher (file-based status)
+    if (this.statusWatcher) {
+      this.statusWatcher.on("status", (event: StatusUpdateEvent) => {
+        this.handleStatusUpdate(event);
+      });
+      console.log("[GATEWAY] StatusWatcher subscribed");
+    }
 
     // Start WebSocket server
     this.wss = new WebSocketServer({
@@ -272,6 +333,10 @@ export class GatewayServer {
       case "job.cancel":
         this.handleJobCancel(message);
         break;
+
+      case "sessions.list":
+        this.handleSessionsList(ws);
+        break;
     }
   }
 
@@ -305,6 +370,19 @@ export class GatewayServer {
         cols: message.cols,
         rows: message.rows,
       });
+
+      // Add to session store (PTY-created session)
+      this.sessionStore.addFromPty({
+        sessionId: session.sessionId,
+        projectId: session.projectId,
+        cwd: message.repo_root,
+        pid: session.pid,
+      });
+
+      // Start watching status files for this project
+      if (this.statusWatcher) {
+        this.statusWatcher.watchProject(message.repo_root);
+      }
 
       // Auto-attach to the new session
       state.attachedSession = session.sessionId;
@@ -558,6 +636,98 @@ export class GatewayServer {
       if (state.fleetSubscribed) {
         this.send(ws, event);
       }
+    }
+  }
+
+  // ==========================================================================
+  // Session Tracking (v5.2)
+  // ==========================================================================
+
+  /**
+   * Handle sessions.list message - return full session snapshot.
+   */
+  private handleSessionsList(ws: WebSocket): void {
+    const sessions = this.sessionStore.getAll();
+    this.send(ws, {
+      type: "sessions.snapshot",
+      sessions,
+    });
+  }
+
+  /**
+   * Handle session watcher events (external Claude Code sessions).
+   */
+  private handleWatcherSession(event: WatcherSessionEvent): void {
+    const { type, session } = event;
+
+    switch (type) {
+      case "created":
+      case "updated":
+        this.sessionStore.addFromWatcher({
+          sessionId: session.sessionId,
+          cwd: session.cwd,
+          status: session.status,
+          gitBranch: session.gitBranch,
+          gitRepoUrl: session.gitRepoUrl,
+          originalPrompt: session.originalPrompt,
+          startedAt: session.startedAt,
+        });
+
+        // Start watching status files for this project
+        if (this.statusWatcher) {
+          this.statusWatcher.watchProject(session.cwd);
+        }
+        break;
+
+      case "deleted":
+        this.sessionStore.remove(session.sessionId);
+        break;
+    }
+  }
+
+  /**
+   * Handle status watcher events (file-based status updates).
+   */
+  private handleStatusUpdate(event: StatusUpdateEvent): void {
+    const { sessionId, status } = event;
+    this.sessionStore.updateFileStatus(sessionId, status);
+  }
+
+  /**
+   * Handle session store events - broadcast to clients.
+   */
+  private handleSessionStoreEvent(event: SessionStoreEvent): void {
+    switch (event.type) {
+      case "discovered":
+        this.broadcast({
+          type: "session.discovered",
+          session: event.session,
+        });
+        break;
+
+      case "updated":
+        this.broadcast({
+          type: "session.updated",
+          session_id: event.sessionId,
+          updates: event.updates,
+        });
+        break;
+
+      case "removed":
+        this.broadcast({
+          type: "session.removed",
+          session_id: event.sessionId,
+        });
+        break;
+    }
+  }
+
+  /**
+   * Broadcast message to all connected clients.
+   */
+  private broadcast(message: GatewayMessage): void {
+    for (const ws of this.clients.keys()) {
+      this.send(ws, message);
     }
   }
 

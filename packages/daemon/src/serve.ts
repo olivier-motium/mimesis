@@ -53,6 +53,7 @@ import { setupKitty, getKittyStatus } from "./kitty-setup.js";
 import { getErrorMessage } from "./utils/type-guards.js";
 import { tabManager } from "./tab-manager.js";
 import { GatewayServer } from "./gateway/index.js";
+import { StatusWatcher } from "./status-watcher.js";
 
 // Validate required environment variables at startup
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
@@ -184,8 +185,17 @@ async function main(): Promise<void> {
   await ensurePortAvailable(API_PORT, STREAM_HOST);
   await ensurePortAvailable(FLEET_GATEWAY_PORT, FLEET_GATEWAY_HOST);
 
-  // Start the Fleet Gateway server (replaces Durable Streams and PTY server)
-  const gatewayServer = new GatewayServer();
+  // Start the session watcher early so Gateway can use it
+  const watcher = new SessionWatcher({ debounceMs: 300 });
+
+  // Start status watcher for file-based status updates
+  const statusWatcher = new StatusWatcher({ debounceMs: 100 });
+
+  // Start the Fleet Gateway server with watchers (replaces Durable Streams and PTY server)
+  const gatewayServer = new GatewayServer({
+    sessionWatcher: watcher,
+    statusWatcher: statusWatcher,
+  });
   await gatewayServer.start();
 
   console.log(`Gateway URL: ${colors.cyan}ws://${FLEET_GATEWAY_HOST}:${FLEET_GATEWAY_PORT}${colors.reset}`);
@@ -216,9 +226,6 @@ async function main(): Promise<void> {
   } else {
     console.log(`${colors.green}[KITTY]${colors.reset} Remote control ready`);
   }
-
-  // Start the session watcher
-  const watcher = new SessionWatcher({ debounceMs: 300 });
 
   // Create API server with Hono
   const app = new Hono();

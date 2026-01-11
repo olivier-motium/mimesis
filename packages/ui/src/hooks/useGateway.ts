@@ -70,6 +70,11 @@ function connectSingleton(fromEventId: number) {
       type: "fleet.subscribe",
       from_event_id: fromEventId,
     }));
+
+    // Request session list (v5.2 - unified session store)
+    ws.send(JSON.stringify({
+      type: "sessions.list",
+    }));
   };
 
   ws.onmessage = (event) => {
@@ -126,6 +131,35 @@ export interface SessionState {
   pid: number;
   status: "working" | "waiting" | "idle";
   attachedClients: number;
+}
+
+/**
+ * Tracked session from gateway session store (v5.2).
+ * Unified representation of sessions from both watcher and PTY sources.
+ */
+export interface TrackedSession {
+  sessionId: string;
+  projectId?: string;
+  cwd: string;
+  status: "working" | "waiting" | "idle";
+  source: "watcher" | "pty";
+  lastActivityAt: string;
+  createdAt: string;
+  gitBranch?: string | null;
+  gitRepoUrl?: string | null;
+  originalPrompt?: string | null;
+  fileStatus?: {
+    status: string;
+    updated: string;
+    task?: string;
+    summary?: string;
+    blockedOn?: string;
+    error?: string;
+    currentFile?: string;
+    toolCount?: number;
+    todos?: Array<{ content: string; status: string }>;
+  } | null;
+  pid?: number;
 }
 
 export interface FleetEvent {
@@ -194,7 +228,7 @@ export interface UseGatewayResult {
   // Fleet events
   fleetEvents: FleetEvent[];
   lastEventId: number;
-  // Sessions
+  // Sessions (legacy PTY sessions)
   sessions: Map<string, SessionState>;
   attachedSession: string | null;
   sessionEvents: Map<string, SequencedSessionEvent[]>;
@@ -205,6 +239,9 @@ export interface UseGatewayResult {
   sendSignal: (sessionId: string, signal: "SIGINT" | "SIGTERM" | "SIGKILL") => void;
   resizeSession: (sessionId: string, cols: number, rows: number) => void;
   clearSessionEvents: (sessionId: string) => void;
+  // Tracked sessions (v5.2 - unified session store)
+  trackedSessions: Map<string, TrackedSession>;
+  requestSessionList: () => void;
   // Jobs
   activeJob: JobState | null;
   createJob: (request: JobCreateRequest) => void;
@@ -236,11 +273,14 @@ export function useGateway(): UseGatewayResult {
   const [lastEventId, setLastEventId] = useState(0);
   const lastEventIdRef = useRef(0); // Ref for reconnection cursor
 
-  // Sessions
+  // Sessions (legacy PTY sessions)
   const [sessions, setSessions] = useState<Map<string, SessionState>>(new Map());
   const [attachedSession, setAttachedSession] = useState<string | null>(null);
   const attachedSessionRef = useRef<string | null>(null); // Ref for message handler
   const [sessionEvents, setSessionEvents] = useState<Map<string, SequencedSessionEvent[]>>(new Map());
+
+  // Tracked sessions (v5.2 - unified session store)
+  const [trackedSessions, setTrackedSessions] = useState<Map<string, TrackedSession>>(new Map());
 
   // Jobs
   const [activeJob, setActiveJob] = useState<JobState | null>(null);
@@ -386,6 +426,54 @@ export function useGateway(): UseGatewayResult {
         break;
       }
 
+      // Session tracking messages (v5.2)
+      case "sessions.snapshot": {
+        const sessionsList = message.sessions as TrackedSession[];
+        const sessionsMap = new Map<string, TrackedSession>();
+        for (const session of sessionsList) {
+          sessionsMap.set(session.sessionId, session);
+        }
+        setTrackedSessions(sessionsMap);
+        console.log("[GATEWAY] Sessions snapshot received:", sessionsList.length, "sessions");
+        break;
+      }
+
+      case "session.discovered": {
+        const session = message.session as TrackedSession;
+        setTrackedSessions((prev) => {
+          const updated = new Map(prev);
+          updated.set(session.sessionId, session);
+          return updated;
+        });
+        console.log("[GATEWAY] Session discovered:", session.sessionId);
+        break;
+      }
+
+      case "session.updated": {
+        const sessionId = message.session_id as string;
+        const updates = message.updates as Partial<TrackedSession>;
+        setTrackedSessions((prev) => {
+          const updated = new Map(prev);
+          const existing = updated.get(sessionId);
+          if (existing) {
+            updated.set(sessionId, { ...existing, ...updates });
+          }
+          return updated;
+        });
+        break;
+      }
+
+      case "session.removed": {
+        const sessionId = message.session_id as string;
+        setTrackedSessions((prev) => {
+          const updated = new Map(prev);
+          updated.delete(sessionId);
+          return updated;
+        });
+        console.log("[GATEWAY] Session removed:", sessionId);
+        break;
+      }
+
       default:
         console.log("[GATEWAY] Unknown message type:", type);
     }
@@ -453,6 +541,10 @@ export function useGateway(): UseGatewayResult {
       updated.delete(sessionId);
       return updated;
     });
+  }, []);
+
+  const requestSessionList = useCallback(() => {
+    sendMessage({ type: "sessions.list" });
   }, []);
 
   // ============================================================================
@@ -539,6 +631,8 @@ export function useGateway(): UseGatewayResult {
     sendSignal,
     resizeSession,
     clearSessionEvents,
+    trackedSessions,
+    requestSessionList,
     activeJob,
     createJob,
     cancelJob,
@@ -557,6 +651,8 @@ export function useGateway(): UseGatewayResult {
     sendSignal,
     resizeSession,
     clearSessionEvents,
+    trackedSessions,
+    requestSessionList,
     activeJob,
     createJob,
     cancelJob,

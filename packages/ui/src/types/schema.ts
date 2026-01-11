@@ -6,7 +6,7 @@
  * making it easier to evolve the daemon schema independently.
  */
 
-// Type exports - UI reads these from streamed data
+// Type exports - UI reads these from gateway or converts from TrackedSession
 export type {
   Session,
   SessionStatus,
@@ -15,6 +15,3 @@ export type {
   TerminalLink,
   EmbeddedPty,
 } from "@mimesis/daemon/schema";
-
-// Runtime schemas needed for StreamDB initialization
-export { sessionsStateSchema } from "@mimesis/daemon/schema";

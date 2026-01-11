@@ -14,6 +14,20 @@
 // Main server
 export { GatewayServer } from "./gateway-server.js";
 
+// Session store (v5.2 unified session tracking)
+export {
+  SessionStore,
+  type SessionSource,
+  type UIStatus,
+  type TrackedSession,
+  type WatcherSessionData,
+  type PtySessionData,
+  type SessionStoreEvent,
+  type SessionDiscoveredEvent,
+  type SessionUpdatedEvent,
+  type SessionRemovedEvent,
+} from "./session-store.js";
+
 // Core components
 export { PtyBridge, type PtySessionInfo, type PtyBridgeCallbacks } from "./pty-bridge.js";
 export { EventMerger, EventMergerManager } from "./event-merger.js";
@@ -63,6 +77,12 @@ export {
   type JobStreamMessage,
   type JobCompletedMessage,
   type ErrorMessage,
+  // Session tracking messages (v5.2)
+  type SessionsListMessage,
+  type SessionsSnapshotMessage,
+  type SessionDiscoveredMessage,
+  type SessionUpdatedMessage,
+  type SessionRemovedMessage,
   // Session events
   type SessionEvent,
   type StdoutEvent,
