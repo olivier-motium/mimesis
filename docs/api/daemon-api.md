@@ -797,134 +797,86 @@ See the hook files at `~/.claude/hooks/` after installation.
 
 ---
 
-## Embedded PTY Server (`pty/`)
+## PTY Bridge (Gateway Integration)
 
-WebSocket-based pseudo-terminal server for browser-embedded terminals.
+PTY spawning and I/O integrated into the Fleet Gateway WebSocket.
 
 ### Architecture
 
 ```
-UI (xterm.js) ⟷ WebSocket :4452 ⟷ PtyManager ⟷ node-pty
+UI (Timeline) ⟷ Gateway WebSocket :4452 ⟷ PtyBridge ⟷ node-pty
 ```
 
-The PTY server runs on port 4452 (configurable via `PTY_WS_HOST`, `PTY_WS_PORT`) and provides bidirectional terminal I/O.
+The Gateway WebSocket server (port 4452) handles both session streaming and PTY I/O. PTY stdout is merged with hook events via `event-merger.ts` and rendered in the Timeline.
 
 ### Components
 
 | File | Purpose |
 |------|---------|
-| `pty-manager.ts` | PTY lifecycle, token auth, idle cleanup |
-| `ws-server.ts` | WebSocket server, message relay |
-| `types.ts` | PtySession, WsMessage interfaces |
-
-### PtyManager
-
-```typescript
-import { PtyManager } from "./pty/index.js";
-
-const manager = new PtyManager();
-
-// Create a new PTY for a session
-const session = await manager.createPty({
-  sessionId: "abc123",
-  cwd: "/path/to/project",
-  cols: 120,
-  rows: 40,
-});
-// Returns: { id, sessionId, wsToken, ... }
-
-// Get PTY by session ID
-const pty = manager.getPtyBySessionId("abc123");
-
-// Resize PTY
-manager.resize("pty-id", 100, 30);
-
-// Write to PTY
-manager.write("pty-id", "npm test\n");
-
-// Destroy PTY
-manager.destroy("pty-id");
-
-// Validate token
-const valid = manager.validateToken("pty-id", "token-uuid");
-```
-
-### WebSocket Protocol
-
-**Connection:** `ws://127.0.0.1:4452/pty/:ptyId?token=<wsToken>`
-
-**Messages (Client → Server):**
-```typescript
-// Terminal input
-{ type: "input", payload: "npm test\n" }
-
-// Resize event
-{ type: "resize", cols: 100, rows: 30 }
-```
-
-**Messages (Server → Client):**
-```typescript
-// Terminal output
-{ type: "data", payload: "npm test\r\n> running tests..." }
-```
+| `gateway/pty-bridge.ts` | PTY spawn, write, destroy |
+| `gateway/event-merger.ts` | Merge PTY stdout with hook events |
+| `gateway/gateway-server.ts` | WebSocket connection manager |
 
 ### PTY API Endpoints (Port 4451)
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| POST | `/api/sessions/:id/pty` | Create PTY, returns {ptyId, wsUrl, wsToken} |
+| POST | `/api/sessions/:id/pty` | Create PTY, returns {ptyId, wsUrl} |
 | GET | `/api/sessions/:id/pty` | Get existing PTY info |
 | DELETE | `/api/sessions/:id/pty` | Destroy PTY |
-| POST | `/api/sessions/:id/pty/resize` | Resize PTY {cols, rows} |
 
 **Create PTY:**
 ```bash
 curl -X POST http://127.0.0.1:4451/api/sessions/abc123/pty \
   -H "Content-Type: application/json" \
   -d '{"cols": 120, "rows": 40}'
-# {
-#   "ptyId": "pty-uuid",
-#   "wsUrl": "ws://127.0.0.1:4452/pty/pty-uuid",
-#   "wsToken": "auth-token-uuid"
-# }
+# { "ptyId": "pty-uuid", "wsUrl": "ws://127.0.0.1:4452" }
 ```
 
-**Get PTY info:**
-```bash
-curl http://127.0.0.1:4451/api/sessions/abc123/pty
-# { "ptyId": "...", "wsUrl": "...", "active": true, "connectedAt": "..." }
+### Gateway WebSocket Protocol
+
+PTY events are delivered through the main Gateway WebSocket connection alongside session events.
+
+**Messages (Client → Server):**
+```typescript
+// PTY input
+{ type: "pty:input", sessionId: "abc123", payload: "npm test\n" }
+
+// PTY resize
+{ type: "pty:resize", sessionId: "abc123", cols: 100, rows: 30 }
+```
+
+**Messages (Server → Client):**
+```typescript
+// PTY stdout (merged with session events)
+{ type: "pty:stdout", sessionId: "abc123", data: "npm test\r\n> running tests..." }
 ```
 
 ### Security
 
 | Mechanism | Description |
 |-----------|-------------|
-| Localhost binding | All servers on 127.0.0.1 only |
-| Token auth | UUID token generated per PTY, required for WS upgrade |
+| Localhost binding | Gateway server on 127.0.0.1 only |
 | Session scope | Only spawns `claude --resume <sessionId>` |
 
 ### Configuration
 
 | Constant | Default | Purpose |
 |----------|---------|---------|
-| `PTY_WS_HOST` | `127.0.0.1` | WebSocket server host |
-| `PTY_WS_PORT` | `4452` | WebSocket server port |
+| `GATEWAY_HOST` | `127.0.0.1` | Gateway WebSocket host |
+| `GATEWAY_PORT` | `4452` | Gateway WebSocket port |
 | `PTY_IDLE_TIMEOUT_MS` | 30 minutes | Cleanup inactive PTYs |
 | `PTY_DEFAULT_COLS` | 120 | Default terminal width |
 | `PTY_DEFAULT_ROWS` | 40 | Default terminal height |
 
-### Idle Cleanup
+### Send-Text Target
 
-PTYs without active WebSocket connections are cleaned up after `PTY_IDLE_TIMEOUT_MS` (30 minutes). This prevents resource leaks from abandoned sessions.
+The `/api/sessions/:id/send-text` endpoint supports both PTY and kitty terminals:
 
-### Send-Text Dual Target
-
-The `/api/sessions/:id/send-text` endpoint now supports both embedded PTY and kitty terminals:
-
-1. If embedded PTY has active clients → sends to PTY
+1. If PTY exists for session → sends to PTY via Gateway
 2. Otherwise → falls back to kitty terminal (if linked)
 
-Response includes `target: "embedded"` or `target: "kitty"` to indicate which terminal received the text.
+Response includes `target: "gateway"` or `target: "kitty"` to indicate which terminal received the text.
 
 ---
 

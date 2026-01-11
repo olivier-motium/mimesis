@@ -208,7 +208,7 @@ Organize related commands in subdirectories:
 
 ## Related Documentation
 
-- [Hooks Reference](claude-code-hooks.md) - Lifecycle event handlers
-- [Skills Reference](claude-code-skills.md) - Domain-specific knowledge injection
+- [Hooks Reference](hooks.md) - Lifecycle event handlers
+- [Skills Reference](skills.md) - Domain-specific knowledge injection
 - [Config Files](claude-code-config/) - Actual command/hook/skill files for installation
 - [Official Commands Documentation](https://code.claude.com/docs/en/slash-commands) - Anthropic reference

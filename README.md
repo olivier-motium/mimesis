@@ -8,50 +8,45 @@ Monitor, command, and coordinate multiple Claude Code sessions from a single das
 
 ## Fleet Command UI
 
-Mimesis uses a 4-zone "Fleet Command" layout inspired by RTS games:
+Mimesis uses a 3-column "Fleet Command" layout inspired by RTS games and Melty:
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ MIMESIS                            [Ops] [Focus]    ● 3 ○ 2 │
-├─────────────────────────────────────────────────────────────┤
-│ [All] [Working] [Needs Input] [Idle] [Errors] [Stale]       │
-├────────┬──────────────────────────────────┬─────────────────┤
-│ ROSTER │         DATA TABLE               │ TACTICAL INTEL  │
-│        │  Status │ Goal │ Branch │ Age    │                 │
-│ ● proj │    ●    │ ...  │ main   │ 2m     │ Execution Plan  │
-│ ○ api  │    ○    │ ...  │ feat   │ 5m     │ □ Step 1        │
-│ ◐ cli  │    ◐    │ ...  │ fix    │ 1h     │ ☑ Step 2        │
-│        │                                  │ Modified Files  │
-├────────┴──────────────────────────────────┴─────────────────┤
-│                     TERMINAL DOCK                           │
-│ $ claude --resume abc123                                    │
-├─────────────────────────────────────────────────────────────┤
-│ EVENT TICKER: ● api started │ ○ cli waiting │ ...           │
-└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│ MIMESIS                              Gateway: ● Connected  3/5  │
+├─────────────────────────────────────────────────────────────────┤
+│ [All: 5] [Working: 2] [Waiting: 1] [Idle: 2]                    │
+├────────────┬──────────────────────────────────┬─────────────────┤
+│ ROSTER     │ TIMELINE                         │ TACTICAL INTEL  │
+│            │                                  │                 │
+│ ● proj-a   │ ┌ Tool: Edit api.ts ───────────┐ │ Fleet Events    │
+│ ○ proj-b   │ │ Modified lines 45-67         │ │                 │
+│ ◐ proj-c   │ └──────────────────────────────┘ │ Session Details │
+│            │                                  │                 │
+│            │ [Text] Let me explain...         │ Status: working │
+│            │                                  │ Branch: main    │
+│            │ ┌ Session Input ───────────────┐ │                 │
+│            │ │ Send command...         [↵]  │ │                 │
+│            │ └──────────────────────────────┘ │                 │
+└────────────┴──────────────────────────────────┴─────────────────┘
 ```
 
-**4 Zones:**
+**3 Columns:**
 - **Roster** (left) - High-density agent list with status indicators
-- **Data Table** (center) - Sortable/filterable session grid (TanStack Table)
-- **Tactical Intel** (right) - Execution plan + modified artifacts for selected session
-- **Event Ticker** (bottom) - Cross-agent event stream for fleet awareness
-
-**Dual Mode:**
-- **Ops Mode** - Dense table view with terminal dock below
-- **Focus Mode** - Full-screen terminal for deep work
+- **Timeline** (center) - Virtualized event stream with tool cards, text, and session input
+- **Tactical Intel** (right) - Fleet events and session details
 
 ## Features
 
 ### Terminal Integration
-- **Embedded xterm.js** - Full terminal in the browser via WebSocket + node-pty
 - **Kitty native support** - Auto-configured remote control for power users
 - **One-click resume** - Click any session to open `claude --resume` instantly
+- **Session input** - Send commands and signals to active sessions from the UI
 
 ### Real-time Intelligence
-- **Durable Streams** - Live state sync, no polling
+- **Fleet Gateway** - WebSocket-based real-time session sync
 - **XState machine** - Deterministic status detection (working/waiting/idle)
 - **Hook-based status** - Goals and summaries from `.claude/status.md`
-- **Event ticker** - See what's happening across all agents
+- **Timeline view** - Structured event rendering with virtualization
 
 ### Keyboard-First Navigation
 | Key | Action |
@@ -72,9 +67,9 @@ Mimesis uses a 4-zone "Fleet Command" layout inspired by RTS games:
 │  Claude Code    │     │           Daemon            │     │       UI        │
 │   Sessions      │────▶│   (Watcher + API Server)    │────▶│   (React 19)    │
 │  ~/.claude/     │     │                             │     │                 │
-│   projects/     │     │  :4450 Durable Streams SSE  │     │  Fleet Command  │
-│                 │     │  :4451 Hono REST API        │     │  4-Zone Layout  │
-│                 │     │  :4452 PTY WebSocket        │     │  xterm.js       │
+│   projects/     │     │  :4451 Hono REST API        │     │  Fleet Command  │
+│                 │     │  :4452 Gateway WebSocket    │     │  3-Column       │
+│                 │     │                             │     │  Timeline View  │
 └─────────────────┘     └─────────────────────────────┘     └─────────────────┘
                                      │
                                      ▼
@@ -91,9 +86,8 @@ Watches `~/.claude/projects/` for session log changes:
 - XState state machine for status detection
 - Reads `.claude/status.md` hook files for goals/summaries
 - Git branch detection
-- Durable Streams publishing
-- REST API for terminal control
-- Embedded PTY server for xterm.js
+- Fleet Gateway for real-time WebSocket streaming
+- REST API for session and terminal control
 
 ### UI (`packages/ui`)
 
@@ -101,8 +95,8 @@ React 19 app with Fleet Command interface:
 - TanStack Router for navigation
 - TanStack Table for data grid
 - shadcn/ui components (Radix primitives + Tailwind)
-- xterm.js for embedded terminals
-- Durable Streams client for real-time updates
+- @tanstack/react-virtual for Timeline virtualization
+- Gateway WebSocket client for real-time updates
 
 ## Getting Started
 
@@ -114,7 +108,7 @@ pnpm install
 pnpm start
 
 # Or run separately:
-pnpm serve  # Daemon (ports 4450, 4451, 4452)
+pnpm serve  # Daemon (ports 4451, 4452)
 pnpm dev    # UI dev server
 ```
 
@@ -124,9 +118,8 @@ pnpm dev    # UI dev server
 
 | Port | Protocol | Purpose |
 |------|----------|---------|
-| 4450 | SSE | Durable Streams (session state sync) |
-| 4451 | HTTP | REST API (terminal control, health) |
-| 4452 | WebSocket | Embedded PTY terminals (xterm.js) |
+| 4451 | HTTP | REST API (health, sessions, kitty control) |
+| 4452 | WebSocket | Fleet Gateway (sessions, events, jobs) |
 
 ## Session Status State Machine
 
@@ -194,7 +187,7 @@ All endpoints prefixed with `/api/v1` on port 4451:
 |------|-------------|
 | `~/.claude/projects/` | Claude Code session logs (JSONL) |
 | `~/.mimesis/data.db` | SQLite database (terminal links) |
-| `~/.mimesis/streams/` | Durable Streams persistence |
+| `~/.claude/commander/fleet.db` | Fleet database (briefings, jobs) |
 | `~/.config/kitty/claude-code.conf` | Kitty remote control config |
 
 ## Documentation
@@ -216,14 +209,14 @@ All endpoints prefixed with `/api/v1` on port 4451:
 | Package Manager | pnpm |
 | File Watching | chokidar v5 |
 | State Machine | XState v5 |
-| Streaming | @durable-streams/* |
+| Gateway | WebSocket (ws) |
 | REST API | Hono |
 | Database | SQLite (better-sqlite3) + Drizzle ORM |
 | UI Framework | React 19 |
 | Routing | TanStack Router |
 | Tables | TanStack Table v8 |
 | UI Components | shadcn/ui + Tailwind CSS v4 |
-| Terminal | xterm.js + node-pty |
+| Virtualization | @tanstack/react-virtual |
 
 ## Credits
 

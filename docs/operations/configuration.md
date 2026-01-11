@@ -8,11 +8,10 @@ Complete reference for all environment variables and tunable constants.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `STREAM_HOST` | `127.0.0.1` | HTTP server bind address |
-| `PORT` | `4450` | Stream server port |
-| `API_PORT` | `4451` | API server port for terminal control |
-| `PTY_WS_HOST` | `127.0.0.1` | PTY WebSocket server bind address |
-| `PTY_WS_PORT` | `4452` | PTY WebSocket server port |
+| `API_HOST` | `127.0.0.1` | REST API bind address |
+| `API_PORT` | `4451` | REST API port |
+| `GATEWAY_HOST` | `127.0.0.1` | Gateway WebSocket bind address |
+| `GATEWAY_PORT` | `4452` | Gateway WebSocket port |
 | `MAX_AGE_HOURS` | `24` | Filter sessions older than this |
 | `KITTY_SOCKET` | `unix:/tmp/claude-cc-kitty` | Kitty remote control socket |
 | `KITTY_RC_PASSWORD` | (none) | Password for kitty remote control |
@@ -22,8 +21,8 @@ Complete reference for all environment variables and tunable constants.
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `VITE_STREAM_URL` | `http://127.0.0.1:4450/sessions` | Daemon stream endpoint |
-| `VITE_API_URL` | `http://127.0.0.1:4451/api` | Terminal control API endpoint |
+| `VITE_API_URL` | `http://127.0.0.1:4451/api` | REST API endpoint |
+| `VITE_GATEWAY_URL` | `ws://127.0.0.1:4452` | Gateway WebSocket endpoint |
 
 ---
 
@@ -80,8 +79,8 @@ No configuration needed - uses defaults.
 
 ```bash
 # .env
-STREAM_HOST=0.0.0.0
-PORT=8080
+API_HOST=0.0.0.0
+GATEWAY_HOST=0.0.0.0
 MAX_AGE_HOURS=48
 ```
 
@@ -89,7 +88,8 @@ MAX_AGE_HOURS=48
 
 ```bash
 # packages/ui/.env
-VITE_STREAM_URL=http://192.168.1.100:4450/sessions
+VITE_API_URL=http://192.168.1.100:4451/api
+VITE_GATEWAY_URL=ws://192.168.1.100:4452
 ```
 
 ---

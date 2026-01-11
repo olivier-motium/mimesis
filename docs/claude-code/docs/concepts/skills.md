@@ -377,8 +377,8 @@ If multiple skills could apply:
 
 ## Related Documentation
 
-- [Claude Code Hooks](claude-code-hooks.md) - Lifecycle event handlers
-- [Commands Reference](claude-code-commands.md) - Custom slash commands
+- [Claude Code Hooks](hooks.md) - Lifecycle event handlers
+- [Commands Reference](commands.md) - Custom slash commands
 - [Config Files](claude-code-config/) - Actual hook/skill/command files for installation
-- [CLAUDE.md Standards](CLAUDE_AGENTS.md) - Core philosophy
+- [Philosophy](../philosophy.md) - Core principles
 - [Official Skills Documentation](https://docs.anthropic.com/en/docs/claude-code/skills) - Anthropic reference
