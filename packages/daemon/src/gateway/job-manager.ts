@@ -80,8 +80,7 @@ export class JobManager {
   cancelJob(jobId: number): boolean {
     const job = this.running.get(jobId);
     if (!job) {
-      // Check if in queue
-      const queueIndex = this.queue.findIndex((q) => false); // Can't cancel queued jobs yet
+      // Can't cancel queued jobs yet
       return false;
     }
 

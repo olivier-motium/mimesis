@@ -7,7 +7,6 @@
  * - Streaming response display
  */
 
-import { useMemo } from "react";
 import type { JobState, JobStreamChunk } from "../../hooks/useGateway";
 import { cn } from "../../lib/utils";
 import { CommanderHistory } from "./CommanderHistory";
@@ -40,10 +39,7 @@ export function CommanderTab({
   const hasResult = activeJob?.status === "completed" || activeJob?.status === "failed";
 
   // Parse stream events for display
-  const streamContent = useMemo(() => {
-    if (!activeJob) return null;
-    return parseStreamEvents(activeJob.events);
-  }, [activeJob]);
+  const streamContent = activeJob ? parseStreamEvents(activeJob.events) : null;
 
   return (
     <div className={cn("flex flex-col h-full", className)}>

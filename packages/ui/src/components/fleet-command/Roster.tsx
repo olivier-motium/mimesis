@@ -9,7 +9,7 @@
  *   3. Idle (collapsed by default)
  */
 
-import { useState, useMemo } from "react";
+import { useState } from "react";
 import { Search, ChevronDown, ChevronRight, AlertTriangle, Circle } from "lucide-react";
 import { RosterItem } from "./RosterItem";
 import { getEffectiveStatus } from "@/lib/sessionStatus";
@@ -49,26 +49,21 @@ export function Roster({
   const [idleExpanded, setIdleExpanded] = useState(false);
 
   // Filter sessions by search query
-  const filteredSessions = useMemo(() => {
-    return sessions.filter((session) => {
-      if (!searchQuery) return true;
-      const query = searchQuery.toLowerCase();
-      return (
-        session.gitBranch?.toLowerCase().includes(query) ||
-        session.goal?.toLowerCase().includes(query) ||
-        session.originalPrompt?.toLowerCase().includes(query) ||
-        session.sessionId.toLowerCase().includes(query) ||
-        session.gitRepoId?.toLowerCase().includes(query) ||
-        session.workChainName?.toLowerCase().includes(query)
-      );
-    });
-  }, [sessions, searchQuery]);
+  const filteredSessions = sessions.filter((session) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      session.gitBranch?.toLowerCase().includes(query) ||
+      session.goal?.toLowerCase().includes(query) ||
+      session.originalPrompt?.toLowerCase().includes(query) ||
+      session.sessionId.toLowerCase().includes(query) ||
+      session.gitRepoId?.toLowerCase().includes(query) ||
+      session.workChainName?.toLowerCase().includes(query)
+    );
+  });
 
   // Group filtered sessions by status
-  const { attention, running, idle } = useMemo(
-    () => groupSessionsByStatus(filteredSessions),
-    [filteredSessions]
-  );
+  const { attention, running, idle } = groupSessionsByStatus(filteredSessions);
 
   const rosterClass = compact ? "fleet-roster fleet-roster--compact" : "fleet-roster";
 

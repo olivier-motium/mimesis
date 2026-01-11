@@ -8,7 +8,7 @@
  * - Headless job management (Commander)
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { config } from "../config";
 import { dispatchMessage, type GatewayStateSetters, type GatewayRefs } from "./gateway-handlers";
 
@@ -30,16 +30,22 @@ interface ConnectionManager {
   lastStatus: GatewayStatus;
 }
 
+// Type augmentation for globalThis (proper typing instead of double cast)
+declare global {
+  // eslint-disable-next-line no-var
+  var __gatewayManager: ConnectionManager | undefined;
+}
+
 // Global singleton that survives HMR
-const connectionManager: ConnectionManager = (globalThis as unknown as { __gatewayManager?: ConnectionManager }).__gatewayManager ?? {
+const connectionManager: ConnectionManager = globalThis.__gatewayManager ?? {
   ws: null,
   reconnectTimer: null,
   reconnectAttempts: 0,
   subscribers: new Set(),
   statusListeners: new Set(),
-  lastStatus: "disconnected" as GatewayStatus,
+  lastStatus: "disconnected",
 };
-(globalThis as unknown as { __gatewayManager: ConnectionManager }).__gatewayManager = connectionManager;
+globalThis.__gatewayManager = connectionManager;
 
 function notifyStatus(status: GatewayStatus) {
   connectionManager.lastStatus = status;
@@ -292,8 +298,8 @@ export function useGateway(): UseGatewayResult {
     attachedSessionRef.current = attachedSession;
   }, [attachedSession]);
 
-  // State setters for message handlers
-  const stateSetters: GatewayStateSetters = useMemo(() => ({
+  // State setters for message handlers (setState functions are stable)
+  const stateSetters: GatewayStateSetters = {
     setFleetEvents,
     setLastEventId,
     setSessions,
@@ -302,18 +308,20 @@ export function useGateway(): UseGatewayResult {
     setTrackedSessions,
     setActiveJob,
     setLastError,
-  }), []);
+  };
 
-  // Refs for message handlers
-  const gatewayRefs: GatewayRefs = useMemo(() => ({
+  // Refs for message handlers (refs are stable)
+  const gatewayRefs: GatewayRefs = {
     lastEventIdRef,
     attachedSessionRef,
-  }), []);
+  };
 
   // Handle incoming messages (delegates to handler registry)
+  // Empty deps: stateSetters contains stable setState functions, gatewayRefs contains stable refs
   const handleMessage = useCallback((message: Record<string, unknown>) => {
     dispatchMessage(message, stateSetters, gatewayRefs);
-  }, [stateSetters, gatewayRefs]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ============================================================================
   // Session Management (uses singleton sendMessage)
@@ -453,7 +461,7 @@ export function useGateway(): UseGatewayResult {
     return () => clearInterval(interval);
   }, []);
 
-  return useMemo(() => ({
+  return {
     status,
     fleetEvents,
     lastEventId,
@@ -473,25 +481,5 @@ export function useGateway(): UseGatewayResult {
     createJob,
     cancelJob,
     lastError,
-  }), [
-    status,
-    fleetEvents,
-    lastEventId,
-    sessions,
-    attachedSession,
-    sessionEvents,
-    attachSession,
-    detachSession,
-    createSession,
-    sendStdin,
-    sendSignal,
-    resizeSession,
-    clearSessionEvents,
-    trackedSessions,
-    requestSessionList,
-    activeJob,
-    createJob,
-    cancelJob,
-    lastError,
-  ]);
+  };
 }

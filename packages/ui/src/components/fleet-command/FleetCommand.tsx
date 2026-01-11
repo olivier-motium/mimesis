@@ -9,7 +9,7 @@
  * Connects to Fleet Gateway via WebSocket for realtime updates.
  */
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback } from "react";
 import { CommandBar } from "./CommandBar";
 import { Roster } from "./Roster";
 import { TacticalIntel } from "./TacticalIntel";
@@ -39,24 +39,18 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
   const [showCommander, setShowCommander] = useState(false);
 
   // Count sessions by status for StatusStrip
-  const statusCounts = useMemo(
-    () => countSessionsByStatus(sessions),
-    [sessions]
-  );
+  const statusCounts = countSessionsByStatus(sessions);
 
   // Get selected session
-  const selectedSession = useMemo(
-    () => sessions.find((s) => (s.workChainId ?? s.sessionId) === selectedSessionId) ?? null,
-    [sessions, selectedSessionId]
-  );
+  const selectedSession = sessions.find((s) => (s.workChainId ?? s.sessionId) === selectedSessionId) ?? null;
 
   // Get session status from gateway or fallback to durable streams data
-  const activeSessionStatus = useMemo(() => {
+  const activeSessionStatus = (() => {
     if (!selectedSessionId) return "idle";
     const gatewaySession = gateway.sessions.get(selectedSessionId);
     if (gatewaySession) return gatewaySession.status;
     return selectedSession?.status.status ?? "idle";
-  }, [selectedSessionId, gateway.sessions, selectedSession]);
+  })();
 
   // Handle session selection - attach to gateway
   const handleSelectSession = useCallback((sessionId: string) => {
@@ -102,10 +96,10 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
     sessions,
     selectedSessionId,
     onSelectSession: handleSelectSession,
-    onDeselectSession: useCallback(() => setSelectedSessionId(null), []),
+    onDeselectSession: () => setSelectedSessionId(null),
     showCommander,
-    onToggleCommander: useCallback(() => setShowCommander((prev) => !prev), []),
-    onCloseCommander: useCallback(() => setShowCommander(false), []),
+    onToggleCommander: () => setShowCommander((prev) => !prev),
+    onCloseCommander: () => setShowCommander(false),
     onFilterChange: setFilter,
   });
 

@@ -57,15 +57,18 @@ These constants are defined in `packages/daemon/src/config.ts` and affect daemon
 | `API_PORT` | `4451` | Port for terminal control API |
 | `API_PREFIX` | `/api` | URL prefix for API endpoints |
 
-### Embedded PTY Server
+### Gateway PTY Configuration
+
+PTY sessions are managed via the Gateway WebSocket (port 4452), displayed in the Timeline component.
 
 | Constant | Value | Purpose |
 |----------|-------|---------|
-| `PTY_WS_HOST` | `127.0.0.1` | WebSocket server bind address |
-| `PTY_WS_PORT` | `4452` | WebSocket server port |
-| `PTY_IDLE_TIMEOUT_MS` | 30 minutes | Cleanup inactive PTYs |
-| `PTY_DEFAULT_COLS` | `120` | Default terminal width |
-| `PTY_DEFAULT_ROWS` | `40` | Default terminal height |
+| `PTY_IDLE_TIMEOUT_MS` | 30 minutes | Cleanup inactive PTY sessions |
+| `PTY_DEFAULT_COLS` | `120` | Default terminal width for PTY spawn |
+| `PTY_DEFAULT_ROWS` | `40` | Default terminal height for PTY spawn |
+| `PTY_OUTPUT_BUFFER_SIZE` | 5000 | Max chunks in output replay buffer |
+
+**Note:** PTY I/O is streamed through the Gateway WebSocket, not a separate xterm.js server. The UI Timeline component renders events from the Gateway.
 
 ---
 

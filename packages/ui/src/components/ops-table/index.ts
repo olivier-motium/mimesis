@@ -1,8 +1,9 @@
 /**
  * OpsTable module exports
+ *
+ * Note: OpsTable and OpsTableRow were replaced by DataTable (TanStack Table v8) in v5.
+ * These utility functions are still used by the Fleet Command UI.
  */
 
-export { OpsTable } from "./OpsTable";
-export { OpsTableRow } from "./OpsTableRow";
 export { countSessionsByStatus, filterSessions, sortSessions, isSessionStale } from "./utils";
-export type { OpsTableProps, OpsTableRowProps, StatusFilter, StatusCounts } from "./types";
+export type { StatusFilter, StatusCounts } from "./types";

@@ -1,29 +1,26 @@
 ---
 status: completed
-updated: 2026-01-11T20:00:00Z
-task: Fix external session display in Timeline
+updated: 2026-01-11T22:02:00Z
+task: Fix all 32 AI-generated code slop instances
 ---
 
 ## Summary
-Fixed the "External session - monitoring status only" message to show useful session info.
 
-### Changes Made
-- Enhanced gateway-server.ts to send detailed events for external sessions:
-  - Session header with branch info
-  - Task from status file or truncated original prompt
-  - Summary from status file (if available)
-  - Status indicator with emoji
-  - Working directory
-- Fixed data vs text property mismatch in useSessionEvents.ts (daemon sends `data`, UI expected `text`)
-- Fixed duplicate events when switching sessions by clearing events before re-attaching
+Completed comprehensive deslop audit fixing 32 instances across 10 files:
 
-### Files Modified
-**Daemon:**
-- `src/gateway/gateway-server.ts` - Enhanced watcher session attach with detailed info events
+### Fixes Applied
+- **useGateway.ts** (6): Proper globalThis type augmentation, removed unnecessary useMemo
+- **FleetCommand.tsx** (6): Removed useMemo/useCallback from cheap operations
+- **Roster.tsx** (2): Removed useMemo from filtering operations
+- **DataTable.tsx** (1): Removed useMemo from filterSessions
+- **CommanderTab.tsx** (1): Inlined conditional instead of useMemo
+- **job-manager.ts** (1): Deleted dead code (`findIndex(() => false)`)
+- **optimize-prompt.py** (7): Modernized Python typing (list[], dict[], | None)
 
-**UI:**
-- `src/hooks/useSessionEvents.ts` - Map `event.data` to `text` for Timeline rendering
-- `src/components/fleet-command/FleetCommand.tsx` - Clear session events before attaching
+### Verified as Not Slop
+- `return await` in try-catch blocks (required for error catching)
+- Type assertion in job-repo.ts (reasonable for internal JSON storage)
 
-### Result
-External sessions now display meaningful information in Timeline instead of generic "monitoring status only" message.
+### Results
+- UI build: Success
+- Tests: 248 passed

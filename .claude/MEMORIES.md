@@ -1009,6 +1009,18 @@ const connectionManager: ConnectionManager = (globalThis as unknown as { __gatew
 
 **Files:** `packages/ui/src/hooks/useGateway.ts`
 
+**Type augmentation pattern (preferred over double casts):**
+```typescript
+// Bad: double cast abuse
+const singleton = (globalThis as unknown as { __manager?: T }).__manager;
+
+// Good: proper type augmentation
+declare global {
+  // eslint-disable-next-line no-var
+  var __gatewayManager: ConnectionManager | undefined;
+}
+const singleton = globalThis.__gatewayManager;
+
 ### Entry Conversion for Watcher Sessions (Jan 2026)
 
 **Problem:** External/watcher sessions only showed metadata ("Monitoring external session...") in Timeline, not the actual conversation history.

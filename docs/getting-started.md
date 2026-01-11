@@ -33,21 +33,29 @@ This starts:
 
 Navigate to [http://localhost:5173](http://localhost:5173)
 
-You should see your active Claude Code sessions appear as cards organized by repository.
+You should see your active Claude Code sessions appear in the Fleet Command interface.
 
 ## What You'll See
 
-The dashboard shows sessions in a Kanban-style board:
+The dashboard uses a 3-column Fleet Command layout:
 
-| Column | Meaning |
+| Zone | Component | Purpose |
+|------|-----------|---------|
+| **Left** | Roster | High-density agent list with status indicators |
+| **Center** | Timeline | Virtualized event stream (tool steps, text, thinking) |
+| **Right** | Tactical Intel | Plan steps and modified artifacts |
+
+Session status is derived from hook-based `.claude/status.md` files:
+
+| Status | Meaning |
 |--------|---------|
 | **Working** | Claude is actively processing |
-| **Needs Approval** | Tool use waiting for your approval |
-| **Waiting** | Claude finished, waiting for your input |
+| **Waiting for Approval** | Tool use pending (`hasPendingToolUse: true`) |
+| **Waiting for Input** | Claude finished, waiting for your input |
 | **Idle** | No activity for 10+ minutes |
 
-Each session card shows:
-- AI-generated goal and summary
+Each session shows:
+- Hook-based goal and summary from `.claude/status.md`
 - Current git branch
 
 ## Verify It's Working

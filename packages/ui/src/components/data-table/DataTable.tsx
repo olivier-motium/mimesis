@@ -8,7 +8,7 @@
  * - Integrates with StatusStrip filter
  */
 
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import {
   useReactTable,
   getCoreRowModel,
@@ -69,10 +69,7 @@ export function DataTable({
   filter,
 }: DataTableProps) {
   // Apply status filter
-  const filteredData = useMemo(
-    () => filterSessions(data, filter),
-    [data, filter]
-  )
+  const filteredData = filterSessions(data, filter)
 
   // Default sorting: status priority (working first, then waiting, then idle)
   const [sorting, setSorting] = useState<SortingState>([
