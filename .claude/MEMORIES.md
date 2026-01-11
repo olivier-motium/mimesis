@@ -119,6 +119,11 @@ Browser-embedded xterm.js terminals via WebSocket + node-pty. Architecture decis
 
 **Idle cleanup:** PTYs without active WS clients cleaned up after 30 min (PTY_IDLE_TIMEOUT_MS).
 
+**Output buffering:** PTY output is stored in a circular buffer (5000 chunks max) and replayed when clients reconnect. This ensures terminal history is preserved when switching between terminals. Key implementation details:
+- Early output buffer captures data during the 1-second stability check (before session is fully initialized)
+- Buffer is replayed in `addClient()` to newly connecting WebSocket clients
+- This fixes the issue where switching away and back to a terminal would show empty content
+
 ### Session Resume via Kitty
 "Open in kitty" runs `claude --resume <sessionId> --dangerously-skip-permissions`:
 - `--resume` continues the exact Claude Code session from its log file

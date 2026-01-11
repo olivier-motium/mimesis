@@ -100,6 +100,13 @@ export class PtyManager {
       env: spawnEnv,
     });
 
+    // Capture output during stability check into a temporary buffer
+    // This ensures we don't lose initial output (like Claude's history dump)
+    const earlyOutputBuffer: string[] = [];
+    const earlyDataHandler = proc.onData((data) => {
+      earlyOutputBuffer.push(data);
+    });
+
     // Stability check: wait briefly to see if process exits immediately
     // This catches cases where `claude --resume` fails (e.g., session doesn't exist)
     // Using 1 second to catch slow startup failures (claude may take time to check session)
@@ -120,6 +127,9 @@ export class PtyManager {
       ),
     ]);
 
+    // Dispose early handler regardless of outcome
+    earlyDataHandler.dispose();
+
     if (stabilityResult.type === "exit") {
       console.log(
         `[PTY] Process exited during stability check: ${ptyId} (code=${stabilityResult.exitCode}, signal=${stabilityResult.signal})`
@@ -136,7 +146,7 @@ export class PtyManager {
       );
     }
 
-    console.log(`[PTY] Stability check passed for ${ptyId}, process is running`);
+    console.log(`[PTY] Stability check passed for ${ptyId}, process is running (captured ${earlyOutputBuffer.length} early chunks)`);
 
     const session: PtySession = {
       id: ptyId,
@@ -150,7 +160,7 @@ export class PtyManager {
       cols: termCols,
       rows: termRows,
       clients: new Set(),
-      outputBuffer: [],
+      outputBuffer: [...earlyOutputBuffer], // Include early output in buffer
     };
 
     // Store references
@@ -274,7 +284,7 @@ export class PtyManager {
       const msg = serializeWsMessage({ type: "data", payload: historicalData });
       client.send(msg);
       console.log(
-        `[PTY] Replayed ${session.outputBuffer.length} buffer chunks to new client on ${ptyId}`
+        `[PTY] Replayed ${session.outputBuffer.length} buffer chunks (${historicalData.length} chars) to new client on ${ptyId}`
       );
     }
 
