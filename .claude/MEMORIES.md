@@ -844,3 +844,28 @@ When segment changes, Terminal component writes a visual marker:
 3. PTY stream is continuous - same WebSocket connection across segments
 4. Hooks fail open - if daemon is down, Claude still works
 5. Backward compatible - existing Session type unchanged, tabs layer on top
+
+## Fleet Commander Architecture (Jan 2026)
+
+**Problem:** Multi-project monitoring with per-commit analysis. How to trigger Sonnet for each commit?
+
+**V3 approach (rejected):** Subagents spawned by worker Opus
+- Hook prints reminder → Opus notices → spawns subagent → maybe
+- Non-deterministic: relies on "agent psychology"
+- Recursion risk: subagent might trigger hooks
+
+**V4 approach (chosen):** Headless `claude -p` via queue + runner
+- Hook appends to `commits.jsonl` → runner daemon → `claude -p --model sonnet`
+- Deterministic: queue guarantees processing
+- Safe: `disableAllHooks: true` + `defaultMode: "dontAsk"`
+- Structured: `--json-schema` enforces output contract
+
+**Why headless over subagents:**
+1. **Determinism** - "CLI will execute" vs "Opus should notice"
+2. **Isolation** - Fresh context per commit, not inherited session
+3. **Permissions** - Enforced via settings file, not trusted behavior
+4. **Structured output** - JSON schema contract, not markdown hope
+
+**Key insight:** Bet on model intelligence for *content*, bet on determinism for *execution*. The runner is dumb code that invokes smart models.
+
+**Specs:** `FLEET_CMD_SPEC_V3.md` (subagents), `FLEET_CMD_SPEC_V4.md` (headless)
