@@ -1071,3 +1071,28 @@ setFleetEvents((prev) => {
 - Comprehensive error handling (no empty catches)
 - Type safety discipline (only 2 `any` usages, both justified)
 - Proper resource cleanup (all timers, WebSockets, listeners cleaned up)
+
+## Documentation Audit (Jan 2026)
+
+### Critical Staleness: getting-started.md
+Lines 36-51 describe obsolete "Kanban-style board" with session cards. Reality: 3-column Fleet Command layout (Roster, Timeline, Tactical Intel) since v5.
+
+**Fix required:**
+- Replace Kanban board description with Fleet Command layout
+- Change "AI-generated goal and summary" to "hook-based status from .claude/status.md"
+- Remove "Needs Approval" column reference (now `hasPendingToolUse` flag)
+
+### Broken Links & Exports
+- `docs/claude-code/README.md:116` → `docs/guides/installation.md` (file doesn't exist)
+- `packages/ui/src/components/ops-table/index.ts` exports `OpsTable`, `OpsTableRow` that no longer exist
+
+### Documentation Gaps (High Priority)
+| Missing Doc | Purpose |
+|-------------|---------|
+| `docs/architecture/session-lifecycle.md` | Compaction, segments, work chains |
+| `docs/api/gateway-protocol.md` | WebSocket message schemas |
+
+### Coverage
+- 98 total .md files (~128k lines)
+- ~40% of code modules have corresponding docs
+- Daemon: ~33% coverage, UI: ~48% coverage
