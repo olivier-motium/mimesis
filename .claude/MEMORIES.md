@@ -955,3 +955,31 @@ Major transformation from terminal-centric to timeline-centric UI.
 5. **Collapse thinking, expand output** - Clean but informative defaults
 
 **Spec:** `FLEET_CMD_SPEC_V5.md` (headless architecture)
+
+### WebSocket Singleton Pattern for HMR/StrictMode (Jan 2026)
+
+**Problem:** useGateway hook caused rapid WebSocket connect/disconnect loops during development. React StrictMode double-mounts plus Vite HMR reloads created race conditions where multiple WebSocket connections competed.
+
+**Root cause:** Module-level refs and state reset on every HMR reload. Even with mountedRef guards, HMR creates fresh modules, so guards don't persist.
+
+**Solution:** Global singleton stored on `globalThis` that survives HMR:
+```typescript
+// Global singleton that survives HMR
+const connectionManager: ConnectionManager = (globalThis as unknown as { __gatewayManager?: ConnectionManager }).__gatewayManager ?? {
+  ws: null,
+  reconnectTimer: null,
+  reconnectAttempts: 0,
+  subscribers: new Set(),
+  statusListeners: new Set(),
+  lastStatus: "disconnected",
+};
+(globalThis as unknown as { __gatewayManager: ConnectionManager }).__gatewayManager = connectionManager;
+```
+
+**Key design:**
+- Hook subscribes to singleton on mount, unsubscribes on unmount
+- Singleton only reconnects if there are active subscribers
+- Connection stays alive across HMR reloads and StrictMode remounts
+- Status and messages broadcast to all subscribers via Sets
+
+**Files:** `packages/ui/src/hooks/useGateway.ts`

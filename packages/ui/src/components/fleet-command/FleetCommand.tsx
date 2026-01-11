@@ -214,7 +214,7 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
       />
 
       {/* Center: Timeline or Commander */}
-      <div className="fleet-center flex flex-col h-full">
+      <div className="fleet-viewport flex flex-col h-full">
         {showCommander ? (
           <CommanderTab
             activeJob={gateway.activeJob}

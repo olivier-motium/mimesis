@@ -10,16 +10,13 @@ interface LoaderData {
 
 export const Route = createRootRoute({
   loader: async (): Promise<LoaderData> => {
-    try {
-      // Initialize db and preload data before any route renders
-      await getSessionsDb();
-      return {};
-    } catch (error) {
-      // StreamDB failed to initialize after retries
+    // Start StreamDB initialization but don't block on it
+    // FleetCommand can work with gateway-only mode if StreamDB fails
+    getSessionsDb().catch((error) => {
       const message = error instanceof Error ? error.message : String(error);
-      console.error("[ROOT] StreamDB initialization failed:", message);
-      return { streamError: message };
-    }
+      console.warn("[ROOT] StreamDB unavailable (gateway-only mode):", message);
+    });
+    return {};
   },
   component: RootLayout,
 });
@@ -27,9 +24,9 @@ export const Route = createRootRoute({
 function RootLayout() {
   const { streamError } = useLoaderData({ from: "__root__" }) as LoaderData;
 
-  // If StreamDB failed, show error fallback
+  // Log stream error but don't block rendering - FleetCommand can work with gateway
   if (streamError) {
-    return <StreamErrorFallback error={streamError} />;
+    console.warn("[ROOT] StreamDB unavailable, running in gateway-only mode:", streamError);
   }
 
   return (
