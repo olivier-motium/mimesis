@@ -59,13 +59,15 @@ Port 4452 WebSocket Gateway is the sole source of truth for sessions. Durable St
 - `src/gateway/session-store.ts` - Unified session tracking
 - `src/hooks/useGateway.ts` - TrackedSession map + handlers
 
-### Centralized Configuration (config.ts)
-All daemon constants live in `packages/daemon/src/config.ts`:
-- Stream server config (STREAM_HOST, STREAM_PORT, STREAM_PATH)
-- Timeout constants (IDLE_TIMEOUT_MS, APPROVAL_TIMEOUT_MS, STALE_TIMEOUT_MS)
-- Summary cache limits and TTLs
+### Centralized Configuration (Modular Pattern)
+Configuration is split into domain-specific files in `packages/daemon/src/config/`:
+- `stream.ts`, `timeouts.ts`, `scoring.ts`, `ai.ts`, `content.ts`, `pty.ts`, `paths.ts`, `fleet.ts`, `server.ts`
+- All re-exported via `config/index.ts`
 
-This prevents magic numbers scattered across files and enables env var overrides.
+UI config in `packages/ui/src/config/index.ts`:
+- Gateway WebSocket URL, event buffer limits (maxFleetEvents: 1000, maxSessionEvents: 5000)
+
+**Event buffer limits prevent memory leaks**: Both gateway-handlers.ts (daemon→UI) and watcher.ts (file watching) use FIFO eviction when limits are reached.
 
 ### Utility Modules Pattern
 Shared utilities live in `packages/daemon/src/utils/`:
