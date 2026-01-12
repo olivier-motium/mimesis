@@ -101,8 +101,19 @@ export function Roster({
 
       <div className="fleet-roster__list">
         {filteredSessions.length === 0 ? (
-          <div style={{ padding: compact ? 12 : 24, textAlign: "center", color: "var(--nb-text-muted)" }}>
-            {searchQuery ? "No matching agents" : "No active agents"}
+          <div className="roster-empty">
+            <div className="roster-empty__icon">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M8 12h8M12 8v8" />
+              </svg>
+            </div>
+            <div className="roster-empty__text">
+              {searchQuery ? "No matching agents" : "No active agents"}
+            </div>
+            {!searchQuery && (
+              <div className="roster-empty__hint">Agents will appear when sessions start</div>
+            )}
           </div>
         ) : (
           <>

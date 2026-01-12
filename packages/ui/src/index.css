@@ -218,7 +218,13 @@ body {
   height: 6px;
   border-radius: 50%;
   background: var(--nb-green);
-  /* Removed glow and animation for cleaner look */
+  box-shadow: 0 0 6px var(--nb-green);
+  animation: online-pulse 2.5s ease-in-out infinite;
+}
+
+@keyframes online-pulse {
+  0%, 100% { opacity: 0.8; box-shadow: 0 0 4px var(--nb-green); }
+  50% { opacity: 1; box-shadow: 0 0 8px var(--nb-green); }
 }
 
 .fleet-command-bar__meta {
@@ -312,6 +318,7 @@ body {
 
 .fleet-roster__search-input:focus {
   border-color: var(--nb-yellow);
+  box-shadow: 0 0 0 2px rgba(212, 165, 116, 0.15);
 }
 
 .fleet-roster__search-input::placeholder {
@@ -503,7 +510,8 @@ body {
 }
 
 .fleet-roster-item:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.04);
+  border-left: 2px solid var(--nb-border);
 }
 
 .fleet-roster-item--selected {
@@ -604,6 +612,12 @@ body {
   min-width: 0;
   min-height: 0; /* Required for flex children to scroll */
   overflow: hidden; /* Contain scrolling to Timeline child */
+  /* Subtle radial gradient for depth */
+  background-image: radial-gradient(
+    ellipse 100% 100% at 50% 0%,
+    rgba(255, 255, 255, 0.015) 0%,
+    transparent 70%
+  );
 }
 
 .fleet-viewport__hud {
@@ -721,11 +735,12 @@ body {
 /* Viewport Command Input */
 .fleet-viewport__input {
   flex-shrink: 0;
-  height: 48px;
+  height: 56px;
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  padding: 0 20px;
   background: var(--nb-sidebar);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
   border-top: 1px solid var(--nb-border);
 }
 
@@ -733,16 +748,18 @@ body {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
+  gap: 12px;
+  padding: 10px 14px;
   background: var(--nb-black);
   border: 1px solid var(--nb-border);
-  border-radius: 6px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
 }
 
 .fleet-viewport__input-wrapper:focus-within {
   border-color: var(--nb-yellow);
-  box-shadow: 0 0 0 1px var(--nb-yellow);
+  box-shadow: 0 0 0 2px rgba(212, 165, 116, 0.15);
+  background: rgba(10, 10, 12, 0.9);
 }
 
 .fleet-viewport__input-icon {
@@ -1308,11 +1325,31 @@ body > div[style*="position: fixed"]:last-child {
 /* Status filter badges hover animation */
 .fleet-filters button {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+}
+
+.fleet-filters button::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  opacity: 0;
+  background: linear-gradient(135deg, rgba(212, 165, 116, 0.2) 0%, transparent 60%);
+  transition: opacity 0.2s ease;
+  pointer-events: none;
 }
 
 .fleet-filters button:hover {
   transform: scale(1.02);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.fleet-filters button:hover::after {
+  opacity: 1;
+}
+
+.fleet-filters button:active {
+  transform: scale(0.98);
 }
 
 /* Terminal area container - handles HUD spacing */
@@ -2036,4 +2073,112 @@ body > div[style*="position: fixed"]:last-child {
 
 .agent-command ::-webkit-scrollbar-thumb:hover {
   background: var(--nb-text-muted);
+}
+
+/* ===========================================
+   Enhanced Empty States
+   =========================================== */
+
+/* Timeline Empty State */
+.timeline-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.timeline-empty__icon {
+  color: var(--nb-text-muted);
+  opacity: 0.4;
+  animation: pulse-subtle 3s ease-in-out infinite;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.05); }
+}
+
+.timeline-empty__title {
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--nb-text-dim);
+  letter-spacing: 0.02em;
+}
+
+.timeline-empty__subtitle {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--nb-text-muted);
+  max-width: 280px;
+  line-height: 1.5;
+}
+
+/* Roster Empty State */
+.roster-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  text-align: center;
+  gap: 12px;
+}
+
+.roster-empty__icon {
+  color: var(--nb-text-muted);
+  opacity: 0.3;
+}
+
+.roster-empty__text {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--nb-text-dim);
+}
+
+.roster-empty__hint {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--nb-text-muted);
+  max-width: 160px;
+  line-height: 1.4;
+}
+
+/* TacticalIntel Empty State */
+.intel-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.intel-empty__icon {
+  color: var(--nb-yellow-dim);
+  opacity: 0.5;
+}
+
+.intel-empty__title {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--nb-text-dim);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.intel-empty__subtitle {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--nb-text-muted);
+  max-width: 180px;
+  line-height: 1.5;
 }
