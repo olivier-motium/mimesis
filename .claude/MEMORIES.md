@@ -1294,3 +1294,32 @@ const args = [
 5. **Simplified text**: No icons for text events, just content
 
 **Files:** Timeline components in `packages/ui/src/components/timeline/`
+
+### Fleet Commander E2E Test Results (Jan 2026)
+
+Full report: `.claude/test-reports/fleet-commander-e2e-2026-01-12.md`
+
+**Bug #1 FIXED: Commander Permission Blocking**
+
+Headless Commander jobs got stuck because `.claude/` directory triggers "sensitive file" approval. Fix: added `--dangerously-skip-permissions` flag to `job-runner.ts:230`:
+
+```typescript
+const args = [
+  "-p",
+  "--output-format", "stream-json",
+  "--verbose",
+  "--dangerously-skip-permissions", // Required: headless mode can't approve interactively
+];
+```
+
+**Bug #2 DOCUMENTED: UI Conversation History on Reset**
+
+Clicking "New Conversation" resets backend context but UI still displays previous conversation visually. No separator or clear indication of context reset. Backend works correctly.
+
+**All Tests Passed:**
+- Services startup (ports 4451, 4452, 5173)
+- Commander first prompt
+- Commander multi-turn (context preserved via `--continue`)
+- Commander reset (backend works)
+- Hook events flow to Timeline (real-time tool events)
+- Real-time session status updates

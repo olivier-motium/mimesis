@@ -227,6 +227,7 @@ export class JobRunner {
       "-p", // Print mode (non-interactive)
       "--output-format", "stream-json",
       "--verbose", // Required for stream-json in print mode
+      "--dangerously-skip-permissions", // Required: headless mode can't approve interactively
     ];
 
     // Model

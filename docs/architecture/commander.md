@@ -260,6 +260,7 @@ async run(request: JobRequest, onChunk: StreamChunkCallback): Promise<JobResult>
     "-p",                           // Print mode (non-interactive)
     "--output-format", "stream-json",
     "--verbose",                    // REQUIRED for stream-json in print mode
+    "--dangerously-skip-permissions", // REQUIRED: headless can't approve interactively
     "--model", model,
   ];
 
