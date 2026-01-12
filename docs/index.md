@@ -9,6 +9,7 @@ Real-time monitoring dashboard for Claude Code sessions.
 | Get started quickly | [Getting Started](getting-started.md) |
 | Run in production | [Deployment Guide](operations/deployment.md) |
 | Configure the app | [Configuration Reference](architecture/configuration-reference.md) |
+| Understand Commander | [Commander Architecture](architecture/commander.md) |
 | Understand the CLI | [CLI Reference](cli-reference.md) |
 | Learn the architecture | [README](../README.md) |
 | Contribute to the project | [Contributing Guide](contributing.md) |
@@ -40,6 +41,7 @@ Real-time monitoring dashboard for Claude Code sessions.
 
 | Document | Purpose |
 |----------|---------|
+| [Commander Architecture](architecture/commander.md) | Meta-agent system, hooks, and job execution |
 | [Gateway Architecture](architecture/gateway.md) | WebSocket protocol and session management |
 | [Gateway Protocol](api/gateway-protocol.md) | WebSocket message reference |
 | [REST API Endpoints](api/endpoints.md) | HTTP endpoint reference |
@@ -75,10 +77,11 @@ Implementation specifications for Fleet Commander versions:
 
 | Concept | Description | Location |
 |---------|-------------|----------|
+| **Commander** | Meta-agent for cross-project intelligence, headless jobs, and semantic briefings | [Commander Architecture](architecture/commander.md) |
 | **Session Watcher** | Monitors `~/.claude/projects/` for JSONL changes | [README](../README.md#daemon) |
 | **Fleet Gateway** | WebSocket server for PTY sessions and real-time events (port 4452) | [Gateway Architecture](architecture/gateway.md) |
 | **Session Lifecycle** | Session states, compaction, segment chains, work chains | [Session Lifecycle](architecture/session-lifecycle.md) |
-| **File-Based Status** | Claude Code hooks write status to `.claude/status.md` for goal/summary | [Daemon API](api/daemon-api.md#file-based-status-system-status-watcherts-status-parserts) |
+| **File-Based Status** | Claude Code hooks write status to `.claude/status.v5.<session_id>.md` | [Commander Architecture](architecture/commander.md#statusv5-schema) |
 | **Fleet DB** | SQLite ledger for briefings, jobs, projects | [Fleet DB Schema](architecture/fleet-db.md) |
 
 ---
