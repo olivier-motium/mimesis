@@ -17,8 +17,9 @@ import { Brain, Sparkles, RotateCcw, Clock, Terminal } from "lucide-react";
 import { Button } from "../ui/button";
 
 // Strip ANSI escape codes from PTY output
+// Comprehensive pattern handles: CSI sequences, OSC sequences, DEC private modes, character sets
 // eslint-disable-next-line no-control-regex
-const ANSI_REGEX = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[()][AB012]|\x1b\[[\?]?[0-9;]*[hlm]/g;
+const ANSI_REGEX = /\x1b\[[?>=!]?[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[()][AB012UK]|\x1b[78DEHM]|\x1b=|\x1b>/g;
 function stripAnsi(str: string): string {
   return str.replace(ANSI_REGEX, "");
 }
