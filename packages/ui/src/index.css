@@ -618,6 +618,8 @@ body {
   background: var(--nb-terminal);
   position: relative;
   min-width: 0;
+  min-height: 0; /* Required for flex children to scroll */
+  overflow: hidden; /* Contain scrolling to Timeline child */
 }
 
 .fleet-viewport__hud {
