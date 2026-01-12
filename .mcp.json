@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "logfire": {
+      "command": "uvx",
+      "args": ["logfire-mcp@latest", "--base-url", "https://api-eu.pydantic.dev"],
+      "env": {
+        "LOGFIRE_READ_TOKEN": "pylf_v1_eu_yG0T3QLgsbSgdnCzZ7lYxzGnnvnLZ5fqsMlwRLPsN7xY"
+      }
+    }
+  }
+}
