@@ -9,7 +9,7 @@ export const STATUS_LABELS = {
   idle: "Idle",
 } as const;
 
-/** Format relative time (e.g., "2m", "1h", "3d") */
+/** Format relative time with second-level precision for streaming awareness */
 export function formatTimeAgo(isoString: string): string {
   const now = Date.now();
   const then = new Date(isoString).getTime();
@@ -23,7 +23,10 @@ export function formatTimeAgo(isoString: string): string {
   if (days > 0) return `${days}d ago`;
   if (hours > 0) return `${hours}h ago`;
   if (minutes > 0) return `${minutes}m ago`;
-  return "just now";
+  // Show second-level precision for streaming awareness
+  if (seconds > 10) return `${seconds}s ago`;
+  if (seconds > 0) return `${seconds}s ago`;
+  return "now";
 }
 
 /** Get agent name from session */

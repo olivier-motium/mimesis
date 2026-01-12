@@ -133,7 +133,7 @@ export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disc
         <div className="inspector-state__content">
           <div className="inspector-state__row">
             <span className="inspector-state__label">Now:</span>
-            <span className="inspector-state__value">{nowText}</span>
+            <span className={`inspector-state__value inspector-state__value--${status}`}>{nowText}</span>
           </div>
           <div className="inspector-state__row">
             <span className="inspector-state__label">

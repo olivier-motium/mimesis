@@ -166,27 +166,33 @@ body {
   opacity: 0.5;
 }
 
-/* Zone: Command Bar (Top Header) */
+/* Zone: Command Bar (Top Header) - Enhanced with premium feel */
 .fleet-command-bar {
   grid-area: header;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 0 20px;
   background: var(--nb-black-light);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 60%),
+    linear-gradient(90deg, rgba(212, 165, 116, 0.02) 0%, transparent 30%);
   border-bottom: 1px solid var(--nb-border);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.25),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.02);
 }
 
 .fleet-command-bar__logo {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   color: var(--nb-yellow);
+  font-family: var(--font-heading);
   font-weight: 700;
-  font-size: 12px;
-  letter-spacing: 0.1em;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 .fleet-command-bar__divider {
@@ -400,14 +406,16 @@ body {
 .fleet-roster__section-header {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
+  gap: 8px;
+  padding: 10px 12px;
   background: var(--nb-terminal);
-  font-size: 10px;
-  font-weight: 600;
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.015) 0%, transparent 100%);
+  font-family: var(--font-heading);
+  font-size: 11px;
+  font-weight: 700;
   color: var(--nb-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   border: none;
   width: 100%;
   text-align: left;
@@ -500,22 +508,30 @@ body {
   display: none;
 }
 
-/* Roster Item */
+/* Roster Item - Enhanced with depth */
 .fleet-roster-item {
   position: relative;
   padding: 12px;
-  border-bottom: 1px solid var(--nb-border-dim);
+  margin: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
   cursor: pointer;
-  transition: background-color 0.15s;
+  transition: all 0.2s ease;
+  background: transparent;
 }
 
 .fleet-roster-item:hover {
   background: rgba(255, 255, 255, 0.04);
-  border-left: 2px solid var(--nb-border);
+  border-color: var(--nb-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .fleet-roster-item--selected {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(212, 165, 116, 0.06);
+  border-color: rgba(212, 165, 116, 0.3);
+  box-shadow:
+    0 2px 8px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .fleet-roster-item--selected::before {
@@ -715,33 +731,43 @@ body {
 }
 
 .fleet-viewport__status-badge--working {
-  background: rgba(16, 185, 129, 0.15);
+  background: linear-gradient(135deg, rgba(91, 154, 125, 0.2) 0%, rgba(91, 154, 125, 0.1) 100%);
   color: var(--nb-green);
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  border: 1px solid rgba(91, 154, 125, 0.35);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .fleet-viewport__status-badge--waiting {
-  background: rgba(234, 179, 8, 0.15);
+  background: linear-gradient(135deg, rgba(212, 165, 116, 0.2) 0%, rgba(212, 165, 116, 0.1) 100%);
   color: var(--nb-yellow);
-  border: 1px solid rgba(234, 179, 8, 0.3);
+  border: 1px solid rgba(212, 165, 116, 0.35);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
 .fleet-viewport__status-badge--idle {
-  background: rgba(161, 161, 170, 0.1);
+  background: linear-gradient(135deg, rgba(82, 82, 91, 0.15) 0%, rgba(82, 82, 91, 0.08) 100%);
   color: var(--nb-text-dim);
   border: 1px solid var(--nb-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
-/* Viewport Command Input */
+/* Viewport Command Input - Enhanced with depth */
 .fleet-viewport__input {
   flex-shrink: 0;
-  height: 56px;
+  height: 64px;
   display: flex;
   align-items: center;
   padding: 0 20px;
   background: var(--nb-sidebar);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%);
   border-top: 1px solid var(--nb-border);
+  box-shadow:
+    0 -4px 16px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .fleet-viewport__input-wrapper {
@@ -749,17 +775,23 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
+  padding: 12px 16px;
   background: var(--nb-black);
   border: 1px solid var(--nb-border);
-  border-radius: 8px;
-  transition: all 0.2s ease;
+  border-radius: 10px;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.02);
 }
 
 .fleet-viewport__input-wrapper:focus-within {
   border-color: var(--nb-yellow);
-  box-shadow: 0 0 0 2px rgba(212, 165, 116, 0.15);
-  background: rgba(10, 10, 12, 0.9);
+  background: rgba(10, 10, 12, 0.95);
+  box-shadow:
+    0 0 0 3px rgba(212, 165, 116, 0.15),
+    0 4px 12px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .fleet-viewport__input-icon {
@@ -792,15 +824,18 @@ body {
   letter-spacing: 0.05em;
 }
 
-/* Zone C: Tactical Intel (Right Sidebar) */
+/* Zone C: Tactical Intel (Right Sidebar) - Enhanced with depth */
 .fleet-intel {
   grid-area: intel;
   display: flex;
   flex-direction: column;
   background: var(--nb-sidebar);
-  background-image: linear-gradient(270deg, transparent 0%, rgba(255, 255, 255, 0.01) 100%);
+  background-image:
+    linear-gradient(270deg, transparent 0%, rgba(255, 255, 255, 0.015) 100%),
+    radial-gradient(ellipse 80% 50% at 100% 0%, rgba(212, 165, 116, 0.03) 0%, transparent 50%);
   border-left: 1px solid var(--nb-border);
   overflow: hidden;
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.02);
 }
 
 .fleet-intel__section {
@@ -820,16 +855,18 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px;
-  font-size: 10px;
+  padding: 14px 16px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--nb-text-dim);
   background: var(--nb-black-light);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
   border-bottom: 1px solid var(--nb-border);
   position: sticky;
   top: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .fleet-intel__section-icon {
@@ -843,7 +880,7 @@ body {
   padding: 16px;
 }
 
-/* Empty state for intel panel */
+/* Empty state for intel panel - Enhanced */
 .fleet-intel__empty {
   display: flex;
   flex-direction: column;
@@ -854,18 +891,20 @@ body {
   font-size: 13px;
   font-family: var(--font-sans);
   text-align: center;
-  padding: 24px;
+  padding: 32px;
   letter-spacing: 0.02em;
+  background: radial-gradient(ellipse 60% 40% at 50% 40%, rgba(212, 165, 116, 0.03) 0%, transparent 70%);
 }
 
 .fleet-intel__empty::before {
   content: '';
-  width: 40px;
-  height: 40px;
-  margin-bottom: 12px;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 16px;
   border: 2px dashed var(--nb-border);
   border-radius: 50%;
-  opacity: 0.4;
+  opacity: 0.5;
+  animation: pulse-subtle 3s ease-in-out infinite;
 }
 
 /* ===========================================
@@ -900,6 +939,18 @@ body {
 .inspector-hud__status--working {
   background: rgba(16, 185, 129, 0.15);
   color: var(--nb-green);
+  animation: status-pulse 2s ease-in-out infinite;
+}
+
+@keyframes status-pulse {
+  0%, 100% {
+    background: rgba(16, 185, 129, 0.15);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+  50% {
+    background: rgba(16, 185, 129, 0.25);
+    box-shadow: 0 0 8px 2px rgba(16, 185, 129, 0.3);
+  }
 }
 
 .inspector-hud__status--waiting {
@@ -1069,6 +1120,27 @@ body {
   font-size: 10px;
 }
 
+/* Status-specific styling for Live State value */
+.inspector-state__value--working {
+  color: var(--nb-green);
+  font-weight: 600;
+  animation: text-pulse 2s ease-in-out infinite;
+}
+
+.inspector-state__value--waiting {
+  color: var(--nb-yellow);
+  font-weight: 500;
+}
+
+.inspector-state__value--idle {
+  color: var(--nb-text-dim);
+}
+
+@keyframes text-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
 /* Recent Output Section */
 .inspector-output {
   flex: 1;
@@ -1173,6 +1245,111 @@ body {
 .inspector-file-status__summary {
   color: var(--nb-text-dim);
   line-height: 1.4;
+}
+
+/* Fleet Events Section */
+.inspector-fleet-events {
+  padding: 12px;
+  border-bottom: 1px solid var(--nb-border);
+}
+
+.inspector-fleet-events__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--nb-text-dim);
+  margin-bottom: 8px;
+}
+
+.inspector-fleet-events__content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inspector-fleet-events__entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  padding: 4px 6px;
+  background: var(--nb-terminal);
+  border-radius: 3px;
+}
+
+.inspector-fleet-events__type {
+  color: var(--nb-text-muted);
+  font-family: var(--font-mono);
+}
+
+.inspector-fleet-events__project {
+  color: var(--nb-text-dim);
+}
+
+/* Gateway Status Section - CRITICAL for streaming awareness */
+.inspector-gateway {
+  padding: 12px;
+  background: var(--nb-black-light);
+  border-top: 1px solid var(--nb-border);
+  margin-top: auto;
+}
+
+.inspector-gateway__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--nb-text-dim);
+  margin-bottom: 6px;
+}
+
+.inspector-gateway__status {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Connected - Green with subtle glow */
+.inspector-gateway__status--connected {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--nb-green);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+/* Connecting - Yellow with animation */
+.inspector-gateway__status--connecting {
+  background: rgba(234, 179, 8, 0.15);
+  color: var(--nb-yellow);
+  border: 1px solid rgba(234, 179, 8, 0.3);
+}
+
+/* Disconnected - RED AND URGENT! */
+.inspector-gateway__status--disconnected {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--nb-red);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  animation: gateway-warning 1.5s ease-in-out infinite;
+}
+
+@keyframes gateway-warning {
+  0%, 100% {
+    background: rgba(239, 68, 68, 0.15);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+  50% {
+    background: rgba(239, 68, 68, 0.25);
+    box-shadow: 0 0 12px 3px rgba(239, 68, 68, 0.3);
+  }
 }
 
 /* Terminal dock styles */
@@ -2149,30 +2326,33 @@ body > div[style*="position: fixed"]:last-child {
   line-height: 1.4;
 }
 
-/* TacticalIntel Empty State */
+/* TacticalIntel Empty State - Premium styling */
 .intel-empty {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   height: 100%;
-  gap: 16px;
-  padding: 32px 24px;
+  gap: 20px;
+  padding: 40px 24px;
   text-align: center;
+  background: radial-gradient(ellipse 60% 50% at 50% 30%, rgba(212, 165, 116, 0.04) 0%, transparent 70%);
 }
 
 .intel-empty__icon {
-  color: var(--nb-yellow-dim);
-  opacity: 0.5;
+  color: var(--nb-yellow);
+  opacity: 0.6;
+  filter: drop-shadow(0 2px 8px rgba(212, 165, 116, 0.3));
 }
 
 .intel-empty__title {
-  font-family: var(--font-sans);
-  font-size: 14px;
-  font-weight: 600;
+  font-family: var(--font-heading);
+  font-size: 15px;
+  font-weight: 700;
   color: var(--nb-text-dim);
-  letter-spacing: 0.03em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
 .intel-empty__subtitle {
