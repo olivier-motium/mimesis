@@ -91,48 +91,53 @@ Commander separates concerns:
 
 ---
 
-## PTY Session System
+## Headless Mode with Session Resumption
 
-Commander uses a **persistent PTY-based Claude session** for natural conversation flow. This provides several advantages over headless jobs:
+Commander uses **headless mode** (`claude -p`) with **session resumption** (`--resume <session-id>`) for reliable structured output:
 
-| Headless (`claude -p`) | PTY (`claude`) |
-|------------------------|----------------|
-| No hooks fire | All hooks fire naturally |
-| New process per prompt | Persistent session |
-| `--continue` for continuity | Native conversation state |
-| No tool approvals possible | Could show approvals in UI |
-| Can't interrupt mid-response | SIGINT works naturally |
-| BUSY rejection on concurrent prompts | Natural prompt queuing |
+| Interactive PTY (`claude`) | Headless (`claude -p --resume`) |
+|---------------------------|----------------------------------|
+| Persistent session | New process per prompt |
+| Write to stdin | Prompt as CLI argument |
+| TUI waits for keyboard | Immediate execution |
+| 0-byte JSONL (TUI issue) | Reliable JSONL output |
+| Hooks may not fire | All hooks fire naturally |
 
-### PTY-Based Conversation
+### Headless Conversation Flow
 
-Commander maintains a **persistent interactive PTY session** running `claude`. This enables:
-- Context accumulation across multiple prompts (native Claude behavior)
-- Multi-turn investigations ("compare these projects, then propose a plan")
-- Fleet awareness via prelude injection in prompts
-- All Claude hooks firing naturally (PostToolUse, etc.)
-- Natural prompt queuing when Commander is busy
+Commander spawns a **new Claude process for each prompt** using the `-p` flag. Context is preserved across invocations using `--resume <session-id>`:
 
-The gateway handles all conversation state internally - the UI just sends prompts.
+- First prompt: Creates new session, captures session ID from JSONL file
+- Subsequent prompts: Uses `--resume` flag to continue same conversation
+- Multi-turn investigations ("compare these projects, then propose a plan") work naturally
+- Fleet awareness via `<system-reminder>` prelude injection
+- All Claude hooks firing (PostToolUse, etc.) since headless mode still writes to JSONL
+
+The gateway handles conversation state internally - the UI just sends prompts.
 
 **Conversation Flow:**
 ```
-First Prompt                  Subsequent Prompts
-    │                             │
-    ▼                             ▼
-Create PTY (claude)          Reuse existing PTY
-    │                             │
-    ▼                             ▼
-Watch for session file       Check status
-    │                             │
-    ▼                             ▼
-Write prompt to stdin        Queue if busy, else write
-    │                             │
-    ▼                             ▼
-Store session ID             Inject fleet prelude
-                                  │
-                                  ▼
-                             via <system-reminder> in prompt
+First Prompt                    Subsequent Prompts
+    │                               │
+    ▼                               ▼
+Build command:                  Build command:
+  claude -p "<prompt>"             claude -p "<prompt>"
+  --dangerously-skip-permissions   --resume <session-id>
+    │                               --dangerously-skip-permissions
+    ▼                               │
+Spawn new PTY                       ▼
+    │                           Spawn new PTY
+    ▼                               │
+Watch for JSONL file                ▼
+    │                           Inject fleet prelude
+    ▼                               │
+Capture session ID                  ▼
+    │                           Process completes
+    ▼                               │
+Process completes                   ▼
+    │                           PTY exits
+    ▼
+PTY exits
 ```
 
 Source: `packages/daemon/src/gateway/commander-session.ts`
@@ -152,8 +157,6 @@ export class CommanderSessionManager extends EventEmitter {
   private status: CommanderStatus = "idle";
 
   async sendPrompt(prompt: string): Promise<void> {
-    await this.ensureSession();
-
     // If working, queue the prompt
     if (this.status === "working") {
       this.promptQueue.push({ prompt, queuedAt: new Date().toISOString() });
@@ -161,11 +164,11 @@ export class CommanderSessionManager extends EventEmitter {
       return;
     }
 
-    // Otherwise, send immediately
-    await this.writePrompt(prompt);
+    // Run prompt directly in headless mode
+    await this.runPrompt(prompt);
   }
 
-  // Called when SessionStore detects Commander is ready
+  // Called when SessionStore detects Commander is ready (PTY exited)
   private onStatusChange(status: UIStatus): void {
     if (status === "waiting_for_input" || status === "idle") {
       this.drainQueue();
@@ -175,7 +178,7 @@ export class CommanderSessionManager extends EventEmitter {
   private drainQueue(): void {
     const next = this.promptQueue.shift();
     if (next) {
-      this.writePrompt(next.prompt);
+      this.runPrompt(next.prompt);
     }
   }
 }
@@ -198,27 +201,34 @@ The prelude is injected via `<system-reminder>` blocks in the prompt itself:
 
 ```typescript
 // From commander-session.ts
-async writePrompt(prompt: string): Promise<void> {
-  const prelude = this.fleetPreludeBuilder.build({
-    lastEventIdSeen: this.lastOutboxEventIdSeen,
+async runPrompt(prompt: string): Promise<void> {
+  const prelude = this.preludeBuilder.build({
+    lastEventIdSeen: conversation.lastOutboxEventIdSeen ?? 0,
     maxEvents: 50,
     includeDocDriftWarnings: true,
   });
 
   let fullPrompt = prompt;
 
-  // Inject fleet context as system reminder
-  if (prelude.hasActivity) {
-    fullPrompt = `<system-reminder>\n${prelude.fleetDelta}\n</system-reminder>\n\n${prompt}`;
-  }
-
-  // On first turn, also inject role prompt
+  // On first turn, inject system prompt as system-reminder
   if (this.isFirstTurn) {
     fullPrompt = `<system-reminder>\n${prelude.systemPrompt}\n</system-reminder>\n\n${fullPrompt}`;
-    this.isFirstTurn = false;
   }
 
-  this.ptyBridge.write(this.ptySessionId, fullPrompt + "\n");
+  // Inject fleet delta if there's activity
+  if (prelude.fleetDelta.trim().length > 0) {
+    fullPrompt = `<system-reminder>\n${prelude.fleetDelta}\n</system-reminder>\n\n${fullPrompt}`;
+  }
+
+  // Build command for headless mode
+  const command: string[] = ["claude", "-p", fullPrompt];
+  if (this.claudeSessionId) {
+    command.push("--resume", this.claudeSessionId);
+  }
+  command.push("--dangerously-skip-permissions");
+
+  // Spawn PTY with command
+  const ptyInfo = await this.ptyBridge.create({ ... });
 }
 ```
 
@@ -262,55 +272,70 @@ Source: `packages/daemon/src/gateway/fleet-prelude-builder.ts:94-106`
 
 ### Session ID Capture
 
-Commander captures Claude's session ID by watching for the JSONL file creation:
+Commander captures Claude's session ID by watching the JSONL directory for new files:
 
 ```typescript
 // From commander-session.ts
-async ensureSession(): Promise<void> {
-  // 1. Create PTY
-  const ptyInfo = await this.ptyBridge.create({
-    projectId: COMMANDER_PROJECT_ID,
-    cwd: COMMANDER_CWD,
-    command: ["claude"],
-    env: { FLEET_SESSION_ID: "commander" },
+private startSessionIdCapture(): void {
+  // Encode Commander CWD path (replace / and . with -)
+  const encodedCwd = this.encodePathForClaude(COMMANDER_CWD);
+  const sessionsDir = path.join(os.homedir(), ".claude", "projects", encodedCwd);
+
+  // Watch directory directly (FSEvents handles this reliably)
+  this.sessionWatcher = watch(sessionsDir, {
+    ignoreInitial: true,
+    depth: 0,
   });
 
-  this.ptySessionId = ptyInfo.sessionId;
+  this.sessionWatcher.on("add", async (filePath) => {
+    // Filter for .jsonl files only
+    if (!filePath.endsWith(".jsonl")) return;
 
-  // 2. Watch for Claude session file to get session ID
-  // Claude creates: ~/.claude/projects/<encoded-cwd>/<session-id>.jsonl
-  const sessionsDir = getClaudeProjectsDir(COMMANDER_CWD);
+    // Extract session ID from filename
+    const sessionId = path.basename(filePath, ".jsonl");
 
-  const watcher = chokidar.watch(`${sessionsDir}/*.jsonl`, { ignoreInitial: false });
-  watcher.on("add", (filePath) => {
-    this.claudeSessionId = path.basename(filePath, ".jsonl");
+    this.claudeSessionId = sessionId;
+
     // Store in DB for persistence
+    const conversation = this.conversationRepo.getOrCreateCommander();
     this.conversationRepo.updateClaudeSessionId(
-      this.conversationId,
-      this.claudeSessionId
+      conversation.conversationId,
+      sessionId
     );
-    watcher.close();
+
+    // Stop watching once we have the ID
+    await this.sessionWatcher.close();
+    this.sessionWatcher = null;
   });
 }
 ```
 
-### PTY Session Lifecycle
+**Note:** The watcher watches the directory (not a glob pattern) because macOS FSEvents doesn't reliably fire `add` events for glob patterns.
+
+### Session Lifecycle (Headless Mode)
+
+Each prompt runs a new PTY process that exits when Claude completes:
 
 ```
 ┌─────────────┐     ┌─────────────────────┐     ┌─────────────┐
-│    idle     │────▶│  waiting_for_input  │────▶│   working   │
-│ (no PTY)    │     │  (PTY ready)        │     │ (processing)│
-└─────────────┘     └─────────────────────┘     └──────┬──────┘
-       ▲                      ▲                        │
+│    idle     │────▶│      working        │────▶│    idle     │
+│ (no PTY)    │     │  (PTY processing)   │     │ (PTY exited)│
+└─────────────┘     └─────────────────────┘     └─────────────┘
+       │                                               │
+       │                                               │
+       │         Prompt queued while working?          │
        │                      │                        │
-       │                      └────────────────────────┘
-       │                         (prompt complete)
-       │
-       │            ┌─────────────┐
-       └────────────│   reset     │
-                    │ (kill PTY)  │
-                    └─────────────┘
+       └──────────────────────┴────────────────────────┘
+                         drainQueue()
+
+┌─────────────────────────────────────────────────────────────┐
+│                         reset                                │
+│  Clears claudeSessionId, promptQueue, kills active PTY      │
+│  Next prompt starts fresh conversation                       │
+└─────────────────────────────────────────────────────────────┘
 ```
+
+**Key difference from persistent PTY:** Each prompt creates a new PTY process via `claude -p "<prompt>" --resume <session-id>`. The PTY exits when Claude completes, transitioning back to `idle`. If prompts are queued, `drainQueue()` spawns the next PTY.
 
 ### Commander Session Manager
 
@@ -1379,41 +1404,45 @@ WebSocket: commander.send message
         ▼
 CommanderSessionManager.sendPrompt()
         │
-        ├──▶ ensureSession() (create PTY if needed)
-        │         │
-        │         └──▶ ptyBridge.create() → spawn("claude")
-        │         └──▶ Watch for session JSONL file
-        │
         ├──▶ Check status
         │         │
         │         ├── working → Queue prompt, emit commander.state
         │         │
-        │         └── waiting → Continue
+        │         └── idle → Continue to runPrompt()
         │
         ▼
-writePrompt()
+runPrompt() [Headless Mode]
         │
         ├──▶ Build fleet prelude (delta events)
-        ├──▶ Inject <system-reminder> blocks
-        └──▶ Write to PTY stdin
+        ├──▶ Inject <system-reminder> blocks into prompt
+        ├──▶ Build command: claude -p "<prompt>" --resume <id> --dangerously-skip-permissions
+        └──▶ ptyBridge.create() → spawn Claude with command
         │
         ▼
-PTY stdout → SessionStore → status = "working"
+status = "working", emit commander.state
         │
         ▼
-WebSocket: commander.state { status: "working" }
+(For new sessions) Watch for JSONL file to capture session ID
         │
         ▼
-Claude processes prompt...
+Claude processes prompt, writes to JSONL...
         │
         ▼
-SessionStore detects idle → status = "waiting_for_input"
+JSONL watcher reads entries → emit commander.content events
         │
         ▼
-CommanderSessionManager.onStatusChange()
+Claude completes → PTY exits
         │
-        ├──▶ drainQueue() if prompts pending
-        └──▶ Emit commander.state { status: "waiting_for_input" }
+        ▼
+handlePtyExit() → status = "idle"
+        │
+        ▼
+drainQueue() if prompts pending
+        │
+        └──▶ Recursively call runPrompt() with next queued prompt
+        │
+        ▼
+WebSocket: commander.state { status: "idle" }
         │
         ▼
 UI: Commander ready for next prompt
@@ -1482,15 +1511,17 @@ The UI shows queue status via the `commander.state` message:
 
 ### PTY Errors
 
-PTY sessions can fail with these conditions:
+In headless mode, PTY process completion is expected (not an error). However, these conditions can fail:
 
 | Condition | Error | Recovery |
 |-----------|-------|----------|
-| PTY process dies | `PTY exited unexpectedly` | Auto-recreate on next prompt |
 | Spawn failure | `Command not found: claude` | Check PATH, claude installation |
-| Session file not found | `Failed to capture session ID` | PTY works but no persistence |
+| Invalid session ID | `No conversation found with session ID` | Reset Commander, clear stale session ID |
+| JSONL file not created | Session ID not captured | Works but no context resumption |
 
-When a PTY error occurs, the `commander.state` message will show `status: "idle"` with `ptySessionId: null`. The next `commander.send` will attempt to create a new PTY session.
+When an error occurs, the `commander.state` message will show `status: "idle"` with `ptySessionId: null`. The next `commander.send` will attempt to create a new PTY session.
+
+**Note:** In headless mode, PTY exit with code 0 is normal - it means Claude completed successfully. The `handlePtyExit()` method transitions back to `idle` and triggers `drainQueue()` for any pending prompts.
 
 ---
 

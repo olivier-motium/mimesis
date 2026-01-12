@@ -1,17 +1,25 @@
 ---
 status: completed
-updated: 2026-01-12T14:50:00Z
-task: Fix Commander status not transitioning from "Streaming"
+updated: 2026-01-12T15:57:00Z
+task: Fix Commander JSONL content - switched to headless mode with session resumption
 ---
 
 ## Summary
 
-Fixed Commander UI status indicator being stuck on "Streaming..." after Claude finishes. Root cause was session ID mismatch: PTY sessions registered with PTY ID but status files named with Claude session ID.
+Fixed Commander JSONL files being 0 bytes by switching from interactive PTY mode to headless mode (`-p` flag) with session resumption (`--resume`).
 
-**Solution**: Commander now subscribes directly to StatusWatcher for its Claude session ID, bypassing SessionStore lookup mismatch.
+### Changes Made
+- Refactored `commander-session.ts` to use headless mode
+- Each prompt runs: `claude -p "<prompt>" --resume <session-id> --dangerously-skip-permissions`
+- Removed `ensureSession()` method (no longer needed for interactive PTY)
+- Added `runPrompt()` method for headless execution
+- Session ID captured from JSONL file and reused for conversation context
 
-## Changes
-- `commander-session.ts`: Added direct StatusWatcher subscription for Commander's Claude session ID
-  - Added `handleStatusFileUpdate()` method that filters by Claude session ID
-  - Subscribe to StatusWatcher after session ID capture
-  - Cleanup subscription in reset() and shutdown()
+### Root Causes Addressed
+1. Python wrapper (`claude-auto-switch/switch.py`) was intercepting Claude calls - user removed it
+2. Interactive TUI mode doesn't accept piped input - switched to headless mode
+
+### Test Results
+- JSONL file: 12685 bytes (previously 0 bytes)
+- Content events: thinking, text, tool phases all flowing correctly
+- Session resumption working with captured session ID
