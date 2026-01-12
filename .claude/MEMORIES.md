@@ -1508,3 +1508,26 @@ if (age <= MAX_AGE_MS) {
 ```
 
 **Rule:** When capturing session IDs from file system, always filter by creation/modification time relative to the triggering action. Old files from previous sessions must be ignored.
+
+### Chokidar Glob Pattern Gotcha on macOS (Jan 2026)
+
+**Problem:** Chokidar's `add` event never fires when Claude creates new `.jsonl` session files despite watcher being ready.
+
+**Root cause:** macOS FSEvents doesn't reliably fire `add` events when watching with glob patterns like `${dir}/*.jsonl`. The watcher becomes ready, but new file creation events are not emitted.
+
+**Solution:** Watch the **directory directly** instead of using a glob pattern, then filter in the event handler:
+
+```typescript
+// Bad: glob pattern (unreliable on macOS)
+watch(`${sessionsDir}/*.jsonl`, { ignoreInitial: true })
+  .on("add", (path) => { ... })
+
+// Good: directory + filter (reliable)
+watch(sessionsDir, { ignoreInitial: true, depth: 0 })
+  .on("add", (filePath) => {
+    if (!filePath.endsWith(".jsonl")) return;
+    // ... handle file
+  })
+```
+
+**Rule:** On macOS, always watch directories directly instead of glob patterns when you need `add` events for new files. FSEvents handles directory watching reliably but glob pattern matching is unreliable.

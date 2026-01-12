@@ -12,7 +12,6 @@
 import path from "node:path";
 import os from "node:os";
 import { watch, type FSWatcher } from "chokidar";
-import { readdir, stat } from "node:fs/promises";
 import { EventEmitter } from "node:events";
 import type { PtyBridge, PtySessionInfo } from "./pty-bridge.js";
 import type { SessionStore, UIStatus, TrackedSession, SessionStoreEvent } from "./session-store.js";
@@ -96,7 +95,7 @@ export class CommanderSessionManager extends EventEmitter {
   private promptQueue: PromptQueueItem[] = [];
   private isDraining = false;
 
-  // Session ID capture
+  // Session ID capture (directory watching - glob patterns unreliable on macOS)
   private sessionWatcher: FSWatcher | null = null;
   private ptySpawnedAt: number | null = null; // Timestamp when PTY was created
 
@@ -276,7 +275,7 @@ export class CommanderSessionManager extends EventEmitter {
       this.statusUnsubscribe = null;
     }
 
-    // Stop session watcher
+    // Stop watching for session file
     if (this.sessionWatcher) {
       await this.sessionWatcher.close();
       this.sessionWatcher = null;
@@ -459,6 +458,9 @@ export class CommanderSessionManager extends EventEmitter {
   /**
    * Start watching for Claude's session file to capture session ID.
    *
+   * Watches the directory directly instead of using a glob pattern because
+   * macOS FSEvents doesn't reliably fire `add` events for glob patterns.
+   *
    * Claude creates session files at:
    * ~/.claude/projects/<encoded-cwd>/<session-id>.jsonl
    */
@@ -469,13 +471,18 @@ export class CommanderSessionManager extends EventEmitter {
 
     console.log(`[COMMANDER] Watching for session file in: ${sessionsDir}`);
 
-    // Watch for new .jsonl files
-    this.sessionWatcher = watch(`${sessionsDir}/*.jsonl`, {
+    // Watch directory directly (not glob pattern) - FSEvents handles this reliably
+    this.sessionWatcher = watch(sessionsDir, {
       ignoreInitial: true,
       depth: 0,
     });
 
     this.sessionWatcher.on("add", async (filePath) => {
+      // Filter for .jsonl files only
+      if (!filePath.endsWith(".jsonl")) {
+        return;
+      }
+
       // Extract session ID from filename
       const sessionId = path.basename(filePath, ".jsonl");
 
@@ -507,61 +514,6 @@ export class CommanderSessionManager extends EventEmitter {
     this.sessionWatcher.on("error", (error) => {
       console.error("[COMMANDER] Session watcher error:", error);
     });
-
-    // Also check for existing files (in case session was created before watch started)
-    this.checkExistingSessionFiles(sessionsDir);
-  }
-
-  /**
-   * Check for existing session files in case one was created before watching started.
-   * Only considers files modified within 5 seconds of PTY spawn to avoid picking up old sessions.
-   */
-  private async checkExistingSessionFiles(sessionsDir: string): Promise<void> {
-    // Only check if we have a PTY spawn timestamp
-    if (!this.ptySpawnedAt) {
-      return;
-    }
-
-    const MAX_AGE_MS = 5000; // Only consider files created within 5 seconds of PTY spawn
-
-    try {
-      const files = await readdir(sessionsDir);
-      const jsonlFiles = files.filter((f) => f.endsWith(".jsonl"));
-
-      // Filter files by modification time - only recent files
-      const recentFiles: { file: string; mtime: number }[] = [];
-      for (const file of jsonlFiles) {
-        const filePath = path.join(sessionsDir, file);
-        const stats = await stat(filePath);
-        const age = this.ptySpawnedAt - stats.mtimeMs;
-
-        // Only consider files modified close to PTY spawn time
-        // (negative age means file was modified after PTY spawn, which is valid)
-        if (age <= MAX_AGE_MS) {
-          recentFiles.push({ file, mtime: stats.mtimeMs });
-        }
-      }
-
-      if (recentFiles.length > 0 && !this.claudeSessionId) {
-        // Use the most recently modified file
-        recentFiles.sort((a, b) => b.mtime - a.mtime);
-        const mostRecent = recentFiles[0].file;
-        const sessionId = path.basename(mostRecent, ".jsonl");
-
-        console.log(`[COMMANDER] Found recent session file: ${sessionId}`);
-        this.claudeSessionId = sessionId;
-
-        const conversation = this.conversationRepo.getOrCreateCommander();
-        this.conversationRepo.updateClaudeSessionId(
-          conversation.conversationId,
-          sessionId
-        );
-
-        this.emitStateChange();
-      }
-    } catch {
-      // Directory may not exist yet - that's fine
-    }
   }
 
   /**
