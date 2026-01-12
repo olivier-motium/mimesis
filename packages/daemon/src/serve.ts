@@ -61,13 +61,6 @@ import { tabManager } from "./tab-manager.js";
 import { GatewayServer } from "./gateway/index.js";
 import { StatusWatcher } from "./status-watcher.js";
 
-// Validate required environment variables at startup
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-if (!ANTHROPIC_API_KEY) {
-  console.error("Missing required env var: ANTHROPIC_API_KEY");
-  console.error("Set ANTHROPIC_API_KEY=sk-ant-... to enable AI summaries");
-  process.exit(1);
-}
 
 /**
  * Check if a session is recent enough to include
