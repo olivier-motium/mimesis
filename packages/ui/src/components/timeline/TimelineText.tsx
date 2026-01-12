@@ -5,7 +5,6 @@
  */
 
 import type { TextEvent } from "../../hooks/useSessionEvents";
-import { cn } from "../../lib/utils";
 import { MessageSquare } from "lucide-react";
 
 // ============================================================================
@@ -29,11 +28,8 @@ export function TimelineText({ event }: TimelineTextProps) {
       </div>
 
       {/* Content */}
-      <div className={cn(
-        "flex-1 prose prose-sm dark:prose-invert max-w-none",
-        "text-foreground"
-      )}>
-        <p className="whitespace-pre-wrap">{event.text}</p>
+      <div className="flex-1 text-sm text-foreground leading-relaxed">
+        <div className="whitespace-pre-wrap break-words">{event.text}</div>
       </div>
     </div>
   );

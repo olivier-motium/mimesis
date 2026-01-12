@@ -1190,3 +1190,24 @@ cd packages/daemon && pnpm test  # 267 passed, 2 skipped
 | PTY stdin/stdout E2E | Manual only |
 | Commander job streaming | Manual only |
 | Hook event injection | Manual only |
+
+### Tailwind prose Class Gotcha (Jan 2026)
+
+**Problem:** Timeline text events weren't rendering properly - text appeared collapsed or hidden.
+
+**Root cause:** `TimelineText.tsx` used Tailwind's `prose` utility class (`prose prose-sm dark:prose-invert`), which is designed for markdown article rendering. When combined with `whitespace-pre-wrap` on `<p>` elements, it caused text to render with unexpected margins, line-heights, and spacing.
+
+**Fix:** Replace `prose` with simple direct styling:
+```tsx
+// Bad: prose class for non-markdown content
+<div className="prose prose-sm dark:prose-invert">
+  <p className="whitespace-pre-wrap">{text}</p>
+</div>
+
+// Good: direct styling for terminal/structured output
+<div className="text-sm text-foreground leading-relaxed">
+  <div className="whitespace-pre-wrap break-words">{text}</div>
+</div>
+```
+
+**Rule:** Only use `prose` for actual markdown/article content. For terminal output, structured data, or code - use direct Tailwind utilities.

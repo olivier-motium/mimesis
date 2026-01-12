@@ -31,8 +31,8 @@ export interface TimelineProps {
 // Estimated row heights for virtualization (dynamic measurement will refine)
 const ESTIMATED_HEIGHTS: Record<TimelineEvent["type"], number> = {
   tool_group: 150,
-  text: 80,
-  thinking: 60,
+  text: 120,
+  thinking: 80,
   stdout: 40,
   progress: 30,
   status_change: 30,
@@ -63,7 +63,10 @@ export function Timeline({
   // Scroll to bottom when new events arrive (if at bottom)
   useEffect(() => {
     if (!isScrolledAway && events.length > 0) {
-      virtualizer.scrollToIndex(events.length - 1, { align: "end" });
+      // Allow virtualizer to measure before scrolling
+      requestAnimationFrame(() => {
+        virtualizer.scrollToIndex(events.length - 1, { align: "end" });
+      });
     }
   }, [events.length, isScrolledAway, virtualizer]);
 
@@ -109,7 +112,7 @@ export function Timeline({
     <div
       ref={parentRef}
       className={cn(
-        "flex-1 overflow-auto",
+        "relative flex-1 overflow-auto",
         "scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent",
         className
       )}
@@ -152,7 +155,7 @@ export function Timeline({
             onScrolledAwayChange(false);
           }}
           className={cn(
-            "fixed bottom-20 right-8 z-10",
+            "sticky bottom-4 left-1/2 -translate-x-1/2 z-10",
             "px-3 py-1.5 rounded-full",
             "bg-primary text-primary-foreground",
             "shadow-lg hover:bg-primary/90",
