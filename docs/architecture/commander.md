@@ -117,6 +117,34 @@ Store cursor in SQLite       Build fleet prelude
 
 Source: `packages/daemon/src/gateway/handlers/commander-handlers.ts`
 
+### Turn Serialization
+
+Commander processes **one turn at a time**. If a second prompt is sent while a turn is running, it's rejected with a `COMMANDER_BUSY` error. This prevents race conditions and ensures conversation coherence.
+
+```typescript
+// From commander-handlers.ts
+let commanderTurnInProgress = false;
+
+export async function handleCommanderSend(...): Promise<void> {
+  if (commanderTurnInProgress) {
+    send(ws, {
+      type: "error",
+      code: "COMMANDER_BUSY",
+      message: "Commander is already processing a turn. Please wait.",
+    });
+    return;
+  }
+  commanderTurnInProgress = true;
+  try {
+    // ... process turn
+  } finally {
+    commanderTurnInProgress = false;
+  }
+}
+```
+
+The UI should disable the input field while `activeJob` is running.
+
 ### Fleet Prelude Injection
 
 Before each Commander turn, the `FleetPreludeBuilder` constructs a context prelude containing:
@@ -126,7 +154,43 @@ Before each Commander turn, the `FleetPreludeBuilder` constructs a context prelu
 
 The prelude is injected via `--append-system-prompt` for stable framing.
 
-Source: `packages/daemon/src/gateway/fleet-prelude-builder.ts`
+#### Delta-Only Context Injection
+
+The prelude uses a **cursor-based delta pattern** to avoid re-injecting stale events:
+
+```typescript
+// From fleet-prelude-builder.ts
+const newEvents = this.outboxRepo.getAfterCursor(lastEventIdSeen, maxEvents);
+const newCursor = newEvents.length > 0
+  ? newEvents[newEvents.length - 1].eventId
+  : lastEventIdSeen;
+```
+
+**Cursor flow:**
+1. Commander conversation stores `lastOutboxEventIdSeen` in SQLite
+2. Each turn queries only events with `event_id > lastOutboxEventIdSeen`
+3. After successful job completion, cursor is updated via `conversationRepo.updateLastOutboxEventSeen()`
+4. Next turn only sees events that occurred since the last turn
+
+This ensures Commander gets fresh fleet context without accumulating unbounded history.
+
+#### Commander System Prompt
+
+The stable system prompt establishes Commander's role and responsibilities:
+
+```
+You are Fleet Commander, an Opus-powered meta-agent monitoring a fleet of
+Claude Code workers across multiple projects.
+
+Your responsibilities:
+- Track project status, blockers, and cross-project dependencies
+- Answer questions about fleet-wide activity
+- Coordinate work across projects when needed
+- Identify documentation drift and technical debt
+- Provide strategic recommendations
+```
+
+Source: `packages/daemon/src/gateway/fleet-prelude-builder.ts:94-106`
 
 ### Job Types
 
@@ -195,6 +259,7 @@ async run(request: JobRequest, onChunk: StreamChunkCallback): Promise<JobResult>
   const args = [
     "-p",                           // Print mode (non-interactive)
     "--output-format", "stream-json",
+    "--verbose",                    // REQUIRED for stream-json in print mode
     "--model", model,
   ];
 
@@ -636,6 +701,44 @@ The Commander conversation is a singleton - there's only one Commander conversat
 
 Source: `packages/daemon/src/fleet-db/conversation-repo.ts`
 
+#### ConversationRepo API
+
+The repository provides these methods for conversation management:
+
+```typescript
+// From packages/daemon/src/fleet-db/conversation-repo.ts
+
+get(conversationId: string): Conversation | undefined
+// Fetch a conversation by ID
+
+getByKind(kind: ConversationKind): Conversation | undefined
+// Find conversation by kind (e.g., 'commander')
+
+getOrCreateCommander(): Conversation
+// Singleton pattern - returns existing Commander or creates new one
+// This is the primary entry point for Commander operations
+
+create(params: CreateConversationParams): Conversation
+// Create a new conversation record
+
+updateClaudeSessionId(conversationId: string, claudeSessionId: string): void
+// Store Claude's session ID after first turn completes
+// Enables --resume for subsequent turns
+
+updateLastOutboxEventSeen(conversationId: string, eventId: number): void
+// Update cursor after successful job completion
+// Prevents re-injecting events in next prelude
+
+clearClaudeSessionId(conversationId: string): void
+// Clear session ID (used internally by reset)
+
+resetCommander(): void
+// Clear Commander conversation state for fresh start
+// Note: Only clears claudeSessionId, not the entire record
+```
+
+**Important**: `resetCommander()` only clears the `claudeSessionId` field. The conversation record persists, preserving the `last_outbox_event_id_seen` cursor.
+
 ### Entity Relationships
 
 ```
@@ -800,7 +903,38 @@ Fleet event from outbox.
 
 ### Stream JSON Chunk Format
 
-Claude's `--output-format stream-json` produces these chunk types:
+Claude CLI's `--output-format stream-json` produces **JSONL log entries** (one per line), not API-level stream events. The UI handles both formats for compatibility.
+
+#### CLI JSONL Format (Primary)
+
+Each line from `claude -p --output-format stream-json` is a session log entry:
+
+```typescript
+// Assistant message with content blocks
+{
+  type: "assistant",
+  message: {
+    content: [
+      { type: "text", text: "Hello..." },
+      { type: "thinking", thinking: "Let me consider..." },
+      { type: "tool_use", id: "toolu_123", name: "Read", input: { file_path: "..." } }
+    ]
+  }
+}
+
+// System messages
+{ type: "system", subtype: "turn_duration", ... }
+
+// User prompts
+{ type: "user", message: { content: "..." } }
+
+// Results
+{ type: "result", ... }
+```
+
+#### API Stream Format (Legacy Compatibility)
+
+The UI also handles API-level stream events for future compatibility:
 
 ```typescript
 interface StreamJsonChunk {
@@ -821,6 +955,27 @@ interface StreamJsonChunk {
     partial_json?: string;
     stop_reason?: string;
   };
+}
+```
+
+#### UI Parsing
+
+`CommanderTab.tsx` uses `parseStreamEvents()` which handles both formats:
+
+```typescript
+// From CommanderTab.tsx:141-186
+if (event.type === "assistant") {
+  // CLI JSONL format - extract from message.content array
+  const content = event.message?.content;
+  for (const block of content) {
+    if (block.type === "text") text += block.text;
+    if (block.type === "thinking") thinking += block.thinking;
+    if (block.type === "tool_use") toolUses.push(block);
+  }
+} else if (event.type === "content_block_delta") {
+  // API stream format - extract from delta
+  text += event.delta?.text ?? "";
+  thinking += event.delta?.thinking ?? "";
 }
 ```
 
@@ -1100,6 +1255,45 @@ JobManager.executeJob() completes
         │
         ▼
 UI: Show final result
+```
+
+---
+
+## Error Handling
+
+### Commander-Specific Errors
+
+| Error Code | Trigger | Client Action |
+|------------|---------|---------------|
+| `COMMANDER_BUSY` | Second prompt sent while turn in progress | Disable input, wait for completion |
+
+Example error response:
+```typescript
+{
+  type: "error",
+  code: "COMMANDER_BUSY",
+  message: "Commander is already processing a turn. Please wait."
+}
+```
+
+### Job Errors
+
+Jobs can fail with these conditions:
+
+| Condition | Error |
+|-----------|-------|
+| Timeout (5 min) | `Job timed out after 300s` |
+| Process exit | `Process exited with code <N>` |
+| Spawn failure | `Command not found: claude` |
+
+Error responses are sent via `job.completed` with `ok: false`:
+```typescript
+{
+  type: "job.completed",
+  job_id: 123,
+  ok: false,
+  error: "Job timed out after 300s"
+}
 ```
 
 ---
