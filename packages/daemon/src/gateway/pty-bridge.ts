@@ -214,6 +214,7 @@ export class PtyBridge {
     const session = this.sessions.get(sessionId);
     if (!session) return false;
 
+    console.log(`[PTY] Writing ${data.length} chars to session ${sessionId}`);
     session.process.write(data);
     return true;
   }

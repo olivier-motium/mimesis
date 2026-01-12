@@ -173,8 +173,10 @@ export function useSessionEvents(gateway: UseGatewayResult): UseSessionEventsRes
  * - Text, thinking events pass through as-is
  * - Stdout between tools is standalone; stdout during tool is grouped
  * - Status changes and progress pass through
+ *
+ * Exported for reuse by Commander and other components.
  */
-function groupEventsForTimeline(events: SequencedSessionEvent[]): TimelineEvent[] {
+export function groupEventsForTimeline(events: SequencedSessionEvent[]): TimelineEvent[] {
   const result: TimelineEvent[] = [];
   let pendingTool: {
     seq: number;

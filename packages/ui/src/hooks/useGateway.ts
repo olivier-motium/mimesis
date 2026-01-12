@@ -268,10 +268,12 @@ export interface UseGatewayResult {
   // Commander (PTY-based conversation)
   commanderState: CommanderState;
   commanderEvents: SequencedSessionEvent[];
+  commanderContentEvents: SequencedSessionEvent[];
   sendCommanderPrompt: (prompt: string) => void;
   resetCommander: () => void;
   cancelCommander: () => void;
   clearCommanderEvents: () => void;
+  clearCommanderContentEvents: () => void;
   // Errors
   lastError: string | null;
 }
@@ -323,6 +325,9 @@ export function useGateway(): UseGatewayResult {
   // Commander events (streamed PTY output)
   const [commanderEvents, setCommanderEvents] = useState<SequencedSessionEvent[]>([]);
 
+  // Commander content events (structured content from JSONL parsing)
+  const [commanderContentEvents, setCommanderContentEvents] = useState<SequencedSessionEvent[]>([]);
+
   // Keep ref in sync with state for message handler
   useEffect(() => {
     attachedSessionRef.current = attachedSession;
@@ -340,6 +345,7 @@ export function useGateway(): UseGatewayResult {
     setLastError,
     setCommanderState,
     setCommanderEvents,
+    setCommanderContentEvents,
   };
 
   // Refs for message handlers (refs are stable)
@@ -464,10 +470,15 @@ export function useGateway(): UseGatewayResult {
     });
     // Clear events when resetting the conversation
     setCommanderEvents([]);
+    setCommanderContentEvents([]);
   }, []);
 
   const clearCommanderEvents = useCallback(() => {
     setCommanderEvents([]);
+  }, []);
+
+  const clearCommanderContentEvents = useCallback(() => {
+    setCommanderContentEvents([]);
   }, []);
 
   const cancelCommander = useCallback(() => {
@@ -543,10 +554,12 @@ export function useGateway(): UseGatewayResult {
     cancelJob,
     commanderState,
     commanderEvents,
+    commanderContentEvents,
     sendCommanderPrompt,
     resetCommander,
     cancelCommander,
     clearCommanderEvents,
+    clearCommanderContentEvents,
     lastError,
   };
 }

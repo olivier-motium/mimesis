@@ -36,6 +36,7 @@ export interface GatewayStateSetters {
   setLastError: React.Dispatch<React.SetStateAction<string | null>>;
   setCommanderState: React.Dispatch<React.SetStateAction<CommanderState>>;
   setCommanderEvents: React.Dispatch<React.SetStateAction<SequencedSessionEvent[]>>;
+  setCommanderContentEvents: React.Dispatch<React.SetStateAction<SequencedSessionEvent[]>>;
 }
 
 /**
@@ -326,6 +327,35 @@ export function handleCommanderStdout(
   });
 }
 
+/**
+ * Handle commander.content messages (structured content from JSONL parsing).
+ * Contains text, thinking, and tool events from Claude's responses.
+ */
+export function handleCommanderContent(
+  message: Record<string, unknown>,
+  setters: GatewayStateSetters
+): void {
+  const seq = message.seq as number;
+  const eventData = message.event as SessionEvent;
+
+  const sequencedEvent: SequencedSessionEvent = {
+    ...eventData,
+    seq,
+    sessionId: "commander", // Virtual session ID for Commander content
+  };
+
+  setters.setCommanderContentEvents((prev) => {
+    // Insert in order by seq (events may arrive out of order)
+    const insertIndex = prev.findIndex((e) => e.seq > seq);
+    if (insertIndex === -1) {
+      return [...prev, sequencedEvent];
+    }
+    const newEvents = [...prev];
+    newEvents.splice(insertIndex, 0, sequencedEvent);
+    return newEvents;
+  });
+}
+
 // ============================================================================
 // Error Handler
 // ============================================================================
@@ -363,6 +393,7 @@ const messageHandlers: Record<string, MessageHandler> = {
   "commander.queued": handleCommanderQueued,
   "commander.ready": handleCommanderReady,
   "commander.stdout": handleCommanderStdout,
+  "commander.content": handleCommanderContent,
 };
 
 /**

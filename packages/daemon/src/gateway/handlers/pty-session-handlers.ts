@@ -171,6 +171,11 @@ export function handlePtyOutput(
   const commanderPtyId = getCommanderPtySessionId?.();
   const isCommanderOutput = commanderPtyId === sessionId;
 
+  // Debug: Log Commander output
+  if (isCommanderOutput) {
+    console.log(`[COMMANDER PTY] Received ${data.length} chars of stdout (seq=${seq})`);
+  }
+
   // Broadcast to clients
   for (const [ws, state] of clients) {
     // For Commander output, broadcast to ALL clients

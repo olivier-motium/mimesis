@@ -138,8 +138,8 @@ export function setupCommanderEventForwarding(
   ws: WebSocket,
   send: (ws: WebSocket, message: GatewayMessage) => void
 ): () => void {
+  // Forward Commander state/queue events
   const listener = (event: CommanderEvent) => {
-    // Forward Commander events to client
     switch (event.type) {
       case "commander.state":
         console.log(`[COMMANDER] Broadcasting state to WebSocket client: status=${event.state.status}`);
@@ -165,10 +165,21 @@ export function setupCommanderEventForwarding(
     }
   };
 
+  // Forward Commander content events (from JSONL parsing)
+  const contentListener = (event: { seq: number; event: unknown }) => {
+    send(ws, {
+      type: "commander.content",
+      seq: event.seq,
+      event: event.event,
+    } as GatewayMessage);
+  };
+
   commanderSession.on("commander", listener);
+  commanderSession.on("commander.content", contentListener);
 
   // Return unsubscribe function
   return () => {
     commanderSession.off("commander", listener);
+    commanderSession.off("commander.content", contentListener);
   };
 }

@@ -20,6 +20,9 @@ import { ConversationRepo } from "../fleet-db/conversation-repo.js";
 import { FleetPreludeBuilder, type FleetPrelude } from "./fleet-prelude-builder.js";
 import { COMMANDER_CWD } from "../config/fleet.js";
 import { getTracer, recordError } from "../telemetry/spans.js";
+import { tailJSONL } from "../parser.js";
+import { convertEntriesToEvents } from "./entry-converter.js";
+import type { SessionEvent } from "./protocol.js";
 
 // =============================================================================
 // Types
@@ -102,6 +105,11 @@ export class CommanderSessionManager extends EventEmitter {
   // Subscriptions
   private statusUnsubscribe: (() => void) | null = null;
   private statusWatcherUnsubscribe: (() => void) | null = null;
+
+  // JSONL content watching (for structured content display)
+  private jsonlWatcher: FSWatcher | null = null;
+  private jsonlBytePosition: number = 0;
+  private contentSeq: number = 0;
 
   constructor(options: CommanderSessionManagerOptions) {
     super();
@@ -196,6 +204,9 @@ export class CommanderSessionManager extends EventEmitter {
         this.statusWatcherUnsubscribe();
         this.statusWatcherUnsubscribe = null;
       }
+
+      // Stop JSONL content watcher
+      this.stopJsonlWatcher();
 
       // Kill existing PTY
       if (this.ptySessionId) {
@@ -316,6 +327,9 @@ export class CommanderSessionManager extends EventEmitter {
       this.statusWatcherUnsubscribe();
       this.statusWatcherUnsubscribe = null;
     }
+
+    // Stop JSONL content watcher
+    this.stopJsonlWatcher();
 
     // Stop PTY if running
     if (this.ptySessionId) {
@@ -584,6 +598,96 @@ export class CommanderSessionManager extends EventEmitter {
       this.statusWatcher?.off("status", boundHandler);
     };
     console.log(`[COMMANDER] Subscribed to status file updates`);
+
+    // Start JSONL watcher for structured content display
+    this.startJsonlWatcher();
+  }
+
+  // ===========================================================================
+  // Private: JSONL Content Watching
+  // ===========================================================================
+
+  /**
+   * Start watching Commander's JSONL file for structured content events.
+   * Uses incremental reading (tailJSONL) to emit events as they arrive.
+   */
+  private startJsonlWatcher(): void {
+    if (!this.claudeSessionId || this.jsonlWatcher) {
+      return;
+    }
+
+    const encodedCwd = this.encodePathForClaude(COMMANDER_CWD);
+    const jsonlPath = path.join(
+      os.homedir(),
+      ".claude",
+      "projects",
+      encodedCwd,
+      `${this.claudeSessionId}.jsonl`
+    );
+
+    console.log(`[COMMANDER] Starting JSONL watcher: ${jsonlPath}`);
+
+    this.jsonlWatcher = watch(jsonlPath, {
+      ignoreInitial: false, // Process existing content on start
+    });
+
+    this.jsonlWatcher.on("add", () => this.handleJsonlChange(jsonlPath));
+    this.jsonlWatcher.on("change", () => this.handleJsonlChange(jsonlPath));
+
+    this.jsonlWatcher.on("error", (error) => {
+      console.error("[COMMANDER] JSONL watcher error:", error);
+    });
+  }
+
+  /**
+   * Handle JSONL file changes - read new entries and emit content events.
+   */
+  private async handleJsonlChange(jsonlPath: string): Promise<void> {
+    try {
+      console.log(`[COMMANDER] JSONL change detected, reading from byte ${this.jsonlBytePosition}`);
+      const result = await tailJSONL(jsonlPath, this.jsonlBytePosition);
+      console.log(`[COMMANDER] JSONL read result: newPosition=${result.newPosition}, entries=${result.entries.length}`);
+      this.jsonlBytePosition = result.newPosition;
+
+      if (result.entries.length === 0) {
+        console.log(`[COMMANDER] No new entries in JSONL`);
+        return;
+      }
+
+      console.log(`[COMMANDER] Read ${result.entries.length} entries from JSONL`);
+
+      // Convert log entries to session events
+      const { events } = convertEntriesToEvents(result.entries);
+
+      // Emit each event with sequence number
+      for (const event of events) {
+        this.emit("commander.content", {
+          seq: this.contentSeq++,
+          event,
+        });
+      }
+
+      if (events.length > 0) {
+        console.log(`[COMMANDER] Emitted ${events.length} content events`);
+      }
+    } catch (error) {
+      // File might not exist yet or be temporarily locked
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+        console.error("[COMMANDER] JSONL read error:", error);
+      }
+    }
+  }
+
+  /**
+   * Stop JSONL watcher and reset state.
+   */
+  private stopJsonlWatcher(): void {
+    if (this.jsonlWatcher) {
+      this.jsonlWatcher.close();
+      this.jsonlWatcher = null;
+    }
+    this.jsonlBytePosition = 0;
+    this.contentSeq = 0;
   }
 
   // ===========================================================================

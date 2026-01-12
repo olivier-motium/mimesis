@@ -142,6 +142,7 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
           <CommanderTab
             commanderState={gateway.commanderState}
             commanderEvents={gateway.commanderEvents}
+            commanderContentEvents={gateway.commanderContentEvents}
             onSendPrompt={handleCommanderPrompt}
             onCancel={handleCancelCommander}
             onResetConversation={handleResetCommander}

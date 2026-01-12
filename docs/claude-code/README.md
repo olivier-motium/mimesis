@@ -113,7 +113,6 @@ Lifecycle handlers that run automatically at key moments.
 | [docs/concepts/hooks.md](docs/concepts/hooks.md) | Deep dive into hooks |
 | [docs/architecture.md](docs/architecture.md) | How everything fits together |
 | [docs/guides/customization.md](docs/guides/customization.md) | Create your own commands, skills, hooks |
-| [docs/guides/auto-switch.md](docs/guides/auto-switch.md) | Automatic multi-account switching on rate limits |
 
 ## Directory Structure
 
@@ -134,7 +133,6 @@ claude-code-toolkit/
 │   │   ├── nextjs-tanstack-stack/
 │   │   └── ...
 │   └── scripts/                # Utility scripts
-│       └── claude-auto-switch/ # Multi-account auto-switching
 ├── docs/                       # Documentation
 │   ├── concepts/               # What are commands, skills, hooks
 │   ├── guides/                 # How-to guides

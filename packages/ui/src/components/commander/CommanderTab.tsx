@@ -10,19 +10,14 @@
 
 import { useRef, useEffect, useMemo } from "react";
 import type { CommanderState, SequencedSessionEvent } from "../../hooks/useGateway";
+import { useCommanderEvents } from "../../hooks/useCommanderEvents";
 import { cn } from "../../lib/utils";
 import { CommanderHistory } from "./CommanderHistory";
 import { CommanderInput } from "./CommanderInput";
+import { CommanderTimeline } from "./CommanderTimeline";
 import { Brain, Sparkles, RotateCcw, Clock, Terminal } from "lucide-react";
 import { Button } from "../ui/button";
-
-// Strip ANSI escape codes from PTY output
-// Comprehensive pattern handles: CSI sequences, OSC sequences, DEC private modes, character sets
-// eslint-disable-next-line no-control-regex
-const ANSI_REGEX = /\x1b\[[?>=!]?[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[()][AB012UK]|\x1b[78DEHM]|\x1b=|\x1b>/g;
-function stripAnsi(str: string): string {
-  return str.replace(ANSI_REGEX, "");
-}
+import { stripAnsi } from "../../lib/ansi";
 
 // ============================================================================
 // Types
@@ -31,6 +26,7 @@ function stripAnsi(str: string): string {
 export interface CommanderTabProps {
   commanderState: CommanderState;
   commanderEvents: SequencedSessionEvent[];
+  commanderContentEvents: SequencedSessionEvent[];
   onSendPrompt: (prompt: string) => void;
   onCancel: () => void;
   onResetConversation: () => void;
@@ -44,6 +40,7 @@ export interface CommanderTabProps {
 export function CommanderTab({
   commanderState,
   commanderEvents,
+  commanderContentEvents,
   onSendPrompt,
   onCancel,
   onResetConversation,
@@ -55,35 +52,36 @@ export function CommanderTab({
   const hasSession = commanderState.ptySessionId !== null;
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Debug: Log state changes
-  useEffect(() => {
-    console.log(`[COMMANDER UI] State update: status=${commanderState.status}, isRunning=${isRunning}, ptySessionId=${commanderState.ptySessionId}`);
-  }, [commanderState.status, isRunning, commanderState.ptySessionId]);
+  // Process structured content events for timeline display
+  const { events: structuredEvents, hasContent } = useCommanderEvents(commanderContentEvents);
 
-  // Extract and clean stdout content from events
-  const stdoutContent = useMemo(() => {
-    const rawContent = commanderEvents
-      .filter((e) => e.type === "stdout" && e.data)
-      .map((e) => e.data)
+  // Fallback: Process raw PTY stdout when structured content isn't available
+  const rawStdoutContent = useMemo(() => {
+    if (hasContent) return null; // Prefer structured content
+
+    // Extract stdout from raw PTY events
+    const stdoutEvents = commanderEvents
+      .filter((e) => e.type === "stdout")
+      .map((e) => (e as { data: string }).data)
       .join("");
 
-    const stripped = stripAnsi(rawContent);
+    if (!stdoutEvents) return null;
 
-    // Debug logging
-    console.log(`[COMMANDER] Events count: ${commanderEvents.length}, Raw stdout length: ${rawContent.length}, Stripped length: ${stripped.length}`);
-    if (rawContent.length > 0 && rawContent.length < 2000) {
-      console.log(`[COMMANDER] Raw stdout (first 500 chars):`, rawContent.substring(0, 500));
-    }
+    // Strip ANSI codes and clean up
+    return stripAnsi(stdoutEvents);
+  }, [commanderEvents, hasContent]);
 
-    return stripped;
-  }, [commanderEvents]);
+  // Debug: Log state changes
+  useEffect(() => {
+    console.log(`[COMMANDER UI] State update: status=${commanderState.status}, isRunning=${isRunning}, ptySessionId=${commanderState.ptySessionId}, structuredEvents=${structuredEvents.length}`);
+  }, [commanderState.status, isRunning, commanderState.ptySessionId, structuredEvents.length]);
 
   // Auto-scroll to bottom when new content arrives
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [stdoutContent]);
+  }, [structuredEvents.length]);
 
   return (
     <div className={cn("flex flex-col h-full", className)}>
@@ -159,16 +157,16 @@ export function CommanderTab({
           </div>
         )}
 
-        {/* Streaming output display */}
-        {stdoutContent && (
-          <div className="flex-1 min-h-0 rounded-lg border border-border/30 bg-black/30 overflow-hidden flex flex-col">
+        {/* Structured content display */}
+        {hasContent && (
+          <div className="flex-1 min-h-0 rounded-lg border border-border/30 bg-muted/5 overflow-hidden flex flex-col">
             <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/30 shrink-0">
               <Terminal className="w-3.5 h-3.5 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">Commander Output</span>
               {isRunning && (
                 <div className="ml-auto flex items-center gap-1.5 text-xs text-purple-500">
                   <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
-                  <span>Streaming...</span>
+                  <span>Working...</span>
                 </div>
               )}
             </div>
@@ -176,15 +174,37 @@ export function CommanderTab({
               ref={scrollRef}
               className="flex-1 overflow-auto px-3 py-2"
             >
-              <pre className="text-xs font-mono text-foreground/80 whitespace-pre-wrap">
-                {stdoutContent}
+              <CommanderTimeline events={structuredEvents} />
+            </div>
+          </div>
+        )}
+
+        {/* Raw stdout fallback (when structured content isn't available) */}
+        {!hasContent && rawStdoutContent && (
+          <div className="flex-1 min-h-0 rounded-lg border border-border/30 bg-muted/5 overflow-hidden flex flex-col">
+            <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/30 shrink-0">
+              <Terminal className="w-3.5 h-3.5 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Commander Output (Raw)</span>
+              {isRunning && (
+                <div className="ml-auto flex items-center gap-1.5 text-xs text-purple-500">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+                  <span>Working...</span>
+                </div>
+              )}
+            </div>
+            <div
+              ref={scrollRef}
+              className="flex-1 overflow-auto px-3 py-2"
+            >
+              <pre className="text-xs font-mono text-foreground/90 whitespace-pre-wrap">
+                {rawStdoutContent}
               </pre>
             </div>
           </div>
         )}
 
-        {/* Working indicator (shown only when no output yet) */}
-        {isRunning && !stdoutContent && (
+        {/* Working indicator (shown only when no structured content yet) */}
+        {isRunning && !hasContent && (
           <div className={cn(
             "rounded-lg border p-4 border-purple-500/30 bg-purple-500/5"
           )}>
@@ -201,7 +221,7 @@ export function CommanderTab({
         )}
 
         {/* Empty state */}
-        {!hasSession && !isRunning && !stdoutContent && (
+        {!hasSession && !isRunning && !hasContent && (
           <div className="flex flex-col items-center justify-center h-48 text-center">
             <Brain className="w-12 h-12 text-muted-foreground/30 mb-4" />
             <p className="text-sm text-muted-foreground">

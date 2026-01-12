@@ -302,6 +302,16 @@ export interface CommanderStdoutMessage {
   event: SessionEvent;
 }
 
+/**
+ * Commander structured content events from JSONL parsing.
+ * Contains text, thinking, and tool events from Claude's responses.
+ */
+export interface CommanderContentMessage {
+  type: "commander.content";
+  seq: number;
+  event: SessionEvent;
+}
+
 export type GatewayMessage =
   | FleetEventMessage
   | SessionCreatedMessage
@@ -319,6 +329,7 @@ export type GatewayMessage =
   | CommanderQueuedMessage
   | CommanderReadyMessage
   | CommanderStdoutMessage
+  | CommanderContentMessage
   | PongMessage
   | ErrorMessage;
 
