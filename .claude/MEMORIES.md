@@ -1211,3 +1211,21 @@ cd packages/daemon && pnpm test  # 267 passed, 2 skipped
 ```
 
 **Rule:** Only use `prose` for actual markdown/article content. For terminal output, structured data, or code - use direct Tailwind utilities.
+
+### Flex Container Scroll Gotcha (Jan 2026)
+
+**Problem:** Timeline wasn't scrollable and SessionInput was pushed off-screen despite Timeline having `flex-1 overflow-auto`.
+
+**Root cause:** Parent flex container (`.fleet-viewport`) was missing `min-height: 0`. In CSS flexbox, children with `overflow-auto` need the parent to have `min-height: 0` to constrain height - otherwise the flex item expands to fit content instead of scrolling.
+
+**Fix:**
+```css
+.fleet-viewport {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;      /* Required for flex children to scroll */
+  overflow: hidden;   /* Contain scrolling to child */
+}
+```
+
+**Rule:** When a flex child needs to scroll (`overflow-auto` + `flex-1`), the parent MUST have `min-height: 0` (or `overflow: hidden`) to constrain height.
