@@ -107,6 +107,9 @@ export {
   SHUTDOWN_TIMEOUT_MS,
 } from "./server.js";
 
+// Telemetry
+export { TELEMETRY_CONFIG } from "./telemetry.js";
+
 // Fleet Commander
 export {
   FLEET_BASE_DIR,

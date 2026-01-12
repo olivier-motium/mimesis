@@ -35,6 +35,7 @@ Real-time monitoring dashboard for Claude Code sessions.
 | [Deployment Guide](operations/deployment.md) | Running as a service |
 | [Configuration Reference](architecture/configuration-reference.md) | All configuration modules and tunables |
 | [Environment Variables](operations/configuration.md) | Runtime environment variables |
+| [Telemetry & Observability](operations/telemetry.md) | Logfire integration, metrics, and tracing |
 | [CLI Reference](cli-reference.md) | Watcher flags and options |
 
 ### For Developers
@@ -83,6 +84,7 @@ Implementation specifications for Fleet Commander versions:
 | **Session Lifecycle** | Session states, compaction, segment chains, work chains | [Session Lifecycle](architecture/session-lifecycle.md) |
 | **File-Based Status** | Claude Code hooks write status to `.claude/status.v5.<session_id>.md` | [Commander Architecture](architecture/commander.md#statusv5-schema) |
 | **Fleet DB** | SQLite ledger for briefings, jobs, projects | [Fleet DB Schema](architecture/fleet-db.md) |
+| **Telemetry** | OpenTelemetry traces/metrics exported to Logfire | [Telemetry](operations/telemetry.md) |
 
 ---
 

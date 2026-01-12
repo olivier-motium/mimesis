@@ -8,6 +8,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { DB_PATH } from "../config/index.js";
 import * as schema from "./schema.js";
+import { getTracer } from "../telemetry/spans.js";
 
 let db: ReturnType<typeof drizzle<typeof schema>> | null = null;
 let sqlite: Database.Database | null = null;
@@ -18,17 +19,26 @@ let sqlite: Database.Database | null = null;
  */
 export function getDb(): ReturnType<typeof drizzle<typeof schema>> {
   if (!db) {
-    // Ensure directory exists
-    const dir = path.dirname(DB_PATH);
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+    const tracer = getTracer();
+    const span = tracer.startSpan("db.initialize");
+
+    try {
+      // Ensure directory exists
+      const dir = path.dirname(DB_PATH);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
+      sqlite = new Database(DB_PATH);
+      sqlite.pragma("journal_mode = WAL"); // Better concurrent access
+      sqlite.pragma("foreign_keys = ON");
+
+      db = drizzle(sqlite, { schema });
+
+      span.setAttribute("db.path", DB_PATH);
+    } finally {
+      span.end();
     }
-
-    sqlite = new Database(DB_PATH);
-    sqlite.pragma("journal_mode = WAL"); // Better concurrent access
-    sqlite.pragma("foreign_keys = ON");
-
-    db = drizzle(sqlite, { schema });
 
     // Create tables if they don't exist (simple schema sync)
     // For production, use drizzle-kit migrations

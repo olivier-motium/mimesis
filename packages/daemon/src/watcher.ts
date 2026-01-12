@@ -13,6 +13,16 @@ import { deriveStatus, statusChanged } from "./status-derivation.js";
 import { getGitInfoCached, type GitInfo } from "./git.js";
 import type { LogEntry, SessionMetadata, StatusResult, SessionStateInternal } from "./types.js";
 import { MAX_ENTRIES_PER_SESSION } from "./config/index.js";
+import {
+  withSpan,
+  addSessionAttributes,
+  recordError as recordSpanError,
+} from "./telemetry/spans.js";
+import {
+  recordSessionActive,
+  recordParseTime,
+  recordError as recordErrorMetric,
+} from "./telemetry/metrics.js";
 
 const DEFAULT_PROJECTS_DIR = path.join(os.homedir(), ".claude", "projects");
 
@@ -193,6 +203,8 @@ export class SessionWatcher extends EventEmitter {
     filepath: string,
     _eventType: "add" | "change"
   ): Promise<void> {
+    const startTime = performance.now();
+
     try {
       const sessionId = extractSessionId(filepath);
       const existingSession = this.sessions.get(sessionId);
@@ -200,6 +212,10 @@ export class SessionWatcher extends EventEmitter {
       // Read new entries from file
       const fromByte = existingSession?.bytePosition ?? 0;
       const { entries: newEntries, newPosition } = await tailJSONL(filepath, fromByte);
+
+      // Record parse time metric
+      const parseTimeMs = performance.now() - startTime;
+      recordParseTime(parseTimeMs, { session_id: sessionId });
 
       if (newEntries.length === 0 && existingSession) {
         return; // No new data
@@ -254,6 +270,9 @@ export class SessionWatcher extends EventEmitter {
       // Store session
       this.sessions.set(sessionId, session);
 
+      // Update session count metric
+      recordSessionActive(this.sessions.size);
+
       // Emit event
       const hasStatusChange = statusChanged(previousStatus, status);
       const hasNewMessages = currentSession && status.messageCount > currentSession.status.messageCount;
@@ -276,6 +295,7 @@ export class SessionWatcher extends EventEmitter {
       if (error instanceof Error && "code" in error && error.code === "ENOENT") {
         return; // File gone, nothing to do
       }
+      recordErrorMetric("watcher_file_error");
       this.emit("error", error);
     }
   }
@@ -286,6 +306,10 @@ export class SessionWatcher extends EventEmitter {
 
     if (session) {
       this.sessions.delete(sessionId);
+
+      // Update session count metric
+      recordSessionActive(this.sessions.size);
+
       this.emit("session", {
         type: "deleted",
         session,

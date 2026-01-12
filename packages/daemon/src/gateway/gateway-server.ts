@@ -72,6 +72,16 @@ import {
   setupCommanderEventForwarding,
 } from "./handlers/commander-handlers.js";
 import { CommanderSessionManager } from "./commander-session.js";
+import {
+  withSpan,
+  addWebSocketAttributes,
+  recordError as recordSpanError,
+} from "../telemetry/spans.js";
+import {
+  recordGatewayConnection,
+  recordMessageProcessed,
+  recordError as recordErrorMetric,
+} from "../telemetry/metrics.js";
 
 /**
  * Gateway server options.
@@ -370,6 +380,8 @@ export class GatewayServer {
    * Handle new WebSocket connection.
    */
   private handleConnection(ws: WebSocket, req: IncomingMessage): void {
+    const clientId = `client_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
     // Setup Commander event forwarding for this client
     const commanderUnsubscribe = setupCommanderEventForwarding(
       this.commanderSession,
@@ -386,6 +398,10 @@ export class GatewayServer {
     };
 
     this.clients.set(ws, clientState);
+
+    // Update metrics
+    recordGatewayConnection(this.clients.size);
+
     console.log(`[GATEWAY] Client connected (total: ${this.clients.size})`);
 
     // Send initial Commander state
@@ -411,12 +427,20 @@ export class GatewayServer {
         // Don't need to do anything special, just remove from clients
       }
       this.clients.delete(ws);
+
+      // Update metrics
+      recordGatewayConnection(this.clients.size);
+
       console.log(`[GATEWAY] Client disconnected (remaining: ${this.clients.size})`);
     });
 
     ws.on("error", (error) => {
       console.error("[GATEWAY] Client error:", error.message);
       this.clients.delete(ws);
+
+      // Update metrics
+      recordGatewayConnection(this.clients.size);
+      recordErrorMetric("websocket_error", { client: clientId });
     });
   }
 
@@ -424,6 +448,9 @@ export class GatewayServer {
    * Handle incoming client message.
    */
   private handleMessage(ws: WebSocket, state: ClientState, message: ClientMessage): void {
+    // Track message processing
+    recordMessageProcessed(message.type);
+
     switch (message.type) {
       case "ping":
         this.send(ws, { type: "pong" });

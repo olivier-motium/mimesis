@@ -30,6 +30,11 @@ for (const envPath of envPaths) {
     break;
   }
 }
+
+// Initialize telemetry BEFORE other imports (must happen after dotenv)
+import { initTelemetry, shutdownTelemetry } from "./telemetry/index.js";
+initTelemetry();
+
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { SessionWatcher, type SessionEvent, type SessionState } from "./watcher.js";
@@ -303,6 +308,7 @@ async function main(): Promise<void> {
       apiServer.close();
       await gatewayServer.stop();
       closeDb();
+      await shutdownTelemetry();
     } finally {
       clearTimeout(shutdownTimeout);
       process.exit(0);

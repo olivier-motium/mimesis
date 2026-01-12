@@ -17,6 +17,8 @@ import {
   SIGNAL_ESCALATION,
 } from "../config/index.js";
 import type { SessionEvent, StdoutEvent } from "./protocol.js";
+import { withSpan, addPtyAttributes } from "../telemetry/spans.js";
+import { recordPtyActive, recordError as recordErrorMetric } from "../telemetry/metrics.js";
 
 export interface PtyBridgeCallbacks {
   onOutput: (sessionId: string, event: SessionEvent) => void;
@@ -124,6 +126,9 @@ export class PtyBridge {
     };
 
     this.sessions.set(sessionId, session);
+
+    // Update PTY session count metric
+    recordPtyActive(this.sessions.size);
 
     // Handle PTY output
     proc.onData((data) => {
@@ -305,6 +310,10 @@ export class PtyBridge {
     }
 
     this.sessions.delete(sessionId);
+
+    // Update PTY session count metric
+    recordPtyActive(this.sessions.size);
+
     console.log(`[PTY] Cleaned up session ${sessionId}`);
   }
 
