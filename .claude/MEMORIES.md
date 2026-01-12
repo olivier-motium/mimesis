@@ -1265,6 +1265,23 @@ cd packages/daemon && pnpm test  # 267 passed, 2 skipped
 
 **Rule:** When parsing Claude CLI output with `--output-format stream-json`, expect session-level types (`system`, `assistant`, `user`, `result`) not API stream types.
 
+### Claude CLI --verbose Flag Requirement (Jan 2026)
+
+**Problem:** Commander jobs failed immediately with error: "When using --print, --output-format=stream-json requires --verbose"
+
+**Root cause:** Claude CLI's `--output-format stream-json` requires the `--verbose` flag when used with print mode (`-p`). Without it, the CLI exits with code 1.
+
+**Fix:** Always include `--verbose` in job-runner.ts buildArgs():
+```typescript
+const args = [
+  "-p", // Print mode (non-interactive)
+  "--output-format", "stream-json",
+  "--verbose", // Required for stream-json in print mode
+];
+```
+
+**Rule:** When using `claude -p --output-format stream-json`, always add `--verbose`.
+
 ### Timeline Information Density Pattern (Jan 2026)
 
 **Goal:** Maximize visible content in Timeline without sacrificing usability.
