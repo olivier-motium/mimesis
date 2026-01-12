@@ -28,8 +28,8 @@ export const STATUS_FILE_TTL_MS = 5 * 60 * 1000;
 /** Filename for legacy project-level status file */
 export const STATUS_FILENAME = "status.md";
 
-/** Pattern for session-specific status files: status.<sessionId>.md */
-export const STATUS_FILE_PATTERN = /^status\.(.+)\.md$/;
+/** Pattern for session-specific status files: status.<sessionId>.md or status.v5.<sessionId>.md */
+export const STATUS_FILE_PATTERN = /^status\.(?:v5\.)?(.+)\.md$/;
 
 /** Directory containing status file */
 export const STATUS_DIR = ".claude";

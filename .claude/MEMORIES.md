@@ -1440,3 +1440,41 @@ const ANSI_REGEX = /\x1b\[[?>=!]?[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[()][AB0
 - `\x1b=` / `\x1b>` - Keypad mode sequences
 
 **Rule:** When stripping ANSI from PTY output, use comprehensive patterns. The `strip-ansi` npm package is an alternative but adds a dependency.
+
+### StatusWatcher Must Watch PTY Session Directories (Jan 2026)
+
+**Problem:** Commander stuck on "Streaming..." indicator - status never transitioned after Claude finished processing.
+
+**Root cause:** When `CommanderSessionManager` creates a PTY session, it was NOT calling `statusWatcher.watchProject(COMMANDER_CWD)`. StatusWatcher tracks status file changes in `.claude/status.*.md` to detect session state transitions. Without this, the SessionStore never received `fileStatus` updates.
+
+**Data flow that was broken:**
+1. Claude writes status to `~/.claude/commander/.claude/status.*.md` ✓
+2. StatusWatcher NOT monitoring that directory ✗
+3. SessionStore never gets `fileStatus` updates ✗
+4. `CommanderSessionManager.handleSessionStoreEvent()` never fires ✗
+5. Status stays "working" forever ✗
+
+**Fix:** Pass `statusWatcher` to `CommanderSessionManager` and call `watchProject()` after PTY creation:
+
+```typescript
+// commander-session.ts - Add to constructor options
+interface CommanderSessionManagerOptions {
+  ptyBridge: PtyBridge;
+  sessionStore: SessionStore;
+  statusWatcher?: StatusWatcher;  // NEW
+}
+
+// After PTY creation in ensureSession()
+if (this.statusWatcher) {
+  this.statusWatcher.watchProject(COMMANDER_CWD);
+}
+
+// gateway-server.ts - Pass statusWatcher
+this.commanderSession = new CommanderSessionManager({
+  ptyBridge: this.ptyBridge,
+  sessionStore: this.sessionStore,
+  statusWatcher: this.statusWatcher,  // NEW
+});
+```
+
+**Rule:** Any module that creates PTY sessions (where Claude Code writes status files) MUST ensure StatusWatcher is watching that directory. The existing SessionWatcher handles external sessions from `~/.claude/projects/`, but new PTY sessions need explicit `watchProject()` calls.

@@ -141,6 +141,8 @@ Source: `packages/daemon/src/gateway/commander-session.ts`
 
 Commander queues prompts when busy instead of rejecting. The `CommanderSessionManager` uses the existing `SessionStore` infrastructure to detect when Commander is ready.
 
+**Important:** StatusWatcher must be watching the Commander directory (`~/.claude/commander`) for status file changes. When creating the PTY session, `CommanderSessionManager` calls `statusWatcher.watchProject(COMMANDER_CWD)` to enable status detection. Without this, status transitions (working → idle) would never fire.
+
 ```typescript
 // From commander-session.ts
 export class CommanderSessionManager extends EventEmitter {
