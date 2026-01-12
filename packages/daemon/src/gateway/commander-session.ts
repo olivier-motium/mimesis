@@ -12,7 +12,7 @@
 import path from "node:path";
 import os from "node:os";
 import { watch, type FSWatcher } from "chokidar";
-import { readdir } from "node:fs/promises";
+import { readdir, stat } from "node:fs/promises";
 import { EventEmitter } from "node:events";
 import type { PtyBridge, PtySessionInfo } from "./pty-bridge.js";
 import type { SessionStore, UIStatus, TrackedSession, SessionStoreEvent } from "./session-store.js";
@@ -98,6 +98,7 @@ export class CommanderSessionManager extends EventEmitter {
 
   // Session ID capture
   private sessionWatcher: FSWatcher | null = null;
+  private ptySpawnedAt: number | null = null; // Timestamp when PTY was created
 
   // Subscriptions
   private statusUnsubscribe: (() => void) | null = null;
@@ -198,6 +199,7 @@ export class CommanderSessionManager extends EventEmitter {
 
       // Clear state
       this.claudeSessionId = null;
+      this.ptySpawnedAt = null;
       this.status = "idle";
       this.isFirstTurn = true;
       this.turnCount = 0;
@@ -353,6 +355,7 @@ export class CommanderSessionManager extends EventEmitter {
 
       // Start watching for Claude's session file to capture session ID
       if (!this.claudeSessionId) {
+        this.ptySpawnedAt = Date.now();
         this.startSessionIdCapture();
       }
 
@@ -511,29 +514,50 @@ export class CommanderSessionManager extends EventEmitter {
 
   /**
    * Check for existing session files in case one was created before watching started.
+   * Only considers files modified within 5 seconds of PTY spawn to avoid picking up old sessions.
    */
   private async checkExistingSessionFiles(sessionsDir: string): Promise<void> {
+    // Only check if we have a PTY spawn timestamp
+    if (!this.ptySpawnedAt) {
+      return;
+    }
+
+    const MAX_AGE_MS = 5000; // Only consider files created within 5 seconds of PTY spawn
+
     try {
       const files = await readdir(sessionsDir);
       const jsonlFiles = files.filter((f) => f.endsWith(".jsonl"));
 
-      if (jsonlFiles.length > 0) {
-        // Use the most recent file (by name, which includes timestamp)
-        const mostRecent = jsonlFiles.sort().pop()!;
+      // Filter files by modification time - only recent files
+      const recentFiles: { file: string; mtime: number }[] = [];
+      for (const file of jsonlFiles) {
+        const filePath = path.join(sessionsDir, file);
+        const stats = await stat(filePath);
+        const age = this.ptySpawnedAt - stats.mtimeMs;
+
+        // Only consider files modified close to PTY spawn time
+        // (negative age means file was modified after PTY spawn, which is valid)
+        if (age <= MAX_AGE_MS) {
+          recentFiles.push({ file, mtime: stats.mtimeMs });
+        }
+      }
+
+      if (recentFiles.length > 0 && !this.claudeSessionId) {
+        // Use the most recently modified file
+        recentFiles.sort((a, b) => b.mtime - a.mtime);
+        const mostRecent = recentFiles[0].file;
         const sessionId = path.basename(mostRecent, ".jsonl");
 
-        if (!this.claudeSessionId) {
-          console.log(`[COMMANDER] Found existing session file: ${sessionId}`);
-          this.claudeSessionId = sessionId;
+        console.log(`[COMMANDER] Found recent session file: ${sessionId}`);
+        this.claudeSessionId = sessionId;
 
-          const conversation = this.conversationRepo.getOrCreateCommander();
-          this.conversationRepo.updateClaudeSessionId(
-            conversation.conversationId,
-            sessionId
-          );
+        const conversation = this.conversationRepo.getOrCreateCommander();
+        this.conversationRepo.updateClaudeSessionId(
+          conversation.conversationId,
+          sessionId
+        );
 
-          this.emitStateChange();
-        }
+        this.emitStateChange();
       }
     } catch {
       // Directory may not exist yet - that's fine
