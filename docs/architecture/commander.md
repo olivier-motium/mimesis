@@ -1,6 +1,6 @@
 # Commander Architecture
 
-Fleet Commander is a meta-agent system for cross-project fleet monitoring. It runs headless Claude jobs, orchestrates hook-based session tracking, and provides durable briefing storage.
+Fleet Commander is a meta-agent system for cross-project fleet monitoring. It runs a **persistent PTY-based Claude session**, orchestrates hook-based session tracking, and provides durable briefing storage.
 
 ---
 
@@ -17,7 +17,7 @@ Commander separates concerns:
 ## Table of Contents
 
 1. [Architecture Overview](#architecture-overview)
-2. [Job Execution System](#job-execution-system)
+2. [PTY Session System](#pty-session-system)
 3. [Hook System](#hook-system)
 4. [Status.v5 Schema](#statusv5-schema)
 5. [Database Schema](#database-schema)
@@ -46,21 +46,26 @@ Commander separates concerns:
                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                         Fleet Gateway (port 4452)                        │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────────────┐ │
-│  │  Unix Socket    │  │  Job Manager    │  │  Outbox Poller          │ │
-│  │  (hook events)  │  │  (headless jobs)│  │  (SQLite → WebSocket)   │ │
-│  └────────┬────────┘  └────────┬────────┘  └───────────┬─────────────┘ │
-│           │                    │                        │               │
-│           └────────────────────┴────────────────────────┘               │
-│                                │                                         │
-│                        Session Store                                     │
-└────────────────────────────────┼────────────────────────────────────────┘
-                                 │
-                                 ▼
+│  ┌─────────────────┐  ┌─────────────────────────────────────────────┐  │
+│  │  Unix Socket    │  │  Commander Session Manager                   │  │
+│  │  (hook events)  │  │  (PTY + Prompt Queue + Status Detection)     │  │
+│  └────────┬────────┘  └────────────────────┬────────────────────────┘  │
+│           │                                 │                           │
+│           │           ┌─────────────────────┴───────────────┐          │
+│           │           │                                     │          │
+│           │    ┌──────▼──────┐  ┌──────────────┐  ┌────────▼────────┐ │
+│           │    │  PTY Bridge │  │ Session Store│  │ Outbox Poller   │ │
+│           │    │  (stdin/out)│  │  (tracking)  │  │ (SQLite → WS)   │ │
+│           │    └──────┬──────┘  └──────────────┘  └─────────────────┘ │
+│           │           │                                                │
+│           └───────────┴────────────────────────────────────────────────┘
+└────────────────────────────────────┼───────────────────────────────────┘
+                                     │
+                                     ▼
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                     Fleet DB (SQLite)                                    │
 │  ┌─────────────┐  ┌─────────────┐  ┌──────────────┐  ┌─────────────┐   │
-│  │  projects   │  │  briefings  │  │ outbox_events│  │    jobs     │   │
+│  │  projects   │  │  briefings  │  │ outbox_events│  │conversations│   │
 │  └─────────────┘  └─────────────┘  └──────────────┘  └─────────────┘   │
 └─────────────────────────────────────────────────────────────────────────┘
                                  │
@@ -78,81 +83,142 @@ Commander separates concerns:
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| **Fleet Gateway** | `packages/daemon/src/gateway/` | WebSocket server, job execution, event streaming |
-| **Fleet DB** | `~/.claude/commander/fleet.db` | SQLite persistence for briefings and jobs |
+| **Fleet Gateway** | `packages/daemon/src/gateway/` | WebSocket server, PTY management, event streaming |
+| **Commander Session** | `packages/daemon/src/gateway/commander-session.ts` | PTY lifecycle, prompt queue, status detection |
+| **Fleet DB** | `~/.claude/commander/fleet.db` | SQLite persistence for briefings and conversations |
 | **Hook Scripts** | `~/.claude/hooks/` | Session lifecycle automation |
 | **UI Components** | `packages/ui/src/components/commander/` | Commander interface |
 
 ---
 
-## Job Execution System
+## PTY Session System
 
-Commander executes headless Claude jobs using `claude -p --output-format stream-json`.
+Commander uses a **persistent PTY-based Claude session** for natural conversation flow. This provides several advantages over headless jobs:
 
-### Stateful Conversations
+| Headless (`claude -p`) | PTY (`claude`) |
+|------------------------|----------------|
+| No hooks fire | All hooks fire naturally |
+| New process per prompt | Persistent session |
+| `--continue` for continuity | Native conversation state |
+| No tool approvals possible | Could show approvals in UI |
+| Can't interrupt mid-response | SIGINT works naturally |
+| BUSY rejection on concurrent prompts | Natural prompt queuing |
 
-Commander maintains a **persistent conversation** across turns using Claude Code's `--continue` flag. This enables:
-- Context accumulation across multiple prompts
+### PTY-Based Conversation
+
+Commander maintains a **persistent interactive PTY session** running `claude`. This enables:
+- Context accumulation across multiple prompts (native Claude behavior)
 - Multi-turn investigations ("compare these projects, then propose a plan")
-- Fleet awareness via prelude injection
+- Fleet awareness via prelude injection in prompts
+- All Claude hooks firing naturally (PostToolUse, etc.)
+- Natural prompt queuing when Commander is busy
 
 The gateway handles all conversation state internally - the UI just sends prompts.
 
 **Conversation Flow:**
 ```
-First Turn                    Subsequent Turns
+First Prompt                  Subsequent Prompts
     │                             │
     ▼                             ▼
-claude -p                    claude -p --continue
+Create PTY (claude)          Reuse existing PTY
     │                             │
     ▼                             ▼
-New conversation             Resume from cwd
+Watch for session file       Check status
     │                             │
     ▼                             ▼
-Store cursor in SQLite       Build fleet prelude
+Write prompt to stdin        Queue if busy, else write
+    │                             │
+    ▼                             ▼
+Store session ID             Inject fleet prelude
                                   │
                                   ▼
-                             Inject via --append-system-prompt
+                             via <system-reminder> in prompt
 ```
 
-Source: `packages/daemon/src/gateway/handlers/commander-handlers.ts`
+Source: `packages/daemon/src/gateway/commander-session.ts`
 
-### Turn Serialization
+### Prompt Queue and Status Detection
 
-Commander processes **one turn at a time**. If a second prompt is sent while a turn is running, it's rejected with a `COMMANDER_BUSY` error. This prevents race conditions and ensures conversation coherence.
+Commander queues prompts when busy instead of rejecting. The `CommanderSessionManager` uses the existing `SessionStore` infrastructure to detect when Commander is ready.
 
 ```typescript
-// From commander-handlers.ts
-let commanderTurnInProgress = false;
+// From commander-session.ts
+export class CommanderSessionManager extends EventEmitter {
+  private ptySessionId: string | null = null;
+  private claudeSessionId: string | null = null;
+  private promptQueue: PromptQueueItem[] = [];
+  private status: CommanderStatus = "idle";
 
-export async function handleCommanderSend(...): Promise<void> {
-  if (commanderTurnInProgress) {
-    send(ws, {
-      type: "error",
-      code: "COMMANDER_BUSY",
-      message: "Commander is already processing a turn. Please wait.",
-    });
-    return;
+  async sendPrompt(prompt: string): Promise<void> {
+    await this.ensureSession();
+
+    // If working, queue the prompt
+    if (this.status === "working") {
+      this.promptQueue.push({ prompt, queuedAt: new Date().toISOString() });
+      this.emitState();
+      return;
+    }
+
+    // Otherwise, send immediately
+    await this.writePrompt(prompt);
   }
-  commanderTurnInProgress = true;
-  try {
-    // ... process turn
-  } finally {
-    commanderTurnInProgress = false;
+
+  // Called when SessionStore detects Commander is ready
+  private onStatusChange(status: UIStatus): void {
+    if (status === "waiting_for_input" || status === "idle") {
+      this.drainQueue();
+    }
+  }
+
+  private drainQueue(): void {
+    const next = this.promptQueue.shift();
+    if (next) {
+      this.writePrompt(next.prompt);
+    }
   }
 }
 ```
 
-The UI should disable the input field while `activeJob` is running.
+**Queue behavior:**
+1. User sends prompt → If busy, push to `promptQueue` and return immediately
+2. UI shows queue count: "Commander is working (2 queued)..."
+3. When status changes to `waiting_for_input`, drain next prompt from queue
+4. Repeat until queue is empty
 
 ### Fleet Prelude Injection
 
-Before each Commander turn, the `FleetPreludeBuilder` constructs a context prelude containing:
+Before each Commander prompt, the `FleetPreludeBuilder` constructs a context prelude containing:
 1. New outbox events since last cursor position
 2. Documentation drift warnings from recent briefings
-3. Stable system prompt for Commander role
+3. Stable system prompt for Commander role (first turn only)
 
-The prelude is injected via `--append-system-prompt` for stable framing.
+The prelude is injected via `<system-reminder>` blocks in the prompt itself:
+
+```typescript
+// From commander-session.ts
+async writePrompt(prompt: string): Promise<void> {
+  const prelude = this.fleetPreludeBuilder.build({
+    lastEventIdSeen: this.lastOutboxEventIdSeen,
+    maxEvents: 50,
+    includeDocDriftWarnings: true,
+  });
+
+  let fullPrompt = prompt;
+
+  // Inject fleet context as system reminder
+  if (prelude.hasActivity) {
+    fullPrompt = `<system-reminder>\n${prelude.fleetDelta}\n</system-reminder>\n\n${prompt}`;
+  }
+
+  // On first turn, also inject role prompt
+  if (this.isFirstTurn) {
+    fullPrompt = `<system-reminder>\n${prelude.systemPrompt}\n</system-reminder>\n\n${fullPrompt}`;
+    this.isFirstTurn = false;
+  }
+
+  this.ptyBridge.write(this.ptySessionId, fullPrompt + "\n");
+}
+```
 
 #### Delta-Only Context Injection
 
@@ -168,9 +234,9 @@ const newCursor = newEvents.length > 0
 
 **Cursor flow:**
 1. Commander conversation stores `lastOutboxEventIdSeen` in SQLite
-2. Each turn queries only events with `event_id > lastOutboxEventIdSeen`
-3. After successful job completion, cursor is updated via `conversationRepo.updateLastOutboxEventSeen()`
-4. Next turn only sees events that occurred since the last turn
+2. Each prompt queries only events with `event_id > lastOutboxEventIdSeen`
+3. After successful prompt completion, cursor is updated
+4. Next prompt only sees events that occurred since the last prompt
 
 This ensures Commander gets fresh fleet context without accumulating unbounded history.
 
@@ -192,123 +258,106 @@ Your responsibilities:
 
 Source: `packages/daemon/src/gateway/fleet-prelude-builder.ts:94-106`
 
-### Job Types
+### Session ID Capture
 
-| Type | Model | Purpose |
-|------|-------|---------|
-| `commander_turn` | Opus | Cross-project queries from Commander tab (stateful) |
-| `worker_task` | Sonnet/Opus | Repo-specific automation tasks |
-| `skill_patch` | Sonnet | Skill file updates |
-| `doc_patch` | Sonnet | Documentation updates |
-
-Source: `packages/daemon/src/config/fleet.ts:89-94`
-
-### Job Lifecycle
-
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   queued    │────▶│   running   │────▶│  completed  │
-└─────────────┘     └─────────────┘     └─────────────┘
-                           │
-                           ▼
-                    ┌─────────────┐
-                    │   failed    │
-                    └─────────────┘
-                           │
-                           ▼
-                    ┌─────────────┐
-                    │  canceled   │
-                    └─────────────┘
-```
-
-### Concurrency Limits
-
-| Limit | Value | Purpose |
-|-------|-------|---------|
-| `MAX_CONCURRENT_JOBS` | 3 | Global job limit |
-| `MAX_JOBS_PER_PROJECT` | 1 | Per-project limit |
-| `JOB_TIMEOUT_MS` | 300,000 (5 min) | Maximum job duration |
-
-Source: `packages/daemon/src/config/fleet.ts:42-48`
-
-### Job Runner
-
-The `JobRunner` class spawns headless Claude processes with conversation support:
+Commander captures Claude's session ID by watching for the JSONL file creation:
 
 ```typescript
-// From packages/daemon/src/gateway/job-runner.ts
-
-interface ConversationBinding {
-  conversationId: string;        // Our UUID for tracking
-  claudeSessionId?: string;      // Claude's session ID (for --resume)
-  mode: "first_turn" | "continue" | "resume";
-}
-
-interface JobRequest {
-  type: string;
-  model: "opus" | "sonnet" | "haiku";
-  conversation?: ConversationBinding;  // Stateful conversation binding
-  request: {
-    prompt: string;
-    appendSystemPrompt?: string;  // For fleet prelude injection
-  };
-}
-
-async run(request: JobRequest, onChunk: StreamChunkCallback): Promise<JobResult> {
-  // Build CLI arguments
-  const args = [
-    "-p",                           // Print mode (non-interactive)
-    "--output-format", "stream-json",
-    "--verbose",                    // REQUIRED for stream-json in print mode
-    "--dangerously-skip-permissions", // REQUIRED: headless can't approve interactively
-    "--model", model,
-  ];
-
-  // Add conversation continuity flags
-  if (request.conversation) {
-    if (request.conversation.mode === "resume" && request.conversation.claudeSessionId) {
-      args.push("--resume", request.conversation.claudeSessionId);
-    } else if (request.conversation.mode === "continue") {
-      args.push("--continue");  // Continue most recent in cwd
-    }
-    // first_turn: no flags, starts new conversation
-  }
-
-  // Add fleet prelude injection
-  if (request.request.appendSystemPrompt) {
-    args.push("--append-system-prompt", request.request.appendSystemPrompt);
-  }
-
-  // Spawn Claude process
-  this.process = spawn(claudePath, args, {
-    cwd: request.repoRoot,
-    stdio: ["pipe", "pipe", "pipe"],
+// From commander-session.ts
+async ensureSession(): Promise<void> {
+  // 1. Create PTY
+  const ptyInfo = await this.ptyBridge.create({
+    projectId: COMMANDER_PROJECT_ID,
+    cwd: COMMANDER_CWD,
+    command: ["claude"],
+    env: { FLEET_SESSION_ID: "commander" },
   });
 
-  // Stream stdout line by line → WebSocket
+  this.ptySessionId = ptyInfo.sessionId;
+
+  // 2. Watch for Claude session file to get session ID
+  // Claude creates: ~/.claude/projects/<encoded-cwd>/<session-id>.jsonl
+  const sessionsDir = getClaudeProjectsDir(COMMANDER_CWD);
+
+  const watcher = chokidar.watch(`${sessionsDir}/*.jsonl`, { ignoreInitial: false });
+  watcher.on("add", (filePath) => {
+    this.claudeSessionId = path.basename(filePath, ".jsonl");
+    // Store in DB for persistence
+    this.conversationRepo.updateClaudeSessionId(
+      this.conversationId,
+      this.claudeSessionId
+    );
+    watcher.close();
+  });
 }
 ```
 
-### Job Manager
+### PTY Session Lifecycle
 
-The `JobManager` handles queuing and concurrency:
+```
+┌─────────────┐     ┌─────────────────────┐     ┌─────────────┐
+│    idle     │────▶│  waiting_for_input  │────▶│   working   │
+│ (no PTY)    │     │  (PTY ready)        │     │ (processing)│
+└─────────────┘     └─────────────────────┘     └──────┬──────┘
+       ▲                      ▲                        │
+       │                      │                        │
+       │                      └────────────────────────┘
+       │                         (prompt complete)
+       │
+       │            ┌─────────────┐
+       └────────────│   reset     │
+                    │ (kill PTY)  │
+                    └─────────────┘
+```
+
+### Commander Session Manager
+
+The `CommanderSessionManager` class manages the PTY lifecycle:
 
 ```typescript
-// From packages/daemon/src/gateway/job-manager.ts:59-75
+// From packages/daemon/src/gateway/commander-session.ts
 
-async createJob(request: JobRequest, listener: JobEventListener): Promise<number> {
-  // Check per-project limit
-  if (request.projectId && this.projectJobs.has(request.projectId)) {
-    throw new Error(`Project already has a running job`);
-  }
+export class CommanderSessionManager extends EventEmitter {
+  // PTY session tracking
+  private ptySessionId: string | null = null;
+  private claudeSessionId: string | null = null;
+  private status: CommanderStatus = "idle";
 
-  // Start immediately if under limit
-  if (this.running.size < MAX_CONCURRENT_JOBS) {
-    return this.startJob(request, listener);
-  }
+  // Prompt queue
+  private promptQueue: PromptQueueItem[] = [];
 
-  // Otherwise queue
-  this.queue.push({ request, listener, resolve, reject });
+  // Event cursor
+  private lastOutboxEventIdSeen: number = 0;
+
+  constructor(deps: CommanderSessionDeps) { ... }
+
+  // Send prompt (queues if busy)
+  async sendPrompt(prompt: string): Promise<void>;
+
+  // Reset conversation (kills PTY, clears queue)
+  async reset(): Promise<void>;
+
+  // Cancel current operation (sends SIGINT)
+  async cancel(): Promise<void>;
+
+  // Get current state for UI
+  getState(): CommanderState;
+
+  // Initialize on daemon start (restore from DB)
+  async initialize(): Promise<void>;
+
+  // Shutdown (cleanup)
+  async shutdown(): Promise<void>;
+}
+
+type CommanderStatus = "idle" | "working" | "waiting_for_input";
+
+interface CommanderState {
+  status: CommanderStatus;
+  ptySessionId: string | null;
+  claudeSessionId: string | null;
+  queuedPrompts: number;
+  isFirstTurn: boolean;
 }
 ```
 
@@ -822,11 +871,11 @@ Send a prompt to Commander (stateful Opus conversation). The gateway handles all
 ```
 
 The gateway will:
-1. Get or create the Commander conversation
-2. Build fleet prelude from outbox events
-3. Create a job with conversation binding
-4. Stream responses via `job.stream` messages
-5. Update outbox cursor on completion
+1. Ensure PTY session exists (create if needed)
+2. If status is "working", queue the prompt and return
+3. Build fleet prelude from outbox events
+4. Write prompt with prelude to PTY stdin
+5. Emit `commander.state` with updated status
 
 #### commander.reset
 
@@ -838,7 +887,19 @@ Reset the Commander conversation to start fresh.
 }
 ```
 
-This clears the Commander conversation state. The next `commander.send` will start a new conversation.
+This kills the PTY session and clears the prompt queue. The next `commander.send` will start a new session.
+
+#### commander.cancel
+
+Cancel the current Commander operation (sends SIGINT to PTY).
+
+```typescript
+{
+  type: "commander.cancel"
+}
+```
+
+This sends SIGINT to interrupt Commander mid-response. Queued prompts remain in the queue.
 
 ### Gateway → Client Messages
 
@@ -899,6 +960,44 @@ Fleet event from outbox.
     briefing_id?: number,
     data?: unknown
   }
+}
+```
+
+#### commander.state
+
+Commander state update (sent on connect and on state changes).
+
+```typescript
+{
+  type: "commander.state",
+  state: {
+    status: "idle" | "working" | "waiting_for_input",
+    ptySessionId: string | null,
+    claudeSessionId: string | null,
+    queuedPrompts: number,
+    isFirstTurn: boolean
+  }
+}
+```
+
+#### commander.queued
+
+Prompt was queued because Commander is busy.
+
+```typescript
+{
+  type: "commander.queued",
+  position: number  // Queue position (1-indexed)
+}
+```
+
+#### commander.ready
+
+Commander is ready for input (queue drained).
+
+```typescript
+{
+  type: "commander.ready"
 }
 ```
 
@@ -990,13 +1089,12 @@ Commander UI is built with React and lives in `packages/ui/src/components/comman
 
 ```
 CommanderTab
+├── Header (status, queue count, reset button)
 ├── CommanderHistory (placeholder for past conversations)
-├── CommanderStreamDisplay
-│   ├── Thinking (collapsible)
-│   ├── Text content
-│   └── Tool uses
+├── Session info (session ID, first turn indicator)
+├── Working indicator (when processing)
 └── CommanderInput
-    ├── Textarea
+    ├── Textarea (queue-aware placeholder)
     └── Submit/Cancel buttons
 ```
 
@@ -1008,44 +1106,30 @@ Source: `packages/ui/src/components/commander/CommanderTab.tsx`
 
 ```typescript
 interface CommanderTabProps {
-  activeJob: JobState | null;      // Current job state
-  onSendPrompt: (prompt: string) => void;  // Uses gateway.sendCommanderPrompt
-  onCancelJob: () => void;
-  onResetConversation: () => void;  // Uses gateway.resetCommander
+  commanderState: CommanderState;           // PTY session state
+  onSendPrompt: (prompt: string) => void;   // Uses gateway.sendCommanderPrompt
+  onCancel: () => void;                     // Uses gateway.cancelCommander (SIGINT)
+  onResetConversation: () => void;          // Uses gateway.resetCommander
+}
+
+interface CommanderState {
+  status: "idle" | "working" | "waiting_for_input";
+  ptySessionId: string | null;
+  claudeSessionId: string | null;
+  queuedPrompts: number;
+  isFirstTurn: boolean;
 }
 ```
 
 Features:
 - Header with Opus branding and "New Conversation" reset button
-- Content area with history and active stream
-- Input area for new prompts
-- Status indicators (running/completed/failed)
+- Queue indicator showing number of pending prompts
+- Status indicator (Working / Ready / Idle)
+- Session info showing Claude session ID
+- Working indicator with queue count
+- Empty state when no PTY session exists
 
-The component is prompt-only - the gateway handles all conversation state internally.
-
-### CommanderStreamDisplay
-
-Renders streaming Commander output.
-
-Source: `packages/ui/src/components/commander/CommanderStreamDisplay.tsx`
-
-```typescript
-interface CommanderStreamDisplayProps {
-  content: {
-    text: string;
-    thinking: string;
-    toolUses: Array<{ id, name, input }>;
-  } | null;
-  isRunning: boolean;
-  error?: string;
-}
-```
-
-Features:
-- Collapsible thinking display
-- Streaming text output
-- Tool use visualization
-- Error states
+The component is prompt-only - the gateway handles all PTY and queue state internally.
 
 ### CommanderInput
 
@@ -1053,11 +1137,24 @@ Prompt composer for Commander.
 
 Source: `packages/ui/src/components/commander/CommanderInput.tsx`
 
+```typescript
+interface CommanderInputProps {
+  onSubmit: (prompt: string) => void;
+  onCancel: () => void;
+  isRunning: boolean;
+  queuedPrompts?: number;
+}
+```
+
 Features:
-- Multi-line textarea
-- Submit button (triggers `job.create`)
-- Cancel button (triggers `job.cancel`)
-- Disabled state during job execution
+- Multi-line textarea with auto-resize
+- Queue-aware placeholder text:
+  - When idle: "Ask Commander about your fleet..."
+  - When working: "Commander is thinking... Type to queue, Esc to cancel"
+  - When working with queue: "Commander is working (N queued)..."
+- Submit button (sends prompt, allows submission even when running to queue)
+- Cancel button (triggers SIGINT via `commander.cancel`)
+- Enter to submit, Shift+Enter for newline, Escape to cancel
 
 ---
 
@@ -1214,88 +1311,96 @@ ingest-status-v5.py
 EXIT 0 (ALLOW) → Session ends
 ```
 
-### Job Execution Flow
+### Commander Prompt Flow
 
 ```
 UI: User types prompt in Commander tab
         │
         ▼
-WebSocket: job.create message
+WebSocket: commander.send message
         │
         ▼
-JobManager.createJob()
+CommanderSessionManager.sendPrompt()
         │
-        ├──▶ Check per-project limit
-        ├──▶ Check global limit
+        ├──▶ ensureSession() (create PTY if needed)
         │         │
-        │         ├── Under limit → Start immediately
+        │         └──▶ ptyBridge.create() → spawn("claude")
+        │         └──▶ Watch for session JSONL file
+        │
+        ├──▶ Check status
         │         │
-        │         └── At limit → Queue job
+        │         ├── working → Queue prompt, emit commander.state
+        │         │
+        │         └── waiting → Continue
         │
         ▼
-JobRunner.run()
+writePrompt()
         │
-        ├──▶ spawn("claude", ["-p", "--output-format", "stream-json"])
-        ├──▶ Write prompt to stdin
-        └──▶ Stream stdout to WebSocket
-        │
-        ▼
-WebSocket: job.stream messages (per chunk)
+        ├──▶ Build fleet prelude (delta events)
+        ├──▶ Inject <system-reminder> blocks
+        └──▶ Write to PTY stdin
         │
         ▼
-UI: CommanderStreamDisplay renders text/thinking/tools
+PTY stdout → SessionStore → status = "working"
         │
         ▼
-Process exits
+WebSocket: commander.state { status: "working" }
         │
         ▼
-JobManager.executeJob() completes
-        │
-        ├──▶ Store stream chunks in SQLite
-        └──▶ Send job.completed message
+Claude processes prompt...
         │
         ▼
-UI: Show final result
+SessionStore detects idle → status = "waiting_for_input"
+        │
+        ▼
+CommanderSessionManager.onStatusChange()
+        │
+        ├──▶ drainQueue() if prompts pending
+        └──▶ Emit commander.state { status: "waiting_for_input" }
+        │
+        ▼
+UI: Commander ready for next prompt
 ```
 
 ---
 
 ## Error Handling
 
-### Commander-Specific Errors
+### Commander Queue Behavior
 
-| Error Code | Trigger | Client Action |
-|------------|---------|---------------|
-| `COMMANDER_BUSY` | Second prompt sent while turn in progress | Disable input, wait for completion |
+Unlike job-based execution, PTY-based Commander **queues prompts** instead of rejecting them:
 
-Example error response:
+| Scenario | Behavior |
+|----------|----------|
+| Prompt sent while idle | Send immediately to PTY |
+| Prompt sent while working | Queue prompt, show count in UI |
+| Queue drains | Next prompt auto-sent when ready |
+| Cancel requested | SIGINT sent, queue preserved |
+| Reset requested | PTY killed, queue cleared |
+
+The UI shows queue status via the `commander.state` message:
 ```typescript
 {
-  type: "error",
-  code: "COMMANDER_BUSY",
-  message: "Commander is already processing a turn. Please wait."
+  type: "commander.state",
+  state: {
+    status: "working",
+    queuedPrompts: 2,  // UI shows "Commander is working (2 queued)..."
+    ...
+  }
 }
 ```
 
-### Job Errors
+### PTY Errors
 
-Jobs can fail with these conditions:
+PTY sessions can fail with these conditions:
 
-| Condition | Error |
-|-----------|-------|
-| Timeout (5 min) | `Job timed out after 300s` |
-| Process exit | `Process exited with code <N>` |
-| Spawn failure | `Command not found: claude` |
+| Condition | Error | Recovery |
+|-----------|-------|----------|
+| PTY process dies | `PTY exited unexpectedly` | Auto-recreate on next prompt |
+| Spawn failure | `Command not found: claude` | Check PATH, claude installation |
+| Session file not found | `Failed to capture session ID` | PTY works but no persistence |
 
-Error responses are sent via `job.completed` with `ok: false`:
-```typescript
-{
-  type: "job.completed",
-  job_id: 123,
-  ok: false,
-  error: "Job timed out after 300s"
-}
-```
+When a PTY error occurs, the `commander.state` message will show `status: "idle"` with `ptySessionId: null`. The next `commander.send` will attempt to create a new PTY session.
 
 ---
 

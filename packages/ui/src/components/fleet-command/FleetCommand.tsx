@@ -78,12 +78,17 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
     gateway.sendSignal(sessionId, signal);
   }, [gateway]);
 
-  // Handle Commander prompt (uses stateful conversation via gateway)
+  // Handle Commander prompt (uses PTY-based conversation via gateway)
   const handleCommanderPrompt = useCallback((prompt: string) => {
     gateway.sendCommanderPrompt(prompt);
   }, [gateway]);
 
-  // Handle Commander reset (start new conversation)
+  // Handle Commander cancel (sends SIGINT)
+  const handleCancelCommander = useCallback(() => {
+    gateway.cancelCommander();
+  }, [gateway]);
+
+  // Handle Commander reset (kills PTY, starts fresh)
   const handleResetCommander = useCallback(() => {
     gateway.resetCommander();
   }, [gateway]);
@@ -135,9 +140,9 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
       <div className="fleet-viewport flex flex-col h-full">
         {showCommander ? (
           <CommanderTab
-            activeJob={gateway.activeJob}
+            commanderState={gateway.commanderState}
             onSendPrompt={handleCommanderPrompt}
-            onCancelJob={gateway.cancelJob}
+            onCancel={handleCancelCommander}
             onResetConversation={handleResetCommander}
           />
         ) : (

@@ -20,6 +20,8 @@ export interface ClientState {
   attachedSession: string | null;
   fleetSubscribed: boolean;
   fleetCursor: number;
+  /** Unsubscribe from Commander events (set on connection) */
+  commanderUnsubscribe?: () => void;
 }
 
 /**

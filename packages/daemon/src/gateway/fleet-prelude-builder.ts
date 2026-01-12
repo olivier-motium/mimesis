@@ -84,7 +84,8 @@ export class FleetPreludeBuilder {
       systemPrompt: this.buildSystemPrompt(),
       fleetDelta,
       newCursor,
-      hasActivity: newEvents.length > 0 || fleetDeltaParts.length > 1,
+      // Fixed: Check actual fleetDelta content, not parts count
+      hasActivity: fleetDelta.trim().length > 0,
     };
   }
 

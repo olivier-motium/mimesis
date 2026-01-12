@@ -16,6 +16,7 @@ export interface CommanderInputProps {
   onSubmit: (prompt: string) => void;
   onCancel: () => void;
   isRunning: boolean;
+  queuedPrompts?: number;
   className?: string;
 }
 
@@ -27,12 +28,14 @@ export function CommanderInput({
   onSubmit,
   onCancel,
   isRunning,
+  queuedPrompts = 0,
   className,
 }: CommanderInputProps) {
   const [value, setValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const canSubmit = value.trim().length > 0 && !isRunning;
+  // Allow submission even when running (will be queued)
+  const canSubmit = value.trim().length > 0;
 
   // Auto-resize textarea
   useEffect(() => {
@@ -81,10 +84,11 @@ export function CommanderInput({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
-          disabled={isRunning}
           placeholder={
             isRunning
-              ? "Commander is thinking... Press Esc to cancel"
+              ? queuedPrompts > 0
+                ? `Commander is working (${queuedPrompts} queued)... Type to queue more, Esc to cancel`
+                : "Commander is thinking... Type to queue, Esc to cancel"
               : "Ask Commander about your fleet... (Enter to send)"
           }
           className={cn(

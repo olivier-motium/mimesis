@@ -1,122 +1,55 @@
 /**
- * Commander Handlers - Handle stateful Commander conversation.
+ * Commander Handlers - Handle PTY-based Commander conversation.
  *
- * Commander uses persistent Opus conversations with automatic fleet context injection.
- * Conversation state is managed by the gateway, not the client.
+ * Commander is a persistent Opus PTY session with automatic fleet context injection.
+ * Features:
+ * - Prompt queue (no BUSY errors)
+ * - Native conversation state (no --continue needed)
+ * - All hooks fire naturally
+ * - Session persistence via captured session ID
  */
 
 import type { WebSocket } from "ws";
-import type { JobManager, JobEventListener } from "../job-manager.js";
 import type { GatewayMessage } from "../protocol.js";
-import { ConversationRepo, CONVERSATION_KIND } from "../../fleet-db/conversation-repo.js";
-import { FleetPreludeBuilder } from "../fleet-prelude-builder.js";
-import { JOB_TYPE, MODEL, COMMANDER_CWD } from "../../config/fleet.js";
+import type {
+  CommanderSessionManager,
+  CommanderEvent,
+} from "../commander-session.js";
 
 /**
  * Dependencies for commander handlers.
  */
 export interface CommanderHandlerDependencies {
-  jobManager: JobManager;
+  commanderSession: CommanderSessionManager;
   send: (ws: WebSocket, message: GatewayMessage) => void;
 }
 
 /**
- * Singleton state for Commander conversation.
- * Ensures only one Commander turn runs at a time.
- */
-let commanderTurnInProgress = false;
-
-/**
  * Handle commander.send message.
  *
- * This is the main entry point for Commander prompts.
- * The handler:
- * 1. Gets or creates the Commander conversation
- * 2. Builds fleet prelude from outbox events
- * 3. Creates a job with conversation binding
- * 4. Updates conversation cursor after completion
+ * Sends prompt to Commander (queues if busy).
  */
 export async function handleCommanderSend(
   deps: CommanderHandlerDependencies,
   ws: WebSocket,
   message: { prompt: string }
 ): Promise<void> {
-  const { jobManager, send } = deps;
-
-  // Serialize Commander turns
-  if (commanderTurnInProgress) {
-    send(ws, {
-      type: "error",
-      code: "COMMANDER_BUSY",
-      message: "Commander is already processing a turn. Please wait.",
-    });
-    return;
-  }
-
-  commanderTurnInProgress = true;
+  const { commanderSession, send } = deps;
 
   try {
-    const conversationRepo = new ConversationRepo();
-    const preludeBuilder = new FleetPreludeBuilder();
+    await commanderSession.sendPrompt(message.prompt);
 
-    // Get or create Commander conversation
-    const conversation = conversationRepo.getOrCreateCommander();
-
-    // Build fleet prelude
-    const prelude = preludeBuilder.build({
-      lastEventIdSeen: conversation.lastOutboxEventIdSeen ?? 0,
-      maxEvents: 20,
-      includeDocDriftWarnings: true,
+    // Send current state to client
+    send(ws, {
+      type: "commander.state",
+      state: commanderSession.getState(),
     });
-
-    // Prepare prompt with fleet delta
-    const fullPrompt = prelude.hasActivity
-      ? `${prelude.fleetDelta}${message.prompt}`
-      : message.prompt;
-
-    // Determine conversation mode
-    const isFirstTurn = !conversation.claudeSessionId;
-    const mode = isFirstTurn ? "first_turn" : "continue";
-
-    // Create job event listener
-    const listener: JobEventListener = (event) => {
-      send(ws, event);
-
-      // Update cursor on completion
-      if (event.type === "job.completed" && event.ok) {
-        conversationRepo.updateLastOutboxEventSeen(
-          conversation.conversationId,
-          prelude.newCursor
-        );
-      }
-    };
-
-    // Create the job with conversation binding
-    await jobManager.createJob(
-      {
-        type: JOB_TYPE.COMMANDER_TURN,
-        repoRoot: COMMANDER_CWD,
-        model: MODEL.OPUS,
-        conversation: {
-          conversationId: conversation.conversationId,
-          claudeSessionId: conversation.claudeSessionId ?? undefined,
-          mode,
-        },
-        request: {
-          prompt: fullPrompt,
-          appendSystemPrompt: prelude.systemPrompt,
-        },
-      },
-      listener
-    );
   } catch (error) {
     send(ws, {
       type: "error",
       code: "COMMANDER_SEND_FAILED",
       message: error instanceof Error ? error.message : String(error),
     });
-  } finally {
-    commanderTurnInProgress = false;
   }
 }
 
@@ -125,18 +58,20 @@ export async function handleCommanderSend(
  *
  * Resets the Commander conversation to start fresh.
  */
-export function handleCommanderReset(
+export async function handleCommanderReset(
   deps: CommanderHandlerDependencies,
   ws: WebSocket
-): void {
-  const { send } = deps;
+): Promise<void> {
+  const { commanderSession, send } = deps;
 
   try {
-    const conversationRepo = new ConversationRepo();
-    conversationRepo.resetCommander();
+    await commanderSession.reset();
 
-    // Could send a confirmation message, but for now just succeed silently
-    // The next commander.send will start a fresh conversation
+    // Send updated state
+    send(ws, {
+      type: "commander.state",
+      state: commanderSession.getState(),
+    });
   } catch (error) {
     send(ws, {
       type: "error",
@@ -144,4 +79,72 @@ export function handleCommanderReset(
       message: error instanceof Error ? error.message : String(error),
     });
   }
+}
+
+/**
+ * Handle commander.cancel message.
+ *
+ * Cancels current Commander operation (SIGINT).
+ */
+export async function handleCommanderCancel(
+  deps: CommanderHandlerDependencies,
+  ws: WebSocket
+): Promise<void> {
+  const { commanderSession, send } = deps;
+
+  try {
+    await commanderSession.cancel();
+
+    // State will be updated via status detection
+  } catch (error) {
+    send(ws, {
+      type: "error",
+      code: "COMMANDER_CANCEL_FAILED",
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
+/**
+ * Setup Commander event forwarding to a WebSocket client.
+ *
+ * Called when a client connects to forward Commander events.
+ */
+export function setupCommanderEventForwarding(
+  commanderSession: CommanderSessionManager,
+  ws: WebSocket,
+  send: (ws: WebSocket, message: GatewayMessage) => void
+): () => void {
+  const listener = (event: CommanderEvent) => {
+    // Forward Commander events to client
+    switch (event.type) {
+      case "commander.state":
+        send(ws, {
+          type: "commander.state",
+          state: event.state,
+        });
+        break;
+
+      case "commander.queued":
+        send(ws, {
+          type: "commander.queued",
+          position: event.position,
+          prompt: event.prompt,
+        });
+        break;
+
+      case "commander.ready":
+        send(ws, {
+          type: "commander.ready",
+        });
+        break;
+    }
+  };
+
+  commanderSession.on("commander", listener);
+
+  // Return unsubscribe function
+  return () => {
+    commanderSession.off("commander", listener);
+  };
 }

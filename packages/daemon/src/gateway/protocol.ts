@@ -94,6 +94,13 @@ export interface CommanderResetMessage {
   type: "commander.reset";
 }
 
+/**
+ * Cancel current Commander operation (SIGINT).
+ */
+export interface CommanderCancelMessage {
+  type: "commander.cancel";
+}
+
 export interface PingMessage {
   type: "ping";
 }
@@ -114,6 +121,7 @@ export type ClientMessage =
   | JobCancelMessage
   | CommanderSendMessage
   | CommanderResetMessage
+  | CommanderCancelMessage
   | PingMessage
   | SessionsListMessage;
 
@@ -265,6 +273,28 @@ export interface SessionRemovedMessage {
   session_id: string;
 }
 
+// Commander state messages (PTY-based Commander)
+export interface CommanderStateMessage {
+  type: "commander.state";
+  state: {
+    status: "idle" | "working" | "waiting_for_input";
+    ptySessionId: string | null;
+    claudeSessionId: string | null;
+    queuedPrompts: number;
+    isFirstTurn: boolean;
+  };
+}
+
+export interface CommanderQueuedMessage {
+  type: "commander.queued";
+  position: number;
+  prompt: string;
+}
+
+export interface CommanderReadyMessage {
+  type: "commander.ready";
+}
+
 export type GatewayMessage =
   | FleetEventMessage
   | SessionCreatedMessage
@@ -278,6 +308,9 @@ export type GatewayMessage =
   | JobStartedMessage
   | JobStreamMessage
   | JobCompletedMessage
+  | CommanderStateMessage
+  | CommanderQueuedMessage
+  | CommanderReadyMessage
   | PongMessage
   | ErrorMessage;
 

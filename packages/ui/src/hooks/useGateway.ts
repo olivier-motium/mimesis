@@ -219,6 +219,17 @@ export interface JobResult {
   toolUses?: Array<{ id: string; name: string; input: unknown }>;
 }
 
+/**
+ * Commander state (PTY-based Commander).
+ */
+export interface CommanderState {
+  status: "idle" | "working" | "waiting_for_input";
+  ptySessionId: string | null;
+  claudeSessionId: string | null;
+  queuedPrompts: number;
+  isFirstTurn: boolean;
+}
+
 export type GatewayStatus = "connecting" | "connected" | "disconnected";
 
 // ============================================================================
@@ -254,9 +265,11 @@ export interface UseGatewayResult {
   activeJob: JobState | null;
   createJob: (request: JobCreateRequest) => void;
   cancelJob: () => void;
-  // Commander (stateful conversation)
+  // Commander (PTY-based conversation)
+  commanderState: CommanderState;
   sendCommanderPrompt: (prompt: string) => void;
   resetCommander: () => void;
+  cancelCommander: () => void;
   // Errors
   lastError: string | null;
 }
@@ -296,6 +309,15 @@ export function useGateway(): UseGatewayResult {
   // Jobs
   const [activeJob, setActiveJob] = useState<JobState | null>(null);
 
+  // Commander state (PTY-based)
+  const [commanderState, setCommanderState] = useState<CommanderState>({
+    status: "idle",
+    ptySessionId: null,
+    claudeSessionId: null,
+    queuedPrompts: 0,
+    isFirstTurn: true,
+  });
+
   // Keep ref in sync with state for message handler
   useEffect(() => {
     attachedSessionRef.current = attachedSession;
@@ -311,6 +333,7 @@ export function useGateway(): UseGatewayResult {
     setTrackedSessions,
     setActiveJob,
     setLastError,
+    setCommanderState,
   };
 
   // Refs for message handlers (refs are stable)
@@ -435,6 +458,12 @@ export function useGateway(): UseGatewayResult {
     });
   }, []);
 
+  const cancelCommander = useCallback(() => {
+    sendMessage({
+      type: "commander.cancel",
+    });
+  }, []);
+
   // ============================================================================
   // Lifecycle - Subscribe to singleton connection manager
   // ============================================================================
@@ -500,8 +529,10 @@ export function useGateway(): UseGatewayResult {
     activeJob,
     createJob,
     cancelJob,
+    commanderState,
     sendCommanderPrompt,
     resetCommander,
+    cancelCommander,
     lastError,
   };
 }

@@ -1344,3 +1344,53 @@ unset ANTHROPIC_API_KEY
 **Verified:** Commander works without API key (tested Jan 2026). With no API credits on Console account, it used OAuth/Max subscription successfully.
 
 **Dead code removed:** `serve.ts` had unused ANTHROPIC_API_KEY validation from deleted AI summarizer feature.
+
+## PTY-Based Commander Architecture (Jan 2026)
+
+**Problem:** Headless job-based Commander (`claude -p`) had several correctness bugs:
+1. No hooks fire in headless mode (PostToolUse, etc.)
+2. Turn serialization broken - boolean lock released when job starts, not finishes
+3. `--continue` flag not being passed correctly
+4. BUSY rejection instead of prompt queuing
+5. No session persistence across daemon restarts
+
+**Solution:** Transform Commander from headless jobs to a **persistent PTY session** running interactive `claude`.
+
+**Key architectural changes:**
+
+| Headless (`claude -p`) | PTY (`claude`) |
+|------------------------|----------------|
+| No hooks fire | All hooks fire naturally |
+| New process per prompt | Persistent session |
+| `--continue` for continuity | Native conversation state |
+| BUSY rejection on concurrent prompts | Prompt queue with status-based draining |
+
+**Implementation:**
+- `CommanderSessionManager` class manages PTY lifecycle, prompt queue, status detection
+- Session ID captured by watching for Claude's JSONL file creation
+- Fleet prelude injected via `<system-reminder>` blocks in prompt (not `--append-system-prompt`)
+- Status detection via existing `SessionStore` infrastructure
+- Queue drains automatically when status changes to "waiting_for_input"
+
+**New files:**
+- `packages/daemon/src/gateway/commander-session.ts` - Core Commander PTY management
+
+**Protocol changes:**
+```typescript
+// New client messages
+{ type: "commander.send", prompt }  // Queue or send prompt
+{ type: "commander.reset" }         // Kill PTY, clear queue
+{ type: "commander.cancel" }        // SIGINT to interrupt
+
+// New gateway messages
+{ type: "commander.state", state }   // State updates (status, queue count)
+{ type: "commander.queued", position } // Prompt was queued
+{ type: "commander.ready" }          // Ready for input
+```
+
+**UI changes:**
+- `CommanderTab` now uses `commanderState` prop instead of `activeJob`
+- `CommanderInput` shows queue status in placeholder
+- Queue indicator shows "Commander is working (N queued)..."
+
+**Documentation:** `docs/architecture/commander.md` updated with PTY architecture.

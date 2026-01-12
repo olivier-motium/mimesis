@@ -68,7 +68,10 @@ import {
   type CommanderHandlerDependencies,
   handleCommanderSend,
   handleCommanderReset,
+  handleCommanderCancel,
+  setupCommanderEventForwarding,
 } from "./handlers/commander-handlers.js";
+import { CommanderSessionManager } from "./commander-session.js";
 
 /**
  * Gateway server options.
@@ -99,6 +102,9 @@ export class GatewayServer {
   private sessionStore: SessionStore;
   private sessionWatcher?: SessionWatcher;
   private statusWatcher?: StatusWatcher;
+
+  // Commander session (PTY-based)
+  private commanderSession: CommanderSessionManager;
 
   // Handler dependencies (lazy initialized)
   private _ptyDeps: PtyHandlerDependencies | null = null;
@@ -133,6 +139,12 @@ export class GatewayServer {
 
     // Initialize job manager
     this.jobManager = new JobManager();
+
+    // Initialize Commander session manager (PTY-based)
+    this.commanderSession = new CommanderSessionManager({
+      ptyBridge: this.ptyBridge,
+      sessionStore: this.sessionStore,
+    });
   }
 
   // ============================================================================
@@ -190,7 +202,7 @@ export class GatewayServer {
   private get commanderDeps(): CommanderHandlerDependencies {
     if (!this._commanderDeps) {
       this._commanderDeps = {
-        jobManager: this.jobManager,
+        commanderSession: this.commanderSession,
         send: (ws, msg) => this.send(ws, msg),
       };
     }
@@ -203,6 +215,9 @@ export class GatewayServer {
   async start(): Promise<void> {
     // Initialize job manager (crash recovery)
     await this.jobManager.initialize();
+
+    // Initialize Commander session (resume if possible)
+    await this.commanderSession.initialize();
 
     // Recover orphaned PTY sessions
     await this.ptyBridge.recoverOrphans();
@@ -275,6 +290,9 @@ export class GatewayServer {
   async stop(): Promise<void> {
     // Stop outbox tailer
     this.outboxTailer.stop();
+
+    // Shutdown Commander session
+    await this.commanderSession.shutdown();
 
     // Shutdown all jobs
     await this.jobManager.shutdown();
@@ -351,15 +369,29 @@ export class GatewayServer {
    * Handle new WebSocket connection.
    */
   private handleConnection(ws: WebSocket, req: IncomingMessage): void {
+    // Setup Commander event forwarding for this client
+    const commanderUnsubscribe = setupCommanderEventForwarding(
+      this.commanderSession,
+      ws,
+      (ws, msg) => this.send(ws, msg)
+    );
+
     const clientState: ClientState = {
       ws,
       attachedSession: null,
       fleetSubscribed: false,
       fleetCursor: 0,
+      commanderUnsubscribe,
     };
 
     this.clients.set(ws, clientState);
     console.log(`[GATEWAY] Client connected (total: ${this.clients.size})`);
+
+    // Send initial Commander state
+    this.send(ws, {
+      type: "commander.state",
+      state: this.commanderSession.getState(),
+    });
 
     ws.on("message", (data) => {
       const message = parseClientMessage(data.toString());
@@ -369,6 +401,10 @@ export class GatewayServer {
     });
 
     ws.on("close", () => {
+      // Unsubscribe from Commander events
+      if (clientState.commanderUnsubscribe) {
+        clientState.commanderUnsubscribe();
+      }
       // Detach from any session
       if (clientState.attachedSession) {
         // Don't need to do anything special, just remove from clients
@@ -438,6 +474,10 @@ export class GatewayServer {
 
       case "commander.reset":
         handleCommanderReset(this.commanderDeps, ws);
+        break;
+
+      case "commander.cancel":
+        handleCommanderCancel(this.commanderDeps, ws);
         break;
     }
   }

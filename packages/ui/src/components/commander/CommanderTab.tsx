@@ -1,18 +1,18 @@
 /**
  * CommanderTab - Separate tab for Commander (Opus) conversations.
  *
- * Features:
+ * PTY-based Commander features:
+ * - Persistent PTY session with queue-based prompts
  * - Cross-project intelligence queries
- * - Persisted conversation history from SQLite
- * - Streaming response display
+ * - Shows queue status when prompts are pending
+ * - Cancel button sends SIGINT
  */
 
-import type { JobState, JobStreamChunk } from "../../hooks/useGateway";
+import type { CommanderState } from "../../hooks/useGateway";
 import { cn } from "../../lib/utils";
 import { CommanderHistory } from "./CommanderHistory";
 import { CommanderInput } from "./CommanderInput";
-import { CommanderStreamDisplay } from "./CommanderStreamDisplay";
-import { Brain, Sparkles, RotateCcw } from "lucide-react";
+import { Brain, Sparkles, RotateCcw, Clock } from "lucide-react";
 import { Button } from "../ui/button";
 
 // ============================================================================
@@ -20,9 +20,9 @@ import { Button } from "../ui/button";
 // ============================================================================
 
 export interface CommanderTabProps {
-  activeJob: JobState | null;
+  commanderState: CommanderState;
   onSendPrompt: (prompt: string) => void;
-  onCancelJob: () => void;
+  onCancel: () => void;
   onResetConversation: () => void;
   className?: string;
 }
@@ -32,17 +32,16 @@ export interface CommanderTabProps {
 // ============================================================================
 
 export function CommanderTab({
-  activeJob,
+  commanderState,
   onSendPrompt,
-  onCancelJob,
+  onCancel,
   onResetConversation,
   className,
 }: CommanderTabProps) {
-  const isRunning = activeJob?.status === "running";
-  const hasResult = activeJob?.status === "completed" || activeJob?.status === "failed";
-
-  // Parse stream events for display
-  const streamContent = activeJob ? parseStreamEvents(activeJob.events) : null;
+  const isRunning = commanderState.status === "working";
+  const isWaiting = commanderState.status === "waiting_for_input";
+  const hasQueuedPrompts = commanderState.queuedPrompts > 0;
+  const hasSession = commanderState.ptySessionId !== null;
 
   return (
     <div className={cn("flex flex-col h-full", className)}>
@@ -58,6 +57,32 @@ export function CommanderTab({
           </p>
         </div>
         <div className="ml-auto flex items-center gap-3">
+          {/* Queue indicator */}
+          {hasQueuedPrompts && (
+            <div className="flex items-center gap-1 px-2 py-1 rounded-md bg-amber-500/10 text-amber-600 text-xs">
+              <Clock className="w-3 h-3" />
+              <span>{commanderState.queuedPrompts} queued</span>
+            </div>
+          )}
+
+          {/* Status indicator */}
+          <div className={cn(
+            "flex items-center gap-1 px-2 py-1 rounded-md text-xs",
+            isRunning && "bg-purple-500/10 text-purple-600",
+            isWaiting && "bg-green-500/10 text-green-600",
+            !hasSession && "bg-muted text-muted-foreground"
+          )}>
+            <div className={cn(
+              "w-2 h-2 rounded-full",
+              isRunning && "bg-purple-500 animate-pulse",
+              isWaiting && "bg-green-500",
+              !hasSession && "bg-muted-foreground"
+            )} />
+            <span>
+              {isRunning ? "Working" : isWaiting ? "Ready" : "Idle"}
+            </span>
+          </div>
+
           <Button
             variant="ghost"
             size="sm"
@@ -80,24 +105,37 @@ export function CommanderTab({
         {/* History (placeholder - would load from SQLite) */}
         <CommanderHistory />
 
-        {/* Active job stream */}
-        {activeJob && (
+        {/* Session info */}
+        {hasSession && (
+          <div className="text-xs text-muted-foreground border-b border-border pb-2">
+            <span className="font-mono">
+              Session: {commanderState.claudeSessionId ?? commanderState.ptySessionId}
+            </span>
+            {commanderState.isFirstTurn && (
+              <span className="ml-2 text-amber-600">(New conversation)</span>
+            )}
+          </div>
+        )}
+
+        {/* Working indicator */}
+        {isRunning && (
           <div className={cn(
-            "rounded-lg border p-4",
-            isRunning && "border-purple-500/30 bg-purple-500/5",
-            activeJob.status === "completed" && "border-green-500/30 bg-green-500/5",
-            activeJob.status === "failed" && "border-red-500/30 bg-red-500/5"
+            "rounded-lg border p-4 border-purple-500/30 bg-purple-500/5"
           )}>
-            <CommanderStreamDisplay
-              content={streamContent}
-              isRunning={isRunning}
-              error={activeJob.error}
-            />
+            <div className="flex items-center gap-2 text-sm text-purple-600">
+              <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+              <span>Commander is thinking...</span>
+            </div>
+            {hasQueuedPrompts && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {commanderState.queuedPrompts} more prompt(s) will be processed after this
+              </p>
+            )}
           </div>
         )}
 
         {/* Empty state */}
-        {!activeJob && (
+        {!hasSession && !isRunning && (
           <div className="flex flex-col items-center justify-center h-48 text-center">
             <Brain className="w-12 h-12 text-muted-foreground/30 mb-4" />
             <p className="text-sm text-muted-foreground">
@@ -113,78 +151,10 @@ export function CommanderTab({
       {/* Input area */}
       <CommanderInput
         onSubmit={onSendPrompt}
-        onCancel={onCancelJob}
+        onCancel={onCancel}
         isRunning={isRunning}
+        queuedPrompts={commanderState.queuedPrompts}
       />
     </div>
   );
-}
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-interface ParsedStreamContent {
-  text: string;
-  thinking: string;
-  toolUses: Array<{ id: string; name: string; input: unknown }>;
-}
-
-function parseStreamEvents(events: JobStreamChunk[]): ParsedStreamContent {
-  const result: ParsedStreamContent = {
-    text: "",
-    thinking: "",
-    toolUses: [],
-  };
-
-  for (const event of events) {
-    // Claude CLI stream-json outputs JSONL log entries, not API stream events.
-    // Handle "assistant" type which contains message.content array with text/thinking.
-    if (event.type === "assistant") {
-      const message = (event as { message?: { content?: unknown[] } }).message;
-      const content = message?.content;
-      if (Array.isArray(content)) {
-        for (const block of content) {
-          if (typeof block !== "object" || block === null) continue;
-          const b = block as { type?: string; text?: string; thinking?: string; id?: string; name?: string; input?: unknown };
-
-          if (b.type === "text" && b.text) {
-            result.text += b.text;
-          } else if (b.type === "thinking" && b.thinking) {
-            result.thinking += b.thinking;
-          } else if (b.type === "tool_use") {
-            result.toolUses.push({
-              id: b.id ?? "",
-              name: b.name ?? "",
-              input: b.input,
-            });
-          }
-        }
-      }
-    }
-
-    // Also handle API-level stream events for future compatibility
-    if (event.type === "content_block_delta") {
-      const delta = event.delta as { text?: string; thinking?: string } | undefined;
-      if (delta?.text) {
-        result.text += delta.text;
-      }
-      if (delta?.thinking) {
-        result.thinking += delta.thinking;
-      }
-    }
-
-    if (event.type === "content_block_start") {
-      const contentBlock = event.content_block as { type: string; id?: string; name?: string; input?: unknown } | undefined;
-      if (contentBlock?.type === "tool_use") {
-        result.toolUses.push({
-          id: contentBlock.id ?? "",
-          name: contentBlock.name ?? "",
-          input: contentBlock.input,
-        });
-      }
-    }
-  }
-
-  return result;
 }

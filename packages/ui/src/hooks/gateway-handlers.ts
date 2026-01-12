@@ -15,6 +15,7 @@ import type {
   JobState,
   JobStreamChunk,
   JobResult,
+  CommanderState,
 } from "./useGateway";
 
 // ============================================================================
@@ -33,6 +34,7 @@ export interface GatewayStateSetters {
   setTrackedSessions: React.Dispatch<React.SetStateAction<Map<string, TrackedSession>>>;
   setActiveJob: React.Dispatch<React.SetStateAction<JobState | null>>;
   setLastError: React.Dispatch<React.SetStateAction<string | null>>;
+  setCommanderState: React.Dispatch<React.SetStateAction<CommanderState>>;
 }
 
 /**
@@ -269,6 +271,35 @@ export function handleSessionRemoved(
 }
 
 // ============================================================================
+// Commander Handlers (PTY-based Commander)
+// ============================================================================
+
+export function handleCommanderState(
+  message: Record<string, unknown>,
+  setters: GatewayStateSetters
+): void {
+  const state = message.state as CommanderState;
+  setters.setCommanderState(state);
+  console.log("[GATEWAY] Commander state:", state.status, "queued:", state.queuedPrompts);
+}
+
+export function handleCommanderQueued(
+  message: Record<string, unknown>,
+  setters: GatewayStateSetters
+): void {
+  const position = message.position as number;
+  const prompt = message.prompt as string;
+  console.log("[GATEWAY] Commander prompt queued at position:", position, "prompt:", prompt.substring(0, 50));
+}
+
+export function handleCommanderReady(
+  _message: Record<string, unknown>,
+  _setters: GatewayStateSetters
+): void {
+  console.log("[GATEWAY] Commander ready for input");
+}
+
+// ============================================================================
 // Error Handler
 // ============================================================================
 
@@ -300,6 +331,10 @@ const messageHandlers: Record<string, MessageHandler> = {
   "session.discovered": handleSessionDiscovered,
   "session.updated": handleSessionUpdated,
   "session.removed": handleSessionRemoved,
+  // Commander (PTY-based)
+  "commander.state": handleCommanderState,
+  "commander.queued": handleCommanderQueued,
+  "commander.ready": handleCommanderReady,
 };
 
 /**

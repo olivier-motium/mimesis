@@ -213,12 +213,27 @@ def run_claude_interactive(
             except OSError:
                 pass
 
-        # Get final exit status
-        try:
-            _, status = os.waitpid(pid, 0)
-            exit_code = os.WEXITSTATUS(status) if os.WIFEXITED(status) else 1
-        except ChildProcessError:
-            exit_code = 0
+        # Wait for child to exit with timeout, then force kill if needed
+        import time
+
+        exit_code = 0
+        for _ in range(30):  # 3 second timeout (30 * 0.1s)
+            result = os.waitpid(pid, os.WNOHANG)
+            if result[0] != 0:
+                exit_code = os.WEXITSTATUS(result[1]) if os.WIFEXITED(result[1]) else 1
+                break
+            time.sleep(0.1)
+        else:
+            # Child didn't respond to SIGTERM, force kill
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            try:
+                os.waitpid(pid, 0)
+            except ChildProcessError:
+                pass
+            exit_code = 1
 
         if rate_limit_detected:
             return -1, output_lines
