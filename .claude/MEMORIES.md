@@ -1326,20 +1326,21 @@ Clicking "New Conversation" resets backend context but UI still displays previou
 
 ## Claude CLI Authentication vs API Billing (Jan 2026)
 
-**Critical limitation:** Headless mode (`claude -p`) does NOT use OAuth/Max subscription - it requires `ANTHROPIC_API_KEY` environment variable.
+**Key behavior:** Headless mode (`claude -p`) prefers `ANTHROPIC_API_KEY` when set, but falls back to OAuth if not set.
 
-| Mode | Authentication | Billing |
-|------|----------------|---------|
-| Interactive (`claude`) | OAuth login | Depends on login type (Max or Console) |
-| Headless (`claude -p`) | `ANTHROPIC_API_KEY` env var | Always API billing |
+| Scenario | Authentication | Billing |
+|----------|----------------|---------|
+| ANTHROPIC_API_KEY set | API key (preferred) | Pay-per-token |
+| ANTHROPIC_API_KEY unset | OAuth fallback | Max subscription ✓ |
 
-**Why Commander incurs API costs:** Job-runner spawns `claude -p` which ignores OAuth and requires API key. If `ANTHROPIC_API_KEY` is in your environment, headless jobs use it and bill per-token.
+**Root cause of API costs:** Having `ANTHROPIC_API_KEY` in your environment causes headless mode to prefer API billing over OAuth, even when logged into Max subscription.
 
-**Known Anthropic limitation:** GitHub issues #7100, #5666, #9694 document that headless OAuth is not yet supported. Workarounds exist but are unreliable.
+**Solution:** Remove `ANTHROPIC_API_KEY` from your environment:
+```bash
+unset ANTHROPIC_API_KEY
+# Also remove from ~/.zshrc, ~/.bashrc, or .env files
+```
 
-**Options for Commander:**
-1. Accept API billing for headless jobs (set ANTHROPIC_API_KEY)
-2. Remove API key and disable Commander until Anthropic fixes headless OAuth
-3. Use interactive mode only (not practical for automation)
+**Verified:** Commander works without API key (tested Jan 2026). With no API credits on Console account, it used OAuth/Max subscription successfully.
 
-**Dead code removed:** `serve.ts` had unused ANTHROPIC_API_KEY validation from deleted AI summarizer feature. The daemon doesn't need it, but Commander headless jobs do.
+**Dead code removed:** `serve.ts` had unused ANTHROPIC_API_KEY validation from deleted AI summarizer feature.
