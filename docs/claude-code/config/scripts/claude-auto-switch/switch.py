@@ -108,6 +108,7 @@ def run_claude_interactive(
     exit_code -1 means rate limit detected.
     """
     config_dir = expand_path(account["config_dir"])
+    default_config_dir = Path.home() / ".claude"
 
     if not config_dir.exists():
         print(f"\n⚠️  Config directory not found: {config_dir}")
@@ -117,7 +118,11 @@ def run_claude_interactive(
         return 1, []
 
     env = os.environ.copy()
-    env["CLAUDE_CONFIG_DIR"] = str(config_dir)
+
+    # Only set CLAUDE_CONFIG_DIR for non-default directories
+    # Setting it explicitly (even to ~/.claude) can break MCP server detection
+    if config_dir != default_config_dir:
+        env["CLAUDE_CONFIG_DIR"] = str(config_dir)
 
     print(f"\n🔄 Using account: {account['name']} ({config_dir.name})")
 

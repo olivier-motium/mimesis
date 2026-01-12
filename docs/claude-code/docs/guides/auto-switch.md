@@ -37,7 +37,18 @@ CLAUDE_CONFIG_DIR=~/.claude-max-2 claude
 # Complete login, then exit with Ctrl+C
 ```
 
-### 3. Add Shell Alias
+### 3. Symlink Settings
+
+Share your MCP servers, hooks, and env vars across accounts:
+
+```bash
+ln -sf ~/.claude/settings.json ~/.claude-max-1/settings.json
+ln -sf ~/.claude/settings.json ~/.claude-max-2/settings.json
+```
+
+This ensures all accounts have access to your configured MCP servers and settings.
+
+### 4. Add Shell Alias
 
 Add to `~/.zshrc` or `~/.bashrc`:
 
@@ -209,6 +220,8 @@ If switches aren't happening when expected, Anthropic may have changed their mes
 ### Environment Variable
 
 The script uses `CLAUDE_CONFIG_DIR` - an undocumented but official environment variable that tells Claude Code where to store its configuration, credentials, and session data.
+
+**Important:** The wrapper only sets `CLAUDE_CONFIG_DIR` for non-default directories. Setting it explicitly to `~/.claude` (even though that's the default) can cause issues like MCP servers not being detected. The wrapper handles this automatically.
 
 ### PTY Handling
 
