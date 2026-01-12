@@ -1394,3 +1394,21 @@ unset ANTHROPIC_API_KEY
 - Queue indicator shows "Commander is working (N queued)..."
 
 **Documentation:** `docs/architecture/commander.md` updated with PTY architecture.
+
+### ANSI Escape Code Stripping for PTY Output (Jan 2026)
+
+**Problem:** Commander PTY output showed garbled text with visible escape sequences like `[>1v`.
+
+**Root cause:** Basic ANSI regex patterns miss DEC private mode sequences. Claude Code's TUI sends device attribute queries (`\x1b[>c`) and responses (`\x1b[>1v`) which have a `>` prefix not handled by simple patterns.
+
+**Solution:** Comprehensive ANSI regex in `CommanderTab.tsx`:
+```typescript
+const ANSI_REGEX = /\x1b\[[?>=!]?[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[()][AB012UK]|\x1b[78DEHM]|\x1b=|\x1b>/g;
+```
+
+**Key patterns to handle:**
+- `\x1b\[[?>=!]?...` - CSI sequences with DEC prefixes (`?`, `>`, `=`, `!`)
+- `\x1b[78DEHM]` - Cursor save/restore, line operations
+- `\x1b=` / `\x1b>` - Keypad mode sequences
+
+**Rule:** When stripping ANSI from PTY output, use comprehensive patterns. The `strip-ansi` npm package is an alternative but adds a dependency.

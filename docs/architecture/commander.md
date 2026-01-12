@@ -1162,8 +1162,9 @@ CommanderTab includes a real-time output panel showing PTY stdout:
 
 ```typescript
 // ANSI escape code stripping
-// Source: packages/ui/src/components/commander/CommanderTab.tsx:19-24
-const ANSI_REGEX = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[()][AB012]|\x1b\[[\?]?[0-9;]*[hlm]/g;
+// Comprehensive pattern handles: CSI sequences, OSC sequences, DEC private modes, character sets
+// Source: packages/ui/src/components/commander/CommanderTab.tsx:19-25
+const ANSI_REGEX = /\x1b\[[?>=!]?[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[()][AB012UK]|\x1b[78DEHM]|\x1b=|\x1b>/g;
 function stripAnsi(str: string): string {
   return str.replace(ANSI_REGEX, "");
 }
