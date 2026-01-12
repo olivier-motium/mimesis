@@ -1,26 +1,17 @@
 ---
 status: completed
-updated: 2026-01-12T13:25:00Z
-task: Implement Logfire OpenTelemetry integration
+updated: 2026-01-12T14:50:00Z
+task: Fix Commander status not transitioning from "Streaming"
 ---
 
 ## Summary
 
-Implemented full OpenTelemetry observability for the Mimesis daemon, exporting traces and metrics to Logfire (EU region).
+Fixed Commander UI status indicator being stuck on "Streaming..." after Claude finishes. Root cause was session ID mismatch: PTY sessions registered with PTY ID but status files named with Claude session ID.
 
-### Created
-- `src/config/telemetry.ts` - Centralized telemetry configuration
-- `src/telemetry/index.ts` - SDK initialization with OTLP exporters
-- `src/telemetry/spans.ts` - Span helper utilities
-- `src/telemetry/metrics.ts` - Custom metrics (gauges, histograms, counters)
-- `.claude/settings.local.json` - MCP server configuration
+**Solution**: Commander now subscribes directly to StatusWatcher for its Claude session ID, bypassing SessionStore lookup mismatch.
 
-### Instrumented
-- Gateway WebSocket (connections, messages)
-- File watcher (session count, parse time)
-- PTY bridge (session count)
-- Database (initialization span)
-
-### Metrics
-- `mimesis.sessions.active`, `mimesis.pty.active`, `mimesis.gateway.connections`
-- `mimesis.file.parse_duration`, `mimesis.errors.count`, `mimesis.messages.processed`
+## Changes
+- `commander-session.ts`: Added direct StatusWatcher subscription for Commander's Claude session ID
+  - Added `handleStatusFileUpdate()` method that filters by Claude session ID
+  - Subscribe to StatusWatcher after session ID capture
+  - Cleanup subscription in reset() and shutdown()

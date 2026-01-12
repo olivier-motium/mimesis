@@ -35,6 +35,24 @@ for dir in ~/.claude-max-*; do
 done
 echo ""
 
+# Symlink projects directory to enable session resume across accounts
+echo "🔗 Setting up projects symlinks for session sharing..."
+for dir in ~/.claude-max-*; do
+    if [ -d "$dir" ]; then
+        # Remove existing projects dir (if it's a directory, not a symlink)
+        if [ -d "$dir/projects" ] && [ ! -L "$dir/projects" ]; then
+            rm -rf "$dir/projects"
+            echo "   Removed: $dir/projects (was directory)"
+        fi
+        # Create symlink if not exists
+        if [ ! -L "$dir/projects" ]; then
+            ln -sf ~/.claude/projects "$dir/projects"
+            echo "   Linked: $dir/projects -> ~/.claude/projects"
+        fi
+    fi
+done
+echo ""
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "NEXT STEPS:"

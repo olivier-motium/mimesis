@@ -1,28 +1,20 @@
 ---
 status: completed
-updated: 2026-01-11T21:50:00+00:00
-task: Implemented QA audit fixes (10 items)
+updated: 2026-01-12T09:15:00Z
+task: Commander stateful conversation refactor
 ---
 
 ## Summary
 
-Completed all 10 QA audit fixes from critical to low priority:
+Refactored Commander from stateless headless jobs to persistent conversations using Claude Code's `--continue` flag.
 
-**Critical**
-- Added event buffer limits (maxFleetEvents: 1000, maxSessionEvents: 5000) to prevent memory leaks
-
-**High Priority**
-- Decomposed handleCompaction() into 3 helper methods
-- Extracted keyboard navigation to useFleetKeyboard.ts hook
-- Verified outbox-tailer already has error handling
-
-**Medium Priority**
-- Extracted 3 helpers from buildSession()
-- Event limits handled at source (gateway-handlers)
-- Replaced process.env.HOME with os.homedir()
-
-**Low Priority**
-- Added PendingTool to type facade
-- Extracted 6 magic numbers to config/server.ts
-
-All 248 daemon tests pass, UI build succeeds.
+### Changes Made
+- Added `conversations` table to SQLite schema for tracking conversation state
+- Created `ConversationRepo` with CRUD operations and singleton Commander pattern
+- Created `FleetPreludeBuilder` for context injection from outbox events
+- Updated `JobRunner` to support `--continue`, `--resume`, `--append-system-prompt`
+- Added `commander.send` and `commander.reset` protocol messages
+- Created `commander-handlers.ts` with gateway integration
+- Updated `useGateway` hook with `sendCommanderPrompt()` and `resetCommander()`
+- Updated `CommanderTab` with "New Conversation" button and new props
+- Updated `commander.md` documentation with new architecture

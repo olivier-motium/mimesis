@@ -15,7 +15,7 @@ import { watch, type FSWatcher } from "chokidar";
 import { EventEmitter } from "node:events";
 import type { PtyBridge, PtySessionInfo } from "./pty-bridge.js";
 import type { SessionStore, UIStatus, TrackedSession, SessionStoreEvent } from "./session-store.js";
-import type { StatusWatcher } from "../status-watcher.js";
+import type { StatusWatcher, StatusUpdateEvent } from "../status-watcher.js";
 import { ConversationRepo } from "../fleet-db/conversation-repo.js";
 import { FleetPreludeBuilder, type FleetPrelude } from "./fleet-prelude-builder.js";
 import { COMMANDER_CWD } from "../config/fleet.js";
@@ -101,6 +101,7 @@ export class CommanderSessionManager extends EventEmitter {
 
   // Subscriptions
   private statusUnsubscribe: (() => void) | null = null;
+  private statusWatcherUnsubscribe: (() => void) | null = null;
 
   constructor(options: CommanderSessionManagerOptions) {
     super();
@@ -188,6 +189,12 @@ export class CommanderSessionManager extends EventEmitter {
       if (this.sessionWatcher) {
         await this.sessionWatcher.close();
         this.sessionWatcher = null;
+      }
+
+      // Unsubscribe from status file updates
+      if (this.statusWatcherUnsubscribe) {
+        this.statusWatcherUnsubscribe();
+        this.statusWatcherUnsubscribe = null;
       }
 
       // Kill existing PTY
@@ -281,6 +288,12 @@ export class CommanderSessionManager extends EventEmitter {
       this.sessionWatcher = null;
     }
 
+    // Unsubscribe from status file updates
+    if (this.statusWatcherUnsubscribe) {
+      this.statusWatcherUnsubscribe();
+      this.statusWatcherUnsubscribe = null;
+    }
+
     // Stop PTY if running
     if (this.ptySessionId) {
       await this.ptyBridge.stop(this.ptySessionId);
@@ -356,6 +369,10 @@ export class CommanderSessionManager extends EventEmitter {
       if (!this.claudeSessionId) {
         this.ptySpawnedAt = Date.now();
         this.startSessionIdCapture();
+      } else {
+        // Resuming existing session - subscribe to StatusWatcher directly
+        // (startSessionIdCapture does this for new sessions)
+        this.subscribeToStatusWatcher();
       }
 
       this.emitStateChange();
@@ -502,6 +519,9 @@ export class CommanderSessionManager extends EventEmitter {
         sessionId
       );
 
+      // Subscribe to StatusWatcher for this Claude session ID
+      this.subscribeToStatusWatcher();
+
       this.emitStateChange();
 
       // Stop watching once we have the ID
@@ -523,6 +543,24 @@ export class CommanderSessionManager extends EventEmitter {
   private encodePathForClaude(cwdPath: string): string {
     // Replace / and . with -
     return cwdPath.replace(/[\/\.]/g, "-");
+  }
+
+  /**
+   * Subscribe to StatusWatcher for Commander's Claude session ID.
+   * This allows direct status file updates, bypassing SessionStore lookup mismatch.
+   * Called both for new sessions (after ID capture) and resumed sessions.
+   */
+  private subscribeToStatusWatcher(): void {
+    if (!this.statusWatcher || this.statusWatcherUnsubscribe) {
+      return;
+    }
+
+    const boundHandler = this.handleStatusFileUpdate.bind(this);
+    this.statusWatcher.on("status", boundHandler);
+    this.statusWatcherUnsubscribe = () => {
+      this.statusWatcher?.off("status", boundHandler);
+    };
+    console.log(`[COMMANDER] Subscribed to status file updates`);
   }
 
   // ===========================================================================
@@ -556,6 +594,33 @@ export class CommanderSessionManager extends EventEmitter {
             this.drainQueue();
           }
         }
+      }
+    }
+  }
+
+  /**
+   * Handle status file updates directly from StatusWatcher.
+   * This bypasses SessionStore lookup which uses PTY session ID,
+   * while status files use Claude session ID.
+   */
+  private handleStatusFileUpdate(event: StatusUpdateEvent): void {
+    // Only care about our Claude session
+    if (event.sessionId !== this.claudeSessionId) {
+      return;
+    }
+
+    const newStatus = this.mapToCommanderStatus(event.status?.status);
+    if (newStatus !== this.status) {
+      const oldStatus = this.status;
+      this.status = newStatus;
+
+      console.log(`[COMMANDER] Status file update: ${oldStatus} → ${newStatus}`);
+
+      this.emitStateChange();
+
+      // Drain queue when ready for input
+      if (newStatus === "waiting_for_input" || newStatus === "idle") {
+        this.drainQueue();
       }
     }
   }

@@ -1,23 +1,16 @@
 ---
 status: completed
-updated: 2026-01-11T21:17:00Z
-task: Documentation audit - fix all 14 findings
+updated: 2026-01-12T09:34:00Z
+task: Investigate and test Claude headless authentication
 ---
+
 ## Summary
-Completed comprehensive documentation audit fixes:
+Tested Commander without ANTHROPIC_API_KEY - it works! Since user has no API credits, this confirms headless mode (`claude -p`) IS using OAuth/Max subscription in Claude Code v2.1.5.
 
-**New Documentation Created (1,323 lines):**
-- `docs/api/endpoints.md` - REST API endpoint reference
-- `docs/api/gateway-protocol.md` - WebSocket protocol reference
-- `docs/architecture/session-lifecycle.md` - Session states, compaction, work chains
-- `docs/contributing.md` - Contribution guidelines
+## Key Finding (Updated)
+Previous GitHub issues about headless OAuth not working may be outdated. Testing confirms:
+- Commander works without ANTHROPIC_API_KEY
+- No API credits on Console account → would fail if using API billing
+- Therefore headless mode uses OAuth/Max subscription ✓
 
-**Files Fixed:**
-- `docs/index.md` - Added links to all new documentation
-- `packages/ui/src/components/ops-table/index.ts` - Removed broken exports
-- `packages/ui/src/hooks/usePtyInitialization.ts` - Fixed stale comment
-- `docs/PydanticAI/part-16-pydantic-graph-beta-step.md` - Fixed broken mermaid.md links
-- `.claude/MEMORIES.md` - Corrected false Durable Streams removal claims
-
-**Cleanup:**
-- Deleted 4 orphaned files (usage.md, usage_2.md, usage_3.md, usage_final.md)
+The earlier API costs were likely from when ANTHROPIC_API_KEY was set in the environment, causing headless mode to prefer API over OAuth.

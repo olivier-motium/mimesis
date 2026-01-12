@@ -68,17 +68,19 @@ export function TimelineToolStep({ event }: TimelineToolStepProps) {
   return (
     <div
       className={cn(
-        "rounded-sm border border-border/30",
-        isRunning && "bg-blue-500/5",
-        !isRunning && isSuccess && "bg-transparent",
-        !isRunning && !isSuccess && "bg-red-500/5 border-red-500/20"
+        "rounded-md border transition-all duration-200",
+        "shadow-sm hover:shadow-md",
+        isRunning && "bg-blue-500/5 border-blue-500/30 border-l-[3px] border-l-blue-400",
+        !isRunning && isSuccess && "bg-muted/10 hover:bg-muted/20 border-border/40 border-l-[3px] border-l-emerald-500/70 hover:border-l-emerald-500",
+        !isRunning && !isSuccess && "bg-red-500/5 border-red-500/30 border-l-[3px] border-l-red-500/70"
       )}
     >
       {/* Header */}
       <div
         className={cn(
-          "flex items-center gap-1.5 px-2 py-1 cursor-pointer",
-          "hover:bg-muted/30 transition-colors"
+          "flex items-center gap-2 px-3 py-1.5 cursor-pointer",
+          "hover:bg-muted/40 transition-all duration-150",
+          "rounded-t-md"
         )}
         onClick={() => setIsExpanded(!isExpanded)}
       >
