@@ -37,6 +37,8 @@ export interface PtyHandlerDependencies {
   send: (ws: WebSocket, message: GatewayMessage) => void;
   /** Get Commander's PTY session ID (for routing Commander output to all clients) */
   getCommanderPtySessionId?: () => string | null;
+  /** Notify CommanderSessionManager when its PTY exits */
+  onCommanderPtyExit?: (exitCode: number, signal?: string) => void;
 }
 
 /**
@@ -193,7 +195,13 @@ export function handlePtyExit(
   code: number,
   signal?: string
 ): void {
-  const { mergerManager, bufferManager, clients, send } = deps;
+  const { mergerManager, bufferManager, clients, send, getCommanderPtySessionId, onCommanderPtyExit } = deps;
+
+  // Check if this is Commander's PTY exiting
+  const commanderSessionId = getCommanderPtySessionId?.();
+  if (commanderSessionId === sessionId && onCommanderPtyExit) {
+    onCommanderPtyExit(code, signal);
+  }
 
   // Notify attached clients
   for (const [ws, state] of clients) {

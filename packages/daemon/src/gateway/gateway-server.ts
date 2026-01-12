@@ -173,6 +173,7 @@ export class GatewayServer {
         clients: this.clients,
         send: (ws, msg) => this.send(ws, msg),
         getCommanderPtySessionId: () => this.commanderSession.getPtySessionId(),
+        onCommanderPtyExit: (code, signal) => this.commanderSession.handlePtyExit(code, signal),
       };
     }
     return this._ptyDeps;

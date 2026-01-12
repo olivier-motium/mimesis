@@ -238,6 +238,29 @@ export class CommanderSessionManager extends EventEmitter {
   }
 
   /**
+   * Handle PTY exit event.
+   * Called by gateway when Commander's PTY process exits.
+   */
+  handlePtyExit(exitCode: number, signal?: string): void {
+    console.log(`[COMMANDER] PTY exited (code=${exitCode}, signal=${signal})`);
+
+    // Clear PTY session ID (PTY is gone)
+    this.ptySessionId = null;
+    this.ptySpawnedAt = null;
+
+    // Transition to idle
+    if (this.status !== "idle") {
+      this.status = "idle";
+      this.emitStateChange();
+    }
+
+    // If there are queued prompts, we'll need to recreate PTY on next send
+    if (this.promptQueue.length > 0) {
+      console.log(`[COMMANDER] PTY exited with ${this.promptQueue.length} queued prompts - will recreate on next send`);
+    }
+  }
+
+  /**
    * Get current Commander state for UI.
    */
   getState(): CommanderState {
