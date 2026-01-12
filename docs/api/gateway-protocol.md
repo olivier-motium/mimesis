@@ -183,6 +183,40 @@ Cancel a running job.
 
 ---
 
+### Commander (PTY-based)
+
+#### `commander.send`
+Send a prompt to Commander (stateful conversation).
+
+```typescript
+{
+  type: "commander.send",
+  prompt: string              // User prompt to send
+}
+```
+
+**Response:** `commander.state`, then `commander.stdout` stream, then `commander.ready`
+
+---
+
+#### `commander.cancel`
+Cancel current Commander operation (sends SIGINT).
+
+```typescript
+{ type: "commander.cancel" }
+```
+
+---
+
+#### `commander.reset`
+Reset Commander conversation (kills PTY, clears queue).
+
+```typescript
+{ type: "commander.reset" }
+```
+
+---
+
 ### Utility
 
 #### `ping`
@@ -377,6 +411,62 @@ Job finished.
   ok: boolean,
   result?: unknown,
   error?: string
+}
+```
+
+---
+
+### Commander State
+
+#### `commander.state`
+Commander state update (sent after state changes).
+
+```typescript
+{
+  type: "commander.state",
+  state: {
+    status: "idle" | "working" | "waiting_for_input",
+    ptySessionId: string | null,
+    claudeSessionId: string | null,
+    queuedPrompts: number,
+    isFirstTurn: boolean
+  }
+}
+```
+
+---
+
+#### `commander.queued`
+Prompt was queued (Commander busy).
+
+```typescript
+{
+  type: "commander.queued",
+  position: number,           // Position in queue
+  prompt: string              // The queued prompt
+}
+```
+
+---
+
+#### `commander.ready`
+Commander is ready for next prompt.
+
+```typescript
+{ type: "commander.ready" }
+```
+
+---
+
+#### `commander.stdout`
+Commander PTY output (streaming).
+
+```typescript
+{
+  type: "commander.stdout",
+  session_id: string,
+  seq: number,
+  event: SessionEvent         // Usually stdout type
 }
 ```
 
