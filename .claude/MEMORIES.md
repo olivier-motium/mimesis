@@ -1478,3 +1478,33 @@ this.commanderSession = new CommanderSessionManager({
 ```
 
 **Rule:** Any module that creates PTY sessions (where Claude Code writes status files) MUST ensure StatusWatcher is watching that directory. The existing SessionWatcher handles external sessions from `~/.claude/projects/`, but new PTY sessions need explicit `watchProject()` calls.
+
+### Session ID Capture Must Filter Old Files (Jan 2026)
+
+**Problem:** Commander "New Conversation" still appeared stuck after StatusWatcher fix.
+
+**Root cause:** `checkExistingSessionFiles()` was picking up OLD session files from previous (possibly stuck) sessions instead of waiting for Claude to create a new one.
+
+**Data flow:**
+1. User clicks "New Conversation" → `reset()` clears `claudeSessionId`
+2. New PTY spawns → `startSessionIdCapture()` called
+3. `checkExistingSessionFiles()` finds OLD JSONL files ✗
+4. Uses stale session ID → appears stuck
+
+**Fix:** Track PTY spawn timestamp and filter files by mtime:
+```typescript
+// commander-session.ts
+private ptySpawnedAt: number | null = null;
+
+// In ensureSession() before startSessionIdCapture()
+this.ptySpawnedAt = Date.now();
+
+// In checkExistingSessionFiles()
+const MAX_AGE_MS = 5000;
+const age = this.ptySpawnedAt - stats.mtimeMs;
+if (age <= MAX_AGE_MS) {
+  // Only consider files modified within 5 seconds of PTY spawn
+}
+```
+
+**Rule:** When capturing session IDs from file system, always filter by creation/modification time relative to the triggering action. Old files from previous sessions must be ignored.
