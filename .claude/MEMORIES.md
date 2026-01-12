@@ -1323,3 +1323,20 @@ Clicking "New Conversation" resets backend context but UI still displays previou
 - Commander reset (backend works)
 - Hook events flow to Timeline (real-time tool events)
 - Real-time session status updates
+
+## Claude CLI Authentication vs API Billing (Jan 2026)
+
+**Key discovery:** Claude Code billing is determined by `claude login` type, NOT by ANTHROPIC_API_KEY:
+
+| Login Type | Command | Billing | Config Indicator |
+|------------|---------|---------|------------------|
+| Claude.ai (Max) | `claude login` | Usage included | No `organizationUuid` |
+| Console/API | `claude login --console` | Pay-per-token | Has `organizationUuid` |
+
+**Detection:** Check `~/.claude.json` for `oauthAccount.organizationUuid`:
+- Present = Console account = API billing
+- Absent = Claude.ai account = Max subscription
+
+**Important:** This affects ALL Claude Code usage, not just Commander. Job-runner spawns `claude -p` which uses CLI's OAuth authentication.
+
+**Dead code removed:** `serve.ts` had unused ANTHROPIC_API_KEY validation from deleted AI summarizer feature. Removed to avoid confusion.
