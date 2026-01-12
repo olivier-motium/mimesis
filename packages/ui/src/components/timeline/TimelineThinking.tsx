@@ -25,41 +25,29 @@ export interface TimelineThinkingProps {
 export function TimelineThinking({ event, defaultExpanded = false }: TimelineThinkingProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
-  // Truncate preview
-  const preview = event.thinking.slice(0, 100).replace(/\n/g, " ");
-  const hasMore = event.thinking.length > 100;
+  // Truncate preview to show more context
+  const preview = event.thinking.slice(0, 150).replace(/\n/g, " ");
+  const hasMore = event.thinking.length > 150;
 
   return (
-    <div
-      className={cn(
-        "rounded-lg border border-dashed border-border/50",
-        "bg-muted/20"
-      )}
-    >
-      {/* Header */}
+    <div className="rounded-sm border border-dashed border-border/30 bg-muted/5">
+      {/* Header - inline with preview for density */}
       <button
         className={cn(
-          "w-full flex items-center gap-2 px-3 py-2",
-          "text-left hover:bg-muted/30 transition-colors"
+          "w-full flex items-center gap-1.5 px-2 py-0.5",
+          "text-left hover:bg-muted/20 transition-colors"
         )}
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        {/* Expand/collapse */}
         {isExpanded ? (
-          <ChevronDown className="w-4 h-4 text-muted-foreground" />
+          <ChevronDown className="w-3.5 h-3.5 text-muted-foreground/60 flex-shrink-0" />
         ) : (
-          <ChevronRight className="w-4 h-4 text-muted-foreground" />
+          <ChevronRight className="w-3.5 h-3.5 text-muted-foreground/60 flex-shrink-0" />
         )}
-
-        {/* Icon */}
-        <Brain className="w-4 h-4 text-muted-foreground" />
-
-        {/* Label */}
-        <span className="text-xs text-muted-foreground font-medium">Thinking</span>
-
-        {/* Preview (when collapsed) */}
+        <Brain className="w-3.5 h-3.5 text-muted-foreground/60 flex-shrink-0" />
+        <span className="text-xs text-muted-foreground/70 flex-shrink-0">Thinking</span>
         {!isExpanded && (
-          <span className="flex-1 text-xs text-muted-foreground/70 truncate italic">
+          <span className="flex-1 text-xs text-muted-foreground/50 truncate italic ml-1">
             {preview}{hasMore && "..."}
           </span>
         )}
@@ -67,8 +55,8 @@ export function TimelineThinking({ event, defaultExpanded = false }: TimelineThi
 
       {/* Expanded content */}
       {isExpanded && (
-        <div className="px-3 py-2 border-t border-border/30">
-          <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">
+        <div className="px-2 py-1 border-t border-border/20">
+          <p className="text-xs text-muted-foreground/80 whitespace-pre-wrap leading-snug max-h-40 overflow-y-auto">
             {event.thinking}
           </p>
         </div>

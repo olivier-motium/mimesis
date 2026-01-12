@@ -29,13 +29,14 @@ export interface TimelineProps {
 }
 
 // Estimated row heights for virtualization (dynamic measurement will refine)
+// Using compact estimates since tools are collapsed by default
 const ESTIMATED_HEIGHTS: Record<TimelineEvent["type"], number> = {
-  tool_group: 150,
-  text: 120,
-  thinking: 80,
-  stdout: 40,
-  progress: 30,
-  status_change: 30,
+  tool_group: 32,
+  text: 24,
+  thinking: 28,
+  stdout: 24,
+  progress: 20,
+  status_change: 20,
 };
 
 // ============================================================================
@@ -132,7 +133,7 @@ export function Timeline({
               className="absolute top-0 left-0 w-full"
               style={{ transform: `translateY(${virtualRow.start}px)` }}
             >
-              <div className="px-4 py-2">
+              <div className="px-2 py-0.5">
                 {renderEvent(event)}
               </div>
             </div>

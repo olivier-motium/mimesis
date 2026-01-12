@@ -1243,3 +1243,37 @@ cd packages/daemon && pnpm test  # 267 passed, 2 skipped
 - Both `job-runner.ts` and `api/routes/pty.ts` now import from shared location
 
 **Also fixed:** Silent failure on non-JSON output - now logs stderr and non-JSON stdout for debugging.
+
+### Claude CLI stream-json Format vs API Events (Jan 2026)
+
+**Problem:** Commander UI showed empty green box after job completion despite daemon logs showing success.
+
+**Root cause:** `parseStreamEvents()` in `CommanderTab.tsx` expected API-level stream events (`content_block_delta`, `content_block_start`) but Claude CLI's `--output-format stream-json` outputs session-level JSONL entries.
+
+**Format difference:**
+```typescript
+// Expected (API events):
+{ type: "content_block_delta", delta: { type: "text_delta", text: "Hello" } }
+
+// Actual (CLI JSONL):
+{ type: "assistant", message: { content: [{ type: "text", text: "Hello" }] } }
+```
+
+**Fix:** `parseStreamEvents()` now handles both formats:
+1. Parses `type: "assistant"` events and extracts from `message.content` array
+2. Keeps backwards compatibility for API-level events
+
+**Rule:** When parsing Claude CLI output with `--output-format stream-json`, expect session-level types (`system`, `assistant`, `user`, `result`) not API stream types.
+
+### Timeline Information Density Pattern (Jan 2026)
+
+**Goal:** Maximize visible content in Timeline without sacrificing usability.
+
+**Key patterns:**
+1. **Running vs completed tools**: Running tools expand (need visibility), completed collapse (preserve density)
+2. **Smart path truncation**: `smartTruncatePath()` shows `...src/components/File.tsx` instead of full path
+3. **Strip line numbers**: Results from Read tool have `1→` prefixes stripped via `stripLineNumbers()`
+4. **Minimal padding**: py-0.5 between events, py-1 within tool cards
+5. **Simplified text**: No icons for text events, just content
+
+**Files:** Timeline components in `packages/ui/src/components/timeline/`

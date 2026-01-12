@@ -52,13 +52,14 @@ const TOOL_ICONS: Record<string, typeof Terminal> = {
 // ============================================================================
 
 export function TimelineToolStep({ event }: TimelineToolStepProps) {
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [showInput, setShowInput] = useState(false);
-  const [showResult, setShowResult] = useState(false);
-
   const isRunning = event.completedAt === null;
   const isSuccess = event.ok === true;
   const Icon = TOOL_ICONS[event.toolName] ?? HelpCircle;
+
+  // Running tools stay expanded for visibility; completed tools collapse for density
+  const [isExpanded, setIsExpanded] = useState(isRunning);
+  const [showInput, setShowInput] = useState(false);
+  const [showResult, setShowResult] = useState(false);
 
   // Format tool input for display
   const inputSummary = formatToolInput(event.toolName, event.toolInput);
@@ -67,17 +68,17 @@ export function TimelineToolStep({ event }: TimelineToolStepProps) {
   return (
     <div
       className={cn(
-        "rounded-lg border",
-        isRunning && "border-blue-500/50 bg-blue-500/5",
-        !isRunning && isSuccess && "border-green-500/30 bg-green-500/5",
-        !isRunning && !isSuccess && "border-red-500/30 bg-red-500/5"
+        "rounded-sm border border-border/30",
+        isRunning && "bg-blue-500/5",
+        !isRunning && isSuccess && "bg-transparent",
+        !isRunning && !isSuccess && "bg-red-500/5 border-red-500/20"
       )}
     >
       {/* Header */}
       <div
         className={cn(
-          "flex items-center gap-2 px-3 py-2 cursor-pointer",
-          "hover:bg-muted/50 transition-colors"
+          "flex items-center gap-1.5 px-2 py-1 cursor-pointer",
+          "hover:bg-muted/30 transition-colors"
         )}
         onClick={() => setIsExpanded(!isExpanded)}
       >
@@ -109,13 +110,13 @@ export function TimelineToolStep({ event }: TimelineToolStepProps) {
         )}
       </div>
 
-      {/* Expanded content */}
-      {isExpanded && (
-        <div className="border-t border-border/50">
+      {/* Expanded content - only show details when tool has completed */}
+      {isExpanded && !isRunning && (
+        <div className="border-t border-border/30">
           {/* Tool input (collapsible) */}
-          <div className="border-b border-border/50">
+          <div className="border-b border-border/30">
             <button
-              className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted/30 flex items-center gap-1"
+              className="w-full px-2 py-0.5 text-left text-xs text-muted-foreground/70 hover:bg-muted/30 flex items-center gap-1"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowInput(!showInput);
@@ -125,7 +126,7 @@ export function TimelineToolStep({ event }: TimelineToolStepProps) {
               Input
             </button>
             {showInput && (
-              <pre className="px-3 py-2 text-xs font-mono bg-muted/30 overflow-x-auto max-h-48">
+              <pre className="px-2 py-1.5 text-xs font-mono bg-muted/30 overflow-x-auto max-h-32">
                 {formatJson(event.toolInput)}
               </pre>
             )}
@@ -133,36 +134,43 @@ export function TimelineToolStep({ event }: TimelineToolStepProps) {
 
           {/* Stdout output */}
           {hasStdout && (
-            <div className="px-3 py-2 bg-black/20">
-              <pre className="text-xs font-mono text-foreground/80 whitespace-pre-wrap overflow-x-auto max-h-64">
+            <div className="px-2 py-1 bg-black/20">
+              <pre className="text-xs font-mono text-foreground/80 whitespace-pre-wrap overflow-x-auto max-h-40">
                 {event.stdout.join("")}
               </pre>
             </div>
           )}
 
-          {/* Tool result (if completed) */}
-          {event.completedAt !== null && (
-            <div className="border-t border-border/50">
-              <button
-                className="w-full px-3 py-1.5 text-left text-xs text-muted-foreground hover:bg-muted/30 flex items-center gap-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowResult(!showResult);
-                }}
-              >
-                {showResult ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-                Result {!isSuccess && "(error)"}
-              </button>
-              {showResult && (
-                <pre className={cn(
-                  "px-3 py-2 text-xs font-mono overflow-x-auto max-h-48",
-                  isSuccess ? "bg-muted/30" : "bg-red-500/10"
-                )}>
-                  {formatJson(event.toolResult)}
-                </pre>
-              )}
-            </div>
-          )}
+          {/* Tool result */}
+          <div className="border-t border-border/30">
+            <button
+              className="w-full px-2 py-0.5 text-left text-xs text-muted-foreground/70 hover:bg-muted/30 flex items-center gap-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowResult(!showResult);
+              }}
+            >
+              {showResult ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              Result {!isSuccess && "(error)"}
+            </button>
+            {showResult && (
+              <pre className={cn(
+                "px-2 py-1.5 text-xs font-mono overflow-x-auto max-h-32",
+                isSuccess ? "bg-muted/30" : "bg-red-500/10"
+              )}>
+                {formatJson(event.toolResult, true)}
+              </pre>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Running tool - just show stdout if any */}
+      {isExpanded && isRunning && hasStdout && (
+        <div className="border-t border-border/30 px-2 py-1 bg-black/20">
+          <pre className="text-xs font-mono text-foreground/80 whitespace-pre-wrap overflow-x-auto max-h-40">
+            {event.stdout.join("")}
+          </pre>
         </div>
       )}
     </div>
@@ -180,40 +188,41 @@ function formatToolInput(toolName: string, input: unknown): string {
 
   const obj = input as Record<string, unknown>;
 
-  // Tool-specific summaries
+  // Tool-specific summaries with smart path truncation for file operations
   switch (toolName) {
     case "Bash":
-      return obj.command ? `$ ${truncate(String(obj.command), 60)}` : "";
+      return obj.command ? `$ ${truncate(String(obj.command), 70)}` : "";
     case "Read":
-      return obj.file_path ? truncate(String(obj.file_path), 60) : "";
+      return obj.file_path ? smartTruncatePath(String(obj.file_path), 60) : "";
     case "Write":
-      return obj.file_path ? truncate(String(obj.file_path), 60) : "";
+      return obj.file_path ? smartTruncatePath(String(obj.file_path), 60) : "";
     case "Edit":
-      return obj.file_path ? truncate(String(obj.file_path), 60) : "";
+      return obj.file_path ? smartTruncatePath(String(obj.file_path), 60) : "";
     case "Grep":
-      return obj.pattern ? `/${truncate(String(obj.pattern), 40)}/` : "";
+      return obj.pattern ? `/${truncate(String(obj.pattern), 50)}/` : "";
     case "Glob":
-      return obj.pattern ? truncate(String(obj.pattern), 60) : "";
+      return obj.pattern ? truncate(String(obj.pattern), 70) : "";
     case "WebFetch":
-      return obj.url ? truncate(String(obj.url), 60) : "";
+      return obj.url ? truncate(String(obj.url), 70) : "";
     case "Task":
-      return obj.description ? truncate(String(obj.description), 60) : "";
+      return obj.description ? truncate(String(obj.description), 70) : "";
     default:
       // Generic: show first string value
       const firstValue = Object.values(obj).find((v) => typeof v === "string");
-      return firstValue ? truncate(String(firstValue), 60) : "";
+      return firstValue ? truncate(String(firstValue), 70) : "";
   }
 }
 
-function formatJson(value: unknown): string {
+function formatJson(value: unknown, stripNumbers: boolean = false): string {
   if (value === null || value === undefined) {
     return "null";
   }
   if (typeof value === "string") {
-    return value;
+    return stripNumbers ? stripLineNumbers(value) : value;
   }
   try {
-    return JSON.stringify(value, null, 2);
+    const json = JSON.stringify(value, null, 2);
+    return stripNumbers ? stripLineNumbers(json) : json;
   } catch {
     return String(value);
   }
@@ -222,4 +231,32 @@ function formatJson(value: unknown): string {
 function truncate(str: string, maxLen: number): string {
   if (str.length <= maxLen) return str;
   return str.slice(0, maxLen - 3) + "...";
+}
+
+/**
+ * Strip line number prefixes from file content (e.g., "    1→content" -> "content")
+ * These are added by the Read tool but add visual clutter in the UI.
+ */
+function stripLineNumbers(content: string): string {
+  if (typeof content !== "string") return String(content);
+  // Match lines like "    1→content" or "   42→content" (spaces + number + arrow)
+  return content.replace(/^\s*\d+→/gm, "");
+}
+
+/**
+ * Smart path truncation - shows basename and abbreviated parent context
+ * "/Users/foo/project/src/components/Button.tsx" -> "...src/components/Button.tsx"
+ */
+function smartTruncatePath(path: string, maxLen: number = 50): string {
+  if (path.length <= maxLen) return path;
+
+  const parts = path.split("/");
+  if (parts.length <= 3) return truncate(path, maxLen);
+
+  // Keep last 3 segments
+  const tail = parts.slice(-3).join("/");
+  if (tail.length <= maxLen - 3) {
+    return ".../" + tail;
+  }
+  return ".../" + parts.slice(-2).join("/");
 }

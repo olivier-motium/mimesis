@@ -1,11 +1,10 @@
 /**
  * TimelineText - Renders assistant text messages.
  *
- * Displays streaming text with markdown rendering.
+ * Compact text display optimized for information density.
  */
 
 import type { TextEvent } from "../../hooks/useSessionEvents";
-import { MessageSquare } from "lucide-react";
 
 // ============================================================================
 // Types
@@ -21,16 +20,8 @@ export interface TimelineTextProps {
 
 export function TimelineText({ event }: TimelineTextProps) {
   return (
-    <div className="flex gap-3">
-      {/* Icon */}
-      <div className="flex-shrink-0 w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
-        <MessageSquare className="w-3.5 h-3.5 text-primary" />
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 text-sm text-foreground leading-relaxed">
-        <div className="whitespace-pre-wrap break-words">{event.text}</div>
-      </div>
+    <div className="text-sm text-foreground leading-snug">
+      <div className="whitespace-pre-wrap break-words">{event.text}</div>
     </div>
   );
 }
