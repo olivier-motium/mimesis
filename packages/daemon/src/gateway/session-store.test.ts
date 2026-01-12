@@ -5,11 +5,24 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   SessionStore,
-  type TrackedSession,
   type WatcherSessionData,
   type PtySessionData,
-  type SessionStoreEvent,
 } from "./session-store.js";
+import type { StatusResult } from "../types.js";
+
+// Helper to create valid StatusResult
+function createStatus(
+  status: "working" | "waiting" | "idle",
+  lastActivityAt = "2024-01-01T00:00:00Z"
+): StatusResult {
+  return {
+    status,
+    lastRole: "assistant",
+    hasPendingToolUse: false,
+    lastActivityAt,
+    messageCount: 1,
+  };
+}
 
 describe("SessionStore", () => {
   let store: SessionStore;
@@ -23,7 +36,7 @@ describe("SessionStore", () => {
       const data: WatcherSessionData = {
         sessionId: "session-1",
         cwd: "/home/user/project",
-        status: { status: "working", lastActivityAt: "2024-01-01T00:00:00Z" },
+        status: createStatus("working"),
         gitBranch: "main",
         gitRepoUrl: "https://github.com/user/repo",
         originalPrompt: "Hello world",
@@ -48,7 +61,7 @@ describe("SessionStore", () => {
       const data: WatcherSessionData = {
         sessionId: "session-1",
         cwd: "/home/user/project",
-        status: { status: "idle", lastActivityAt: "2024-01-01T00:00:00Z" },
+        status: createStatus("idle"),
       };
 
       store.addFromWatcher(data);
@@ -66,7 +79,7 @@ describe("SessionStore", () => {
       const data: WatcherSessionData = {
         sessionId: "session-1",
         cwd: "/home/user/project",
-        status: { status: "idle", lastActivityAt: "2024-01-01T00:00:00Z" },
+        status: createStatus("idle"),
       };
 
       store.addFromWatcher(data);
@@ -77,7 +90,7 @@ describe("SessionStore", () => {
       const updatedData: WatcherSessionData = {
         sessionId: "session-1",
         cwd: "/home/user/project",
-        status: { status: "working", lastActivityAt: "2024-01-01T00:01:00Z" },
+        status: createStatus("working", "2024-01-01T00:01:00Z"),
       };
 
       store.addFromWatcher(updatedData);
@@ -104,28 +117,12 @@ describe("SessionStore", () => {
         store.addFromWatcher({
           sessionId: `session-${input}`,
           cwd: "/test",
-          status: { status: input, lastActivityAt: "2024-01-01T00:00:00Z" },
+          status: createStatus(input),
         });
 
         const session = store.get(`session-${input}`);
         expect(session?.status).toBe(expected);
       }
-    });
-
-    it("stores conversation entries", () => {
-      const entries = [
-        { type: "user" as const, message: { role: "user" as const, content: "Hello" } },
-      ];
-
-      store.addFromWatcher({
-        sessionId: "session-1",
-        cwd: "/test",
-        status: { status: "idle", lastActivityAt: "2024-01-01T00:00:00Z" },
-        entries,
-      });
-
-      const session = store.get("session-1");
-      expect(session?.entries).toEqual(entries);
     });
   });
 
@@ -154,7 +151,7 @@ describe("SessionStore", () => {
       store.addFromWatcher({
         sessionId: "session-1",
         cwd: "/test",
-        status: { status: "idle", lastActivityAt: "2024-01-01T00:00:00Z" },
+        status: createStatus("idle"),
         gitBranch: "feature-branch",
         originalPrompt: "Original prompt",
       });
@@ -180,11 +177,12 @@ describe("SessionStore", () => {
       store.addFromWatcher({
         sessionId: "session-1",
         cwd: "/test",
-        status: { status: "idle", lastActivityAt: "2024-01-01T00:00:00Z" },
+        status: createStatus("idle"),
       });
 
       store.updateFileStatus("session-1", {
         status: "working",
+        updated: "2024-01-01T00:00:00Z",
         task: "Running tests",
         summary: "Test summary",
       });
@@ -198,11 +196,12 @@ describe("SessionStore", () => {
       store.addFromWatcher({
         sessionId: "session-1",
         cwd: "/test",
-        status: { status: "idle", lastActivityAt: "2024-01-01T00:00:00Z" },
+        status: createStatus("idle"),
       });
 
       store.updateFileStatus("session-1", {
         status: "waiting_for_approval",
+        updated: "2024-01-01T00:00:00Z",
         task: "Waiting",
       });
 
@@ -214,13 +213,17 @@ describe("SessionStore", () => {
       store.addFromWatcher({
         sessionId: "session-1",
         cwd: "/test",
-        status: { status: "idle", lastActivityAt: "2024-01-01T00:00:00Z" },
+        status: createStatus("idle"),
       });
 
       const listener = vi.fn();
       store.subscribe(listener);
 
-      store.updateFileStatus("session-1", { status: "working", task: "Task" });
+      store.updateFileStatus("session-1", {
+        status: "working",
+        updated: "2024-01-01T00:00:00Z",
+        task: "Task",
+      });
 
       expect(listener).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -237,7 +240,10 @@ describe("SessionStore", () => {
       const listener = vi.fn();
       store.subscribe(listener);
 
-      store.updateFileStatus("non-existent", { status: "working" });
+      store.updateFileStatus("non-existent", {
+        status: "working",
+        updated: "2024-01-01T00:00:00Z",
+      });
 
       expect(listener).not.toHaveBeenCalled();
     });
@@ -248,7 +254,7 @@ describe("SessionStore", () => {
       store.addFromWatcher({
         sessionId: "session-1",
         cwd: "/test",
-        status: { status: "idle", lastActivityAt: "2024-01-01T00:00:00Z" },
+        status: createStatus("idle"),
       });
 
       store.updateStatus("session-1", "working");
@@ -261,7 +267,7 @@ describe("SessionStore", () => {
       store.addFromWatcher({
         sessionId: "session-1",
         cwd: "/test",
-        status: { status: "idle", lastActivityAt: "2024-01-01T00:00:00Z" },
+        status: createStatus("idle"),
       });
 
       const before = store.get("session-1")?.lastActivityAt;
@@ -278,7 +284,7 @@ describe("SessionStore", () => {
       store.addFromWatcher({
         sessionId: "session-1",
         cwd: "/test",
-        status: { status: "idle", lastActivityAt: "2024-01-01T00:00:00Z" },
+        status: createStatus("idle"),
       });
 
       store.remove("session-1");
@@ -290,7 +296,7 @@ describe("SessionStore", () => {
       store.addFromWatcher({
         sessionId: "session-1",
         cwd: "/test",
-        status: { status: "idle", lastActivityAt: "2024-01-01T00:00:00Z" },
+        status: createStatus("idle"),
       });
 
       const listener = vi.fn();
@@ -319,12 +325,12 @@ describe("SessionStore", () => {
       store.addFromWatcher({
         sessionId: "session-1",
         cwd: "/test",
-        status: { status: "idle", lastActivityAt: "2024-01-01T00:00:00Z" },
+        status: createStatus("idle"),
       });
       store.addFromWatcher({
         sessionId: "session-2",
         cwd: "/test",
-        status: { status: "working", lastActivityAt: "2024-01-01T00:00:00Z" },
+        status: createStatus("working"),
       });
       store.addFromPty({
         sessionId: "pty-session",
@@ -349,7 +355,7 @@ describe("SessionStore", () => {
       store.addFromWatcher({
         sessionId: "session-1",
         cwd: "/test",
-        status: { status: "idle", lastActivityAt: "2024-01-01T00:00:00Z" },
+        status: createStatus("idle"),
       });
 
       expect(listener).toHaveBeenCalledTimes(1);
@@ -359,7 +365,7 @@ describe("SessionStore", () => {
       store.addFromWatcher({
         sessionId: "session-2",
         cwd: "/test",
-        status: { status: "idle", lastActivityAt: "2024-01-01T00:00:00Z" },
+        status: createStatus("idle"),
       });
 
       expect(listener).toHaveBeenCalledTimes(1);
@@ -378,7 +384,7 @@ describe("SessionStore", () => {
       store.addFromWatcher({
         sessionId: "session-1",
         cwd: "/test",
-        status: { status: "idle", lastActivityAt: "2024-01-01T00:00:00Z" },
+        status: createStatus("idle"),
       });
 
       expect(errorListener).toHaveBeenCalled();

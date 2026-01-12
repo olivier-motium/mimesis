@@ -2,18 +2,18 @@
 schema: status.v5
 
 # identity
-project_id: mimesis__607a7a7c
-repo_name: mimesis
-repo_root: /Users/olivierdebeufderijcker/Desktop/motium_github/mimesis
+project_id: daemon__db232858
+repo_name: daemon
+repo_root: /Users/olivierdebeufderijcker/Desktop/motium_github/mimesis/packages/daemon
 git_remote: https://github.com/olivier-motium/mimesis.git
 branch: fleet-gateway
 
 # session + task
-session_id: a8cf97d3-4c9f-4e68-8f6f-bdf92f7b1110
-task_id: 2026-01-11T2103Z
+session_id: b0c6960e-2dee-4482-8b83-38b19f4e0dbd
+task_id: 2026-01-12T0643Z
 status: completed
-started_at: 2026-01-11T21:03:52.036900+00:00
-ended_at: 2026-01-11T21:23:49.540074+00:00
+started_at: 2026-01-12T06:43:47.214644+00:00
+ended_at: 2026-01-12T06:44:11.053613+00:00
 
 # semantic fields (Sonnet-authored on finalize)
 impact_level: minor
@@ -21,7 +21,7 @@ broadcast_level: silent
 doc_drift_risk: low
 
 # traceability
-base_commit: e60eb20
+base_commit: f78e6d6
 head_commit: f78e6d6
 
 # structured lists

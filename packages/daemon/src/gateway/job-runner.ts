@@ -200,6 +200,7 @@ export class JobRunner {
     const args = [
       "-p", // Print mode (non-interactive)
       "--output-format", "stream-json",
+      "--verbose", // Required for stream-json with -p
     ];
 
     // Model
@@ -230,18 +231,10 @@ export class JobRunner {
 
   /**
    * Get model ID from shorthand.
+   * Claude CLI accepts shorthand names directly (opus, sonnet, haiku).
    */
   private getModelId(model: "opus" | "sonnet" | "haiku"): string {
-    switch (model) {
-      case "opus":
-        return "claude-3-opus-20240229";
-      case "sonnet":
-        return "claude-3-5-sonnet-20241022";
-      case "haiku":
-        return "claude-3-haiku-20240307";
-      default:
-        return "claude-3-5-sonnet-20241022";
-    }
+    return model;
   }
 
   /**
