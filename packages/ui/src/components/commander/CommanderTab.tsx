@@ -8,13 +8,20 @@
  * - Cancel button sends SIGINT
  */
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useMemo } from "react";
 import type { CommanderState, SequencedSessionEvent } from "../../hooks/useGateway";
 import { cn } from "../../lib/utils";
 import { CommanderHistory } from "./CommanderHistory";
 import { CommanderInput } from "./CommanderInput";
 import { Brain, Sparkles, RotateCcw, Clock, Terminal } from "lucide-react";
 import { Button } from "../ui/button";
+
+// Strip ANSI escape codes from PTY output
+// eslint-disable-next-line no-control-regex
+const ANSI_REGEX = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[()][AB012]|\x1b\[[\?]?[0-9;]*[hlm]/g;
+function stripAnsi(str: string): string {
+  return str.replace(ANSI_REGEX, "");
+}
 
 // ============================================================================
 // Types
@@ -47,11 +54,14 @@ export function CommanderTab({
   const hasSession = commanderState.ptySessionId !== null;
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Extract stdout content from events
-  const stdoutContent = commanderEvents
-    .filter((e) => e.type === "stdout" && e.data)
-    .map((e) => e.data)
-    .join("");
+  // Extract and clean stdout content from events
+  const stdoutContent = useMemo(() => {
+    const rawContent = commanderEvents
+      .filter((e) => e.type === "stdout" && e.data)
+      .map((e) => e.data)
+      .join("");
+    return stripAnsi(rawContent);
+  }, [commanderEvents]);
 
   // Auto-scroll to bottom when new content arrives
   useEffect(() => {
