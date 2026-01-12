@@ -169,13 +169,7 @@ export function handlePtyOutput(
   const commanderPtyId = getCommanderPtySessionId?.();
   const isCommanderOutput = commanderPtyId === sessionId;
 
-  // Debug logging for Commander output
-  if (isCommanderOutput) {
-    console.log(`[COMMANDER] PTY stdout (${data.length} chars, seq=${seq})`);
-  }
-
   // Broadcast to clients
-  let clientCount = 0;
   for (const [ws, state] of clients) {
     // For Commander output, broadcast to ALL clients
     // For regular PTY output, only send to attached clients
@@ -186,13 +180,7 @@ export function handlePtyOutput(
         seq,
         event,
       });
-      clientCount++;
     }
-  }
-
-  // Debug: confirm clients received Commander output
-  if (isCommanderOutput) {
-    console.log(`[COMMANDER] Sent stdout to ${clientCount}/${clients.size} clients`);
   }
 }
 
