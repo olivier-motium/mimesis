@@ -308,6 +308,9 @@ export function handleCommanderStdout(
   const seq = message.seq as number;
   const eventData = message.event as SessionEvent;
 
+  // Debug: trace commander stdout messages
+  console.log("[GATEWAY] Commander stdout:", seq, "event:", eventData);
+
   const sequencedEvent: SequencedSessionEvent = {
     ...eventData,
     seq,
@@ -375,6 +378,11 @@ export function dispatchMessage(
 ): void {
   const type = message.type as string;
   const handler = messageHandlers[type];
+
+  // Debug: log all incoming messages
+  if (type.startsWith("commander")) {
+    console.log("[GATEWAY] Received commander message:", type, message);
+  }
 
   if (handler) {
     handler(message, setters, refs);

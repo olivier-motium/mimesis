@@ -57,10 +57,15 @@ export function CommanderTab({
 
   // Extract and clean stdout content from events
   const stdoutContent = useMemo(() => {
+    // Debug: log what we're receiving
+    console.log("[CommanderTab] Events:", commanderEvents.length, "types:", commanderEvents.map(e => e.type));
+
     const rawContent = commanderEvents
       .filter((e) => e.type === "stdout" && e.data)
       .map((e) => e.data)
       .join("");
+
+    console.log("[CommanderTab] Filtered stdout content length:", rawContent.length);
     return stripAnsi(rawContent);
   }, [commanderEvents]);
 
