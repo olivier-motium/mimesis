@@ -16,6 +16,7 @@ import { readdir } from "node:fs/promises";
 import { EventEmitter } from "node:events";
 import type { PtyBridge, PtySessionInfo } from "./pty-bridge.js";
 import type { SessionStore, UIStatus, TrackedSession, SessionStoreEvent } from "./session-store.js";
+import type { StatusWatcher } from "../status-watcher.js";
 import { ConversationRepo } from "../fleet-db/conversation-repo.js";
 import { FleetPreludeBuilder, type FleetPrelude } from "./fleet-prelude-builder.js";
 import { COMMANDER_CWD } from "../config/fleet.js";
@@ -43,6 +44,7 @@ export interface CommanderState {
 export interface CommanderSessionManagerOptions {
   ptyBridge: PtyBridge;
   sessionStore: SessionStore;
+  statusWatcher?: StatusWatcher;
 }
 
 // Commander-specific events
@@ -79,6 +81,7 @@ const COMMANDER_PROJECT_ID = "fleet-commander";
 export class CommanderSessionManager extends EventEmitter {
   private ptyBridge: PtyBridge;
   private sessionStore: SessionStore;
+  private statusWatcher?: StatusWatcher;
   private conversationRepo: ConversationRepo;
   private preludeBuilder: FleetPreludeBuilder;
 
@@ -103,6 +106,7 @@ export class CommanderSessionManager extends EventEmitter {
     super();
     this.ptyBridge = options.ptyBridge;
     this.sessionStore = options.sessionStore;
+    this.statusWatcher = options.statusWatcher;
     this.conversationRepo = new ConversationRepo();
     this.preludeBuilder = new FleetPreludeBuilder();
 
@@ -340,6 +344,12 @@ export class CommanderSessionManager extends EventEmitter {
         cwd: COMMANDER_CWD,
         pid: ptyInfo.pid,
       });
+
+      // Start watching Commander directory for status file changes
+      // This is critical for status transitions (working → idle)
+      if (this.statusWatcher) {
+        this.statusWatcher.watchProject(COMMANDER_CWD);
+      }
 
       // Start watching for Claude's session file to capture session ID
       if (!this.claudeSessionId) {

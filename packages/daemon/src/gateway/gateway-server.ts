@@ -154,6 +154,7 @@ export class GatewayServer {
     this.commanderSession = new CommanderSessionManager({
       ptyBridge: this.ptyBridge,
       sessionStore: this.sessionStore,
+      statusWatcher: this.statusWatcher,
     });
   }
 
