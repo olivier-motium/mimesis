@@ -1326,17 +1326,20 @@ Clicking "New Conversation" resets backend context but UI still displays previou
 
 ## Claude CLI Authentication vs API Billing (Jan 2026)
 
-**Key discovery:** Claude Code billing is determined by `claude login` type, NOT by ANTHROPIC_API_KEY:
+**Critical limitation:** Headless mode (`claude -p`) does NOT use OAuth/Max subscription - it requires `ANTHROPIC_API_KEY` environment variable.
 
-| Login Type | Command | Billing | Config Indicator |
-|------------|---------|---------|------------------|
-| Claude.ai (Max) | `claude login` | Usage included | No `organizationUuid` |
-| Console/API | `claude login --console` | Pay-per-token | Has `organizationUuid` |
+| Mode | Authentication | Billing |
+|------|----------------|---------|
+| Interactive (`claude`) | OAuth login | Depends on login type (Max or Console) |
+| Headless (`claude -p`) | `ANTHROPIC_API_KEY` env var | Always API billing |
 
-**Detection:** Check `~/.claude.json` for `oauthAccount.organizationUuid`:
-- Present = Console account = API billing
-- Absent = Claude.ai account = Max subscription
+**Why Commander incurs API costs:** Job-runner spawns `claude -p` which ignores OAuth and requires API key. If `ANTHROPIC_API_KEY` is in your environment, headless jobs use it and bill per-token.
 
-**Important:** This affects ALL Claude Code usage, not just Commander. Job-runner spawns `claude -p` which uses CLI's OAuth authentication.
+**Known Anthropic limitation:** GitHub issues #7100, #5666, #9694 document that headless OAuth is not yet supported. Workarounds exist but are unreliable.
 
-**Dead code removed:** `serve.ts` had unused ANTHROPIC_API_KEY validation from deleted AI summarizer feature. Removed to avoid confusion.
+**Options for Commander:**
+1. Accept API billing for headless jobs (set ANTHROPIC_API_KEY)
+2. Remove API key and disable Commander until Anthropic fixes headless OAuth
+3. Use interactive mode only (not practical for automation)
+
+**Dead code removed:** `serve.ts` had unused ANTHROPIC_API_KEY validation from deleted AI summarizer feature. The daemon doesn't need it, but Commander headless jobs do.
