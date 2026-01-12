@@ -9,36 +9,8 @@
  */
 
 import { Hono } from "hono";
-import { execSync } from "node:child_process";
 import type { RouterDependencies } from "../types.js";
-import { logSilentError } from "../../utils/logger.js";
-
-/**
- * Get the full path to the claude executable.
- * Uses `which` to find the path at startup.
- */
-function getClaudePath(): string {
-  try {
-    return execSync("which claude", { encoding: "utf-8" }).trim();
-  } catch (error) {
-    logSilentError("getClaudePath: which claude failed", error);
-    // Fallback to common locations
-    const paths = [
-      "/opt/homebrew/bin/claude",
-      "/usr/local/bin/claude",
-      "/usr/bin/claude",
-    ];
-    for (const p of paths) {
-      try {
-        execSync(`test -x ${p}`);
-        return p;
-      } catch {
-        // Expected: path doesn't exist, try next
-      }
-    }
-    return "claude"; // Fall back to hoping it's in PATH
-  }
-}
+import { getClaudePath } from "../../utils/claude-path.js";
 
 const CLAUDE_PATH = getClaudePath();
 

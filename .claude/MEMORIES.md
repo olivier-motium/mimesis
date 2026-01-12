@@ -1229,3 +1229,17 @@ cd packages/daemon && pnpm test  # 267 passed, 2 skipped
 ```
 
 **Rule:** When a flex child needs to scroll (`overflow-auto` + `flex-1`), the parent MUST have `min-height: 0` (or `overflow: hidden`) to constrain height.
+
+### Shared Claude Path Utility (Jan 2026)
+
+**Problem:** Commander jobs stuck on "Streaming" because `job-runner.ts` used bare `"claude"` in `spawn()`, while PTY sessions correctly used full path via `getClaudePath()`.
+
+**Root cause:** `spawn()` doesn't inherit PATH the same way as shell commands. The daemon already documented this in MEMORIES.md for node-pty, but the job runner was missing the fix.
+
+**Solution:** Created shared utility `packages/daemon/src/utils/claude-path.ts`:
+- Uses `which claude` to find full path
+- Fallback chain: `/opt/homebrew/bin/claude`, `/usr/local/bin/claude`, `/usr/bin/claude`
+- Caches result for process lifetime
+- Both `job-runner.ts` and `api/routes/pty.ts` now import from shared location
+
+**Also fixed:** Silent failure on non-JSON output - now logs stderr and non-JSON stdout for debugging.

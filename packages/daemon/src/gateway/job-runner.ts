@@ -10,6 +10,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { createInterface } from "node:readline";
 import { JOB_TIMEOUT_MS } from "../config/index.js";
+import { getClaudePath } from "../utils/claude-path.js";
 import { StreamParser, type StreamParserEvent } from "./stream-parser.js";
 import type { StreamJsonChunk } from "./protocol.js";
 
@@ -64,13 +65,15 @@ export class JobRunner {
     // Build claude command
     const args = this.buildArgs(request);
     const cwd = request.repoRoot || process.cwd();
+    const claudePath = getClaudePath();
 
     console.log(`[JOB] Starting ${request.model} job in ${cwd}`);
-    console.log(`[JOB] Command: claude ${args.join(" ")}`);
+    console.log(`[JOB] Using claude at: ${claudePath}`);
+    console.log(`[JOB] Command: ${claudePath} ${args.join(" ")}`);
 
     return new Promise((resolve, reject) => {
       // Spawn claude process
-      this.process = spawn("claude", args, {
+      this.process = spawn(claudePath, args, {
         cwd,
         stdio: ["pipe", "pipe", "pipe"],
         env: {
@@ -106,14 +109,21 @@ export class JobRunner {
           onChunk(chunk);
           this.parser.parse(line);
         } catch {
-          // Non-JSON line, ignore
+          // Log non-JSON lines for debugging (truncate for safety)
+          if (line.trim()) {
+            console.log(`[JOB] Non-JSON output: ${line.slice(0, 200)}`);
+          }
         }
       });
 
-      // Capture stderr for errors
+      // Capture stderr for errors (log in real-time for debugging)
       let stderr = "";
       this.process.stderr?.on("data", (data) => {
-        stderr += data.toString();
+        const text = data.toString();
+        stderr += text;
+        if (text.trim()) {
+          console.log(`[JOB] stderr: ${text.trim().slice(0, 200)}`);
+        }
       });
 
       // Handle process exit
