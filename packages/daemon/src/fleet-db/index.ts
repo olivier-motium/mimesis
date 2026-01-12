@@ -95,6 +95,18 @@ export function getFleetDb(): ReturnType<typeof drizzle<typeof schema>> {
         error TEXT
       );
 
+      -- conversations: stateful conversation sessions (Commander, etc.)
+      CREATE TABLE IF NOT EXISTS conversations (
+        conversation_id TEXT PRIMARY KEY,
+        kind TEXT NOT NULL,
+        cwd TEXT NOT NULL,
+        model TEXT NOT NULL,
+        claude_session_id TEXT,
+        last_outbox_event_id_seen INTEGER DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+
       -- Indexes for common queries
       CREATE INDEX IF NOT EXISTS idx_briefings_project ON briefings(project_id);
       CREATE INDEX IF NOT EXISTS idx_briefings_created ON briefings(created_at);
@@ -103,6 +115,7 @@ export function getFleetDb(): ReturnType<typeof drizzle<typeof schema>> {
       CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
       CREATE INDEX IF NOT EXISTS idx_jobs_project ON jobs(project_id);
       CREATE INDEX IF NOT EXISTS idx_jobs_type ON jobs(type);
+      CREATE INDEX IF NOT EXISTS idx_conversations_kind ON conversations(kind);
     `);
   }
   return db;
@@ -129,3 +142,5 @@ export function getFleetSqlite(): Database.Database | null {
 }
 
 export { schema };
+export { ConversationRepo, CONVERSATION_KIND } from "./conversation-repo.js";
+export type { ConversationKind } from "./conversation-repo.js";

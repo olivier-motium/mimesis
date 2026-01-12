@@ -89,11 +89,50 @@ Commander separates concerns:
 
 Commander executes headless Claude jobs using `claude -p --output-format stream-json`.
 
+### Stateful Conversations
+
+Commander maintains a **persistent conversation** across turns using Claude Code's `--continue` flag. This enables:
+- Context accumulation across multiple prompts
+- Multi-turn investigations ("compare these projects, then propose a plan")
+- Fleet awareness via prelude injection
+
+The gateway handles all conversation state internally - the UI just sends prompts.
+
+**Conversation Flow:**
+```
+First Turn                    Subsequent Turns
+    │                             │
+    ▼                             ▼
+claude -p                    claude -p --continue
+    │                             │
+    ▼                             ▼
+New conversation             Resume from cwd
+    │                             │
+    ▼                             ▼
+Store cursor in SQLite       Build fleet prelude
+                                  │
+                                  ▼
+                             Inject via --append-system-prompt
+```
+
+Source: `packages/daemon/src/gateway/handlers/commander-handlers.ts`
+
+### Fleet Prelude Injection
+
+Before each Commander turn, the `FleetPreludeBuilder` constructs a context prelude containing:
+1. New outbox events since last cursor position
+2. Documentation drift warnings from recent briefings
+3. Stable system prompt for Commander role
+
+The prelude is injected via `--append-system-prompt` for stable framing.
+
+Source: `packages/daemon/src/gateway/fleet-prelude-builder.ts`
+
 ### Job Types
 
 | Type | Model | Purpose |
 |------|-------|---------|
-| `commander_turn` | Opus | Cross-project queries from Commander tab |
+| `commander_turn` | Opus | Cross-project queries from Commander tab (stateful) |
 | `worker_task` | Sonnet/Opus | Repo-specific automation tasks |
 | `skill_patch` | Sonnet | Skill file updates |
 | `doc_patch` | Sonnet | Documentation updates |
@@ -130,19 +169,49 @@ Source: `packages/daemon/src/config/fleet.ts:42-48`
 
 ### Job Runner
 
-The `JobRunner` class spawns headless Claude processes:
+The `JobRunner` class spawns headless Claude processes with conversation support:
 
 ```typescript
-// From packages/daemon/src/gateway/job-runner.ts:58-175
+// From packages/daemon/src/gateway/job-runner.ts
+
+interface ConversationBinding {
+  conversationId: string;        // Our UUID for tracking
+  claudeSessionId?: string;      // Claude's session ID (for --resume)
+  mode: "first_turn" | "continue" | "resume";
+}
+
+interface JobRequest {
+  type: string;
+  model: "opus" | "sonnet" | "haiku";
+  conversation?: ConversationBinding;  // Stateful conversation binding
+  request: {
+    prompt: string;
+    appendSystemPrompt?: string;  // For fleet prelude injection
+  };
+}
 
 async run(request: JobRequest, onChunk: StreamChunkCallback): Promise<JobResult> {
   // Build CLI arguments
   const args = [
     "-p",                           // Print mode (non-interactive)
     "--output-format", "stream-json",
-    "--verbose",                    // Required for stream-json with -p
     "--model", model,
   ];
+
+  // Add conversation continuity flags
+  if (request.conversation) {
+    if (request.conversation.mode === "resume" && request.conversation.claudeSessionId) {
+      args.push("--resume", request.conversation.claudeSessionId);
+    } else if (request.conversation.mode === "continue") {
+      args.push("--continue");  // Continue most recent in cwd
+    }
+    // first_turn: no flags, starts new conversation
+  }
+
+  // Add fleet prelude injection
+  if (request.request.appendSystemPrompt) {
+    args.push("--append-system-prompt", request.request.appendSystemPrompt);
+  }
 
   // Spawn Claude process
   this.process = spawn(claudePath, args, {
@@ -150,15 +219,7 @@ async run(request: JobRequest, onChunk: StreamChunkCallback): Promise<JobResult>
     stdio: ["pipe", "pipe", "pipe"],
   });
 
-  // Stream stdout line by line
-  stdout.on("line", (line) => {
-    const chunk: StreamJsonChunk = JSON.parse(line);
-    onChunk(chunk);  // Forward to WebSocket
-  });
-
-  // Send prompt to stdin
-  this.process.stdin?.write(request.request.prompt);
-  this.process.stdin?.end();
+  // Stream stdout line by line → WebSocket
 }
 ```
 
@@ -554,6 +615,27 @@ CREATE TABLE jobs (
 );
 ```
 
+#### conversations
+
+Stateful conversation sessions for Commander.
+
+```sql
+CREATE TABLE conversations (
+  conversation_id TEXT PRIMARY KEY,     -- Our UUID for tracking
+  kind TEXT NOT NULL,                   -- 'commander' (future: 'worker_session')
+  cwd TEXT NOT NULL,                    -- Working directory (e.g., ~/.claude/commander)
+  model TEXT NOT NULL,                  -- 'opus' for Commander
+  claude_session_id TEXT,               -- Claude's session ID (captured from first turn)
+  last_outbox_event_id_seen INTEGER DEFAULT 0,  -- Cursor for fleet prelude
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+```
+
+The Commander conversation is a singleton - there's only one Commander conversation at a time, stored with `kind='commander'`. The `last_outbox_event_id_seen` tracks which fleet events have been injected, enabling delta-only context injection.
+
+Source: `packages/daemon/src/fleet-db/conversation-repo.ts`
+
 ### Entity Relationships
 
 ```
@@ -623,6 +705,36 @@ Subscribe to fleet events with replay from event ID.
   from_event_id: number
 }
 ```
+
+#### commander.send
+
+Send a prompt to Commander (stateful Opus conversation). The gateway handles all conversation state internally.
+
+```typescript
+{
+  type: "commander.send",
+  prompt: string
+}
+```
+
+The gateway will:
+1. Get or create the Commander conversation
+2. Build fleet prelude from outbox events
+3. Create a job with conversation binding
+4. Stream responses via `job.stream` messages
+5. Update outbox cursor on completion
+
+#### commander.reset
+
+Reset the Commander conversation to start fresh.
+
+```typescript
+{
+  type: "commander.reset"
+}
+```
+
+This clears the Commander conversation state. The next `commander.send` will start a new conversation.
 
 ### Gateway → Client Messages
 
@@ -741,16 +853,19 @@ Source: `packages/ui/src/components/commander/CommanderTab.tsx`
 ```typescript
 interface CommanderTabProps {
   activeJob: JobState | null;      // Current job state
-  onCreateJob: (prompt: string) => void;
+  onSendPrompt: (prompt: string) => void;  // Uses gateway.sendCommanderPrompt
   onCancelJob: () => void;
+  onResetConversation: () => void;  // Uses gateway.resetCommander
 }
 ```
 
 Features:
-- Header with Opus branding
+- Header with Opus branding and "New Conversation" reset button
 - Content area with history and active stream
 - Input area for new prompts
 - Status indicators (running/completed/failed)
+
+The component is prompt-only - the gateway handles all conversation state internally.
 
 ### CommanderStreamDisplay
 

@@ -64,6 +64,11 @@ import {
   type HookHandlerDependencies,
   handleHookEvent,
 } from "./handlers/hook-handlers.js";
+import {
+  type CommanderHandlerDependencies,
+  handleCommanderSend,
+  handleCommanderReset,
+} from "./handlers/commander-handlers.js";
 
 /**
  * Gateway server options.
@@ -100,6 +105,7 @@ export class GatewayServer {
   private _watcherDeps: WatcherHandlerDependencies | null = null;
   private _jobDeps: JobHandlerDependencies | null = null;
   private _hookDeps: HookHandlerDependencies | null = null;
+  private _commanderDeps: CommanderHandlerDependencies | null = null;
 
   constructor(options: GatewayServerOptions = {}) {
     // Store watchers
@@ -179,6 +185,16 @@ export class GatewayServer {
       };
     }
     return this._hookDeps;
+  }
+
+  private get commanderDeps(): CommanderHandlerDependencies {
+    if (!this._commanderDeps) {
+      this._commanderDeps = {
+        jobManager: this.jobManager,
+        send: (ws, msg) => this.send(ws, msg),
+      };
+    }
+    return this._commanderDeps;
   }
 
   /**
@@ -414,6 +430,14 @@ export class GatewayServer {
 
       case "sessions.list":
         handleSessionsList(this.watcherDeps, ws);
+        break;
+
+      case "commander.send":
+        handleCommanderSend(this.commanderDeps, ws, message);
+        break;
+
+      case "commander.reset":
+        handleCommanderReset(this.commanderDeps, ws);
         break;
     }
   }

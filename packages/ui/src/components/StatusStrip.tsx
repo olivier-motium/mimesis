@@ -24,10 +24,10 @@ interface StatusStripProps {
 
 const STATUS_STYLES: Record<string, { bg: string; bgActive: string; text: string; border: string; icon: string }> = {
   all: {
-    bg: "bg-blue-500/10",
-    bgActive: "bg-blue-500",
-    text: "text-blue-400",
-    border: "border-blue-500/20",
+    bg: "bg-zinc-600/10",
+    bgActive: "bg-zinc-500",
+    text: "text-zinc-400",
+    border: "border-zinc-500/20",
     icon: "◉",
   },
   waiting: {
@@ -45,10 +45,10 @@ const STATUS_STYLES: Record<string, { bg: string; bgActive: string; text: string
     icon: "✖",
   },
   stale: {
-    bg: "bg-orange-500/10",
-    bgActive: "bg-orange-500",
-    text: "text-orange-400",
-    border: "border-orange-500/20",
+    bg: "bg-amber-600/10",
+    bgActive: "bg-amber-600",
+    text: "text-amber-500",
+    border: "border-amber-600/20",
     icon: "⚠",
   },
   working: {
@@ -171,8 +171,7 @@ function StatusBadge({ filter, label, count, isActive, needsAttention, onClick }
         "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium border transition-all cursor-pointer",
         isActive
           ? [styles.bgActive, "text-white border-transparent"]
-          : [styles.bg, styles.text, styles.border, "hover:opacity-80"],
-        needsAttention && "animate-pulse"
+          : [styles.bg, styles.text, styles.border, "hover:opacity-80"]
       )}
     >
       <span className="mr-0.5">{styles.icon}</span>

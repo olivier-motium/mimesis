@@ -77,6 +77,23 @@ export interface JobCancelMessage {
   job_id: number;
 }
 
+/**
+ * Send a prompt to Commander (stateful Opus conversation).
+ * Gateway handles conversation state internally.
+ */
+export interface CommanderSendMessage {
+  type: "commander.send";
+  /** User prompt to send to Commander */
+  prompt: string;
+}
+
+/**
+ * Reset the Commander conversation to start fresh.
+ */
+export interface CommanderResetMessage {
+  type: "commander.reset";
+}
+
 export interface PingMessage {
   type: "ping";
 }
@@ -95,6 +112,8 @@ export type ClientMessage =
   | SessionResizeMessage
   | JobCreateMessage
   | JobCancelMessage
+  | CommanderSendMessage
+  | CommanderResetMessage
   | PingMessage
   | SessionsListMessage;
 

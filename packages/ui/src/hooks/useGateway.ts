@@ -254,6 +254,9 @@ export interface UseGatewayResult {
   activeJob: JobState | null;
   createJob: (request: JobCreateRequest) => void;
   cancelJob: () => void;
+  // Commander (stateful conversation)
+  sendCommanderPrompt: (prompt: string) => void;
+  resetCommander: () => void;
   // Errors
   lastError: string | null;
 }
@@ -416,6 +419,23 @@ export function useGateway(): UseGatewayResult {
   }, []);
 
   // ============================================================================
+  // Commander Management (stateful conversation via gateway)
+  // ============================================================================
+
+  const sendCommanderPrompt = useCallback((prompt: string) => {
+    sendMessage({
+      type: "commander.send",
+      prompt,
+    });
+  }, []);
+
+  const resetCommander = useCallback(() => {
+    sendMessage({
+      type: "commander.reset",
+    });
+  }, []);
+
+  // ============================================================================
   // Lifecycle - Subscribe to singleton connection manager
   // ============================================================================
 
@@ -480,6 +500,8 @@ export function useGateway(): UseGatewayResult {
     activeJob,
     createJob,
     cancelJob,
+    sendCommanderPrompt,
+    resetCommander,
     lastError,
   };
 }

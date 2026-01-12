@@ -78,17 +78,14 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
     gateway.sendSignal(sessionId, signal);
   }, [gateway]);
 
-  // Handle Commander job creation
-  const handleCreateCommanderJob = useCallback((prompt: string) => {
-    gateway.createJob({
-      type: "commander_turn",
-      model: "opus",
-      request: {
-        prompt,
-        maxTurns: 1,
-        disallowedTools: ["Bash", "Edit", "Write", "TodoWrite"],
-      },
-    });
+  // Handle Commander prompt (uses stateful conversation via gateway)
+  const handleCommanderPrompt = useCallback((prompt: string) => {
+    gateway.sendCommanderPrompt(prompt);
+  }, [gateway]);
+
+  // Handle Commander reset (start new conversation)
+  const handleResetCommander = useCallback(() => {
+    gateway.resetCommander();
   }, [gateway]);
 
   // Keyboard navigation (extracted to hook)
@@ -139,8 +136,9 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
         {showCommander ? (
           <CommanderTab
             activeJob={gateway.activeJob}
-            onCreateJob={handleCreateCommanderJob}
+            onSendPrompt={handleCommanderPrompt}
             onCancelJob={gateway.cancelJob}
+            onResetConversation={handleResetCommander}
           />
         ) : (
           <>

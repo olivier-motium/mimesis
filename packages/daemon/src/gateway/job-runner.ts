@@ -14,14 +14,30 @@ import { getClaudePath } from "../utils/claude-path.js";
 import { StreamParser, type StreamParserEvent } from "./stream-parser.js";
 import type { StreamJsonChunk } from "./protocol.js";
 
+/**
+ * Conversation binding for stateful Commander turns.
+ */
+export interface ConversationBinding {
+  /** Our conversation UUID */
+  conversationId: string;
+  /** Claude's session ID (captured from first turn for --resume) */
+  claudeSessionId?: string;
+  /** Whether this is the first turn or a continuation */
+  mode: "first_turn" | "continue" | "resume";
+}
+
 export interface JobRequest {
   type: string;
   projectId?: string;
   repoRoot?: string;
   model: "opus" | "sonnet" | "haiku";
+  /** Conversation binding for stateful Commander turns */
+  conversation?: ConversationBinding;
   request: {
     prompt: string;
     systemPrompt?: string;
+    /** System prompt to append (used with --append-system-prompt) */
+    appendSystemPrompt?: string;
     jsonSchema?: string;
     maxTurns?: number;
     disallowedTools?: string[];
@@ -210,11 +226,23 @@ export class JobRunner {
     const args = [
       "-p", // Print mode (non-interactive)
       "--output-format", "stream-json",
-      "--verbose", // Required for stream-json with -p
+      "--verbose", // Required for stream-json in print mode
     ];
 
     // Model
     args.push("--model", this.getModelId(request.model));
+
+    // Conversation continuity
+    if (request.conversation) {
+      if (request.conversation.mode === "resume" && request.conversation.claudeSessionId) {
+        // Resume a specific conversation by session ID
+        args.push("--resume", request.conversation.claudeSessionId);
+      } else if (request.conversation.mode === "continue") {
+        // Continue most recent conversation in cwd
+        args.push("--continue");
+      }
+      // first_turn: no continuation flags, starts new conversation
+    }
 
     // Max turns
     if (request.request.maxTurns) {
@@ -231,9 +259,14 @@ export class JobRunner {
       args.push("--disallowedTools", request.request.disallowedTools.join(","));
     }
 
-    // System prompt
+    // System prompt (full replacement)
     if (request.request.systemPrompt) {
       args.push("--system-prompt", request.request.systemPrompt);
+    }
+
+    // Append system prompt (used for fleet prelude injection)
+    if (request.request.appendSystemPrompt) {
+      args.push("--append-system-prompt", request.request.appendSystemPrompt);
     }
 
     return args;

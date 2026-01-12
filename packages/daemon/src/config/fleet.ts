@@ -21,6 +21,9 @@ export const FLEET_SESSIONS_DIR = path.join(FLEET_BASE_DIR, "sessions");
 /** Directory for JSON schemas (Sonnet output validation) */
 export const FLEET_SCHEMAS_DIR = path.join(FLEET_BASE_DIR, "schemas");
 
+/** Working directory for Commander conversation (used with --continue) */
+export const COMMANDER_CWD = FLEET_BASE_DIR;
+
 /** Gateway WebSocket port */
 export const FLEET_GATEWAY_PORT = 4452;
 

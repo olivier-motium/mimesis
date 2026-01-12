@@ -22,41 +22,36 @@
   --color-accent: #27272a;
   --color-accent-foreground: #fafafa;
 
-  /* Primary (yellow accent) */
-  --color-primary: #eab308;
+  /* Primary (warm amber accent - refined from banana yellow) */
+  --color-primary: #d4a574;
   --color-primary-foreground: #09090b;
 
   /* Secondary (muted) */
   --color-secondary: #27272a;
   --color-secondary-foreground: #fafafa;
 
-  /* Destructive (red) */
-  --color-destructive: #ef4444;
+  /* Destructive (muted rose) */
+  --color-destructive: #c45858;
 
   /* Muted backgrounds */
   --color-muted: #18181b;
 
   /* Form inputs */
   --color-input: #27272a;
-  --color-ring: #eab308;
+  --color-ring: #d4a574;
 
   /* Card (same as popover for consistency) */
   --color-card: #0a0a0c;
   --color-card-foreground: #fafafa;
 
-  /* Status colors */
-  --color-status-working: hsl(142 71% 45%);
-  --color-status-waiting: hsl(43 96% 56%);
-  --color-status-error: hsl(0 84% 60%);
+  /* Status colors (muted, professional palette) */
+  --color-status-working: hsl(152 35% 50%);
+  --color-status-waiting: hsl(35 60% 60%);
+  --color-status-error: hsl(0 50% 55%);
   --color-status-idle: hsl(215 16% 47%);
 
-  /* Custom animations */
-  --animate-pulse-glow: pulse-glow 2s ease-in-out infinite;
-
-  @keyframes pulse-glow {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
-    50% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
-  }
+  /* Custom animations - subtle, professional */
+  --animate-pulse-glow: none;
 }
 
 :root {
@@ -77,24 +72,24 @@ body {
    =========================================== */
 
 :root {
-  /* Mimesis Color Palette */
-  --nb-black: #09090b;
-  --nb-black-light: #0c0c0e;
-  --nb-terminal: #050505;
-  --nb-sidebar: #0a0a0c;
-  --nb-yellow: #eab308;
-  --nb-yellow-glow: rgba(234, 179, 8, 0.4);
-  --nb-yellow-dim: #a16207;
-  --nb-green: #10b981;
-  --nb-green-glow: rgba(16, 185, 129, 0.6);
-  --nb-orange: #f59e0b;
-  --nb-red: #ef4444;
-  --nb-border: #27272a;
-  --nb-border-dim: #18181b;
-  --nb-text: #a1a1aa;
-  --nb-text-bright: #fafafa;
-  --nb-text-dim: #52525b;
-  --nb-text-muted: #3f3f46;
+  /* Mimesis Color Palette - Refined Professional */
+  --nb-black: #0a0a0b;
+  --nb-black-light: #0e0e10;
+  --nb-terminal: #060607;
+  --nb-sidebar: #0c0c0d;
+  --nb-yellow: #d4a574;
+  --nb-yellow-glow: rgba(212, 165, 116, 0.25);
+  --nb-yellow-dim: #a68455;
+  --nb-green: #5b9a7d;
+  --nb-green-glow: rgba(91, 154, 125, 0.35);
+  --nb-orange: #cc8844;
+  --nb-red: #c45858;
+  --nb-border: #252528;
+  --nb-border-dim: #1a1a1c;
+  --nb-text: #9a9aa0;
+  --nb-text-bright: #e8e8ec;
+  --nb-text-dim: #5a5a62;
+  --nb-text-muted: #3d3d42;
 
   /* shadcn/ui CSS variables (mapped to Mimesis theme) */
   --background: var(--nb-sidebar);
@@ -118,7 +113,7 @@ body {
     "header header header"
     "roster viewport intel"
     "filters filters filters";
-  grid-template-columns: 200px 1fr 280px;
+  grid-template-columns: 200px 1fr 240px;
   grid-template-rows: 48px 1fr 40px;
 }
 
@@ -138,9 +133,6 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--nb-terminal);
-  background-image:
-    radial-gradient(ellipse 80% 50% at 50% 0%, rgba(234, 179, 8, 0.03) 0%, transparent 50%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.01) 0%, transparent 100%);
   overflow: hidden;
 }
 
@@ -148,8 +140,6 @@ body {
 .fleet-dock {
   grid-area: dock;
   background: var(--nb-terminal);
-  background-image:
-    linear-gradient(0deg, rgba(234, 179, 8, 0.02) 0%, transparent 30%);
   border-top: 1px solid var(--nb-border);
   overflow: hidden;
 }
@@ -228,13 +218,7 @@ body {
   height: 6px;
   border-radius: 50%;
   background: var(--nb-green);
-  box-shadow: 0 0 6px var(--nb-green-glow);
-  animation: online-pulse 2s ease-in-out infinite;
-}
-
-@keyframes online-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  /* Removed glow and animation for cleaner look */
 }
 
 .fleet-command-bar__meta {
@@ -534,7 +518,7 @@ body {
   bottom: 0;
   width: 2px;
   background: var(--nb-yellow);
-  box-shadow: 0 0 10px var(--nb-yellow-glow);
+  /* Removed glow for cleaner look */
 }
 
 .fleet-roster-item__header {
@@ -546,7 +530,7 @@ body {
 
 .fleet-roster-item__name {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 500;
   color: var(--nb-text-dim);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -855,7 +839,6 @@ body {
   text-align: center;
   padding: 24px;
   letter-spacing: 0.02em;
-  background-image: radial-gradient(circle at 50% 50%, rgba(234, 179, 8, 0.02) 0%, transparent 70%);
 }
 
 .fleet-intel__empty::before {
@@ -1201,7 +1184,6 @@ body {
   flex: 1;
   min-height: 0;
   background: var(--nb-terminal);
-  background-image: radial-gradient(ellipse 100% 100% at 50% 0%, rgba(234, 179, 8, 0.01) 0%, transparent 50%);
 }
 
 /* Scrollbar styling for Fleet Command */
@@ -1234,15 +1216,12 @@ body {
 }
 
 .fleet-table [data-slot="table-row"][data-state="selected"] {
-  background: rgba(234, 179, 8, 0.12);
+  background: rgba(212, 165, 116, 0.08);
   border-left: 3px solid var(--nb-yellow);
-  box-shadow:
-    inset 0 0 0 1px rgba(234, 179, 8, 0.2),
-    0 0 24px -4px rgba(234, 179, 8, 0.15);
 }
 
 .fleet-table [data-slot="table-row"][data-state="selected"]:hover {
-  background: rgba(234, 179, 8, 0.16);
+  background: rgba(212, 165, 116, 0.12);
 }
 
 .fleet-table [data-slot="table-header"] {
@@ -1257,31 +1236,22 @@ body {
   text-transform: uppercase;
 }
 
-/* Working status row glow animation */
+/* Working status row - static indicator (no animation) */
 .fleet-table .border-l-status-working {
-  animation: working-pulse 2s ease-in-out infinite;
+  box-shadow: inset 3px 0 0 var(--color-status-working);
 }
 
-@keyframes working-pulse {
-  0%, 100% {
-    box-shadow: inset 4px 0 0 var(--color-status-working), 0 0 12px -4px rgba(16, 185, 129, 0.3);
-  }
-  50% {
-    box-shadow: inset 4px 0 0 var(--color-status-working), 0 0 20px -4px rgba(16, 185, 129, 0.5);
-  }
-}
-
-/* Status badge enhancements */
+/* Status badge enhancements - muted colors */
 .bg-status-working\\/5 {
-  background: linear-gradient(90deg, rgba(16, 185, 129, 0.08) 0%, transparent 50%);
+  background: linear-gradient(90deg, rgba(91, 154, 125, 0.06) 0%, transparent 50%);
 }
 
 .bg-status-waiting\\/5 {
-  background: linear-gradient(90deg, rgba(234, 179, 8, 0.08) 0%, transparent 50%);
+  background: linear-gradient(90deg, rgba(212, 165, 116, 0.06) 0%, transparent 50%);
 }
 
 .bg-status-error\\/5 {
-  background: linear-gradient(90deg, rgba(239, 68, 68, 0.08) 0%, transparent 50%);
+  background: linear-gradient(90deg, rgba(196, 88, 88, 0.06) 0%, transparent 50%);
 }
 
 /* Hide TanStack Router devtools completely */
@@ -1399,7 +1369,7 @@ body > div[style*="position: fixed"]:last-child {
 .mission-card--selected {
   background: var(--nb-black-light);
   border-left-color: var(--nb-yellow);
-  box-shadow: 0 0 12px rgba(234, 179, 8, 0.15);
+  /* Clean, no glow */
 }
 
 /* Status-based left border coloring */
@@ -1662,8 +1632,7 @@ body > div[style*="position: fixed"]:last-child {
   height: 6px;
   border-radius: 50%;
   background: var(--nb-green);
-  box-shadow: 0 0 6px var(--nb-green-glow);
-  animation: online-pulse 2s ease-in-out infinite;
+  /* Clean, no glow or animation */
 }
 
 .agent-command__status-text {
@@ -1799,9 +1768,8 @@ body > div[style*="position: fixed"]:last-child {
 }
 
 .agent-item--selected {
-  background: rgba(234, 179, 8, 0.08);
+  background: rgba(212, 165, 116, 0.06);
   border-left-color: var(--nb-yellow);
-  box-shadow: 0 0 12px rgba(234, 179, 8, 0.1);
 }
 
 .agent-item--selected .agent-item__name {

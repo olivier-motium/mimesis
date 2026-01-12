@@ -90,6 +90,22 @@ export const jobs = sqliteTable("jobs", {
   error: text("error"),
 });
 
+/**
+ * Conversations table - stateful conversation sessions
+ * Used for Commander (Opus) and potentially future worker sessions.
+ * Tracks Claude session IDs for --continue/--resume support.
+ */
+export const conversations = sqliteTable("conversations", {
+  conversationId: text("conversation_id").primaryKey(), // UUID we control
+  kind: text("kind").notNull(), // 'commander' | 'worker_session' (future)
+  cwd: text("cwd").notNull(), // Working directory for conversation
+  model: text("model").notNull(), // opus|sonnet|haiku
+  claudeSessionId: text("claude_session_id"), // Session ID from Claude CLI (for --resume)
+  lastOutboxEventIdSeen: integer("last_outbox_event_id_seen").default(0), // For fleet prelude cursor
+  createdAt: text("created_at").notNull(),
+  updatedAt: text("updated_at").notNull(),
+});
+
 // Type exports for use in repositories
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
@@ -102,3 +118,6 @@ export type NewOutboxEvent = typeof outboxEvents.$inferInsert;
 
 export type Job = typeof jobs.$inferSelect;
 export type NewJob = typeof jobs.$inferInsert;
+
+export type Conversation = typeof conversations.$inferSelect;
+export type NewConversation = typeof conversations.$inferInsert;

@@ -12,7 +12,8 @@ import { cn } from "../../lib/utils";
 import { CommanderHistory } from "./CommanderHistory";
 import { CommanderInput } from "./CommanderInput";
 import { CommanderStreamDisplay } from "./CommanderStreamDisplay";
-import { Brain, Sparkles } from "lucide-react";
+import { Brain, Sparkles, RotateCcw } from "lucide-react";
+import { Button } from "../ui/button";
 
 // ============================================================================
 // Types
@@ -20,8 +21,9 @@ import { Brain, Sparkles } from "lucide-react";
 
 export interface CommanderTabProps {
   activeJob: JobState | null;
-  onCreateJob: (prompt: string) => void;
+  onSendPrompt: (prompt: string) => void;
   onCancelJob: () => void;
+  onResetConversation: () => void;
   className?: string;
 }
 
@@ -31,8 +33,9 @@ export interface CommanderTabProps {
 
 export function CommanderTab({
   activeJob,
-  onCreateJob,
+  onSendPrompt,
   onCancelJob,
+  onResetConversation,
   className,
 }: CommanderTabProps) {
   const isRunning = activeJob?.status === "running";
@@ -54,9 +57,21 @@ export function CommanderTab({
             Cross-project intelligence powered by Opus
           </p>
         </div>
-        <div className="ml-auto flex items-center gap-1 text-xs text-muted-foreground">
-          <Sparkles className="w-3 h-3" />
-          <span>Opus 4</span>
+        <div className="ml-auto flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onResetConversation}
+            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+            disabled={isRunning}
+          >
+            <RotateCcw className="w-3 h-3 mr-1" />
+            New Conversation
+          </Button>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <Sparkles className="w-3 h-3" />
+            <span>Opus 4</span>
+          </div>
         </div>
       </div>
 
@@ -97,7 +112,7 @@ export function CommanderTab({
 
       {/* Input area */}
       <CommanderInput
-        onSubmit={onCreateJob}
+        onSubmit={onSendPrompt}
         onCancel={onCancelJob}
         isRunning={isRunning}
       />
@@ -123,26 +138,50 @@ function parseStreamEvents(events: JobStreamChunk[]): ParsedStreamContent {
   };
 
   for (const event of events) {
-    switch (event.type) {
-      case "content_block_delta": {
-        const delta = event.delta as { type: string; text?: string; thinking?: string } | undefined;
-        if (delta?.type === "text_delta" && delta.text) {
-          result.text += delta.text;
-        } else if (delta?.type === "thinking_delta" && delta.thinking) {
-          result.thinking += delta.thinking;
+    // Claude CLI stream-json outputs JSONL log entries, not API stream events.
+    // Handle "assistant" type which contains message.content array with text/thinking.
+    if (event.type === "assistant") {
+      const message = (event as { message?: { content?: unknown[] } }).message;
+      const content = message?.content;
+      if (Array.isArray(content)) {
+        for (const block of content) {
+          if (typeof block !== "object" || block === null) continue;
+          const b = block as { type?: string; text?: string; thinking?: string; id?: string; name?: string; input?: unknown };
+
+          if (b.type === "text" && b.text) {
+            result.text += b.text;
+          } else if (b.type === "thinking" && b.thinking) {
+            result.thinking += b.thinking;
+          } else if (b.type === "tool_use") {
+            result.toolUses.push({
+              id: b.id ?? "",
+              name: b.name ?? "",
+              input: b.input,
+            });
+          }
         }
-        break;
       }
-      case "content_block_start": {
-        const contentBlock = event.content_block as { type: string; id?: string; name?: string; input?: unknown } | undefined;
-        if (contentBlock?.type === "tool_use") {
-          result.toolUses.push({
-            id: contentBlock.id ?? "",
-            name: contentBlock.name ?? "",
-            input: contentBlock.input,
-          });
-        }
-        break;
+    }
+
+    // Also handle API-level stream events for future compatibility
+    if (event.type === "content_block_delta") {
+      const delta = event.delta as { text?: string; thinking?: string } | undefined;
+      if (delta?.text) {
+        result.text += delta.text;
+      }
+      if (delta?.thinking) {
+        result.thinking += delta.thinking;
+      }
+    }
+
+    if (event.type === "content_block_start") {
+      const contentBlock = event.content_block as { type: string; id?: string; name?: string; input?: unknown } | undefined;
+      if (contentBlock?.type === "tool_use") {
+        result.toolUses.push({
+          id: contentBlock.id ?? "",
+          name: contentBlock.name ?? "",
+          input: contentBlock.input,
+        });
       }
     }
   }
