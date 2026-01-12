@@ -35,6 +35,8 @@ export interface PtyHandlerDependencies {
   statusWatcher?: StatusWatcher;
   clients: Map<WebSocket, ClientState>;
   send: (ws: WebSocket, message: GatewayMessage) => void;
+  /** Get Commander's PTY session ID (for routing Commander output to all clients) */
+  getCommanderPtySessionId?: () => string | null;
 }
 
 /**
@@ -157,16 +159,22 @@ export function handlePtyOutput(
   sessionId: string,
   event: SessionEvent
 ): void {
-  const { mergerManager, clients, send } = deps;
+  const { mergerManager, clients, send, getCommanderPtySessionId } = deps;
 
   const merger = mergerManager.getOrCreate(sessionId);
   const seq = merger.addStdout((event as { data: string }).data);
 
-  // Broadcast to attached clients
+  // Check if this is Commander output
+  const commanderPtyId = getCommanderPtySessionId?.();
+  const isCommanderOutput = commanderPtyId === sessionId;
+
+  // Broadcast to clients
   for (const [ws, state] of clients) {
-    if (state.attachedSession === sessionId) {
+    // For Commander output, broadcast to ALL clients
+    // For regular PTY output, only send to attached clients
+    if (isCommanderOutput || state.attachedSession === sessionId) {
       send(ws, {
-        type: "event",
+        type: isCommanderOutput ? "commander.stdout" : "event",
         session_id: sessionId,
         seq,
         event,

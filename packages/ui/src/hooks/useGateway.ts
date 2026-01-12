@@ -267,9 +267,11 @@ export interface UseGatewayResult {
   cancelJob: () => void;
   // Commander (PTY-based conversation)
   commanderState: CommanderState;
+  commanderEvents: SequencedSessionEvent[];
   sendCommanderPrompt: (prompt: string) => void;
   resetCommander: () => void;
   cancelCommander: () => void;
+  clearCommanderEvents: () => void;
   // Errors
   lastError: string | null;
 }
@@ -318,6 +320,9 @@ export function useGateway(): UseGatewayResult {
     isFirstTurn: true,
   });
 
+  // Commander events (streamed PTY output)
+  const [commanderEvents, setCommanderEvents] = useState<SequencedSessionEvent[]>([]);
+
   // Keep ref in sync with state for message handler
   useEffect(() => {
     attachedSessionRef.current = attachedSession;
@@ -334,6 +339,7 @@ export function useGateway(): UseGatewayResult {
     setActiveJob,
     setLastError,
     setCommanderState,
+    setCommanderEvents,
   };
 
   // Refs for message handlers (refs are stable)
@@ -456,6 +462,12 @@ export function useGateway(): UseGatewayResult {
     sendMessage({
       type: "commander.reset",
     });
+    // Clear events when resetting the conversation
+    setCommanderEvents([]);
+  }, []);
+
+  const clearCommanderEvents = useCallback(() => {
+    setCommanderEvents([]);
   }, []);
 
   const cancelCommander = useCallback(() => {
@@ -530,9 +542,11 @@ export function useGateway(): UseGatewayResult {
     createJob,
     cancelJob,
     commanderState,
+    commanderEvents,
     sendCommanderPrompt,
     resetCommander,
     cancelCommander,
+    clearCommanderEvents,
     lastError,
   };
 }

@@ -295,6 +295,13 @@ export interface CommanderReadyMessage {
   type: "commander.ready";
 }
 
+export interface CommanderStdoutMessage {
+  type: "commander.stdout";
+  session_id: string;
+  seq: number;
+  event: SessionEvent;
+}
+
 export type GatewayMessage =
   | FleetEventMessage
   | SessionCreatedMessage
@@ -311,6 +318,7 @@ export type GatewayMessage =
   | CommanderStateMessage
   | CommanderQueuedMessage
   | CommanderReadyMessage
+  | CommanderStdoutMessage
   | PongMessage
   | ErrorMessage;
 

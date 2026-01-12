@@ -8,11 +8,12 @@
  * - Cancel button sends SIGINT
  */
 
-import type { CommanderState } from "../../hooks/useGateway";
+import { useRef, useEffect } from "react";
+import type { CommanderState, SequencedSessionEvent } from "../../hooks/useGateway";
 import { cn } from "../../lib/utils";
 import { CommanderHistory } from "./CommanderHistory";
 import { CommanderInput } from "./CommanderInput";
-import { Brain, Sparkles, RotateCcw, Clock } from "lucide-react";
+import { Brain, Sparkles, RotateCcw, Clock, Terminal } from "lucide-react";
 import { Button } from "../ui/button";
 
 // ============================================================================
@@ -21,6 +22,7 @@ import { Button } from "../ui/button";
 
 export interface CommanderTabProps {
   commanderState: CommanderState;
+  commanderEvents: SequencedSessionEvent[];
   onSendPrompt: (prompt: string) => void;
   onCancel: () => void;
   onResetConversation: () => void;
@@ -33,6 +35,7 @@ export interface CommanderTabProps {
 
 export function CommanderTab({
   commanderState,
+  commanderEvents,
   onSendPrompt,
   onCancel,
   onResetConversation,
@@ -42,6 +45,20 @@ export function CommanderTab({
   const isWaiting = commanderState.status === "waiting_for_input";
   const hasQueuedPrompts = commanderState.queuedPrompts > 0;
   const hasSession = commanderState.ptySessionId !== null;
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Extract stdout content from events
+  const stdoutContent = commanderEvents
+    .filter((e) => e.type === "stdout" && e.data)
+    .map((e) => e.data)
+    .join("");
+
+  // Auto-scroll to bottom when new content arrives
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [stdoutContent]);
 
   return (
     <div className={cn("flex flex-col h-full", className)}>
@@ -101,7 +118,7 @@ export function CommanderTab({
       </div>
 
       {/* Content area */}
-      <div className="flex-1 overflow-auto p-4 space-y-4">
+      <div className="flex-1 overflow-hidden flex flex-col p-4 space-y-4">
         {/* History (placeholder - would load from SQLite) */}
         <CommanderHistory />
 
@@ -117,8 +134,32 @@ export function CommanderTab({
           </div>
         )}
 
-        {/* Working indicator */}
-        {isRunning && (
+        {/* Streaming output display */}
+        {stdoutContent && (
+          <div className="flex-1 min-h-0 rounded-lg border border-border/30 bg-black/30 overflow-hidden flex flex-col">
+            <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border/30 shrink-0">
+              <Terminal className="w-3.5 h-3.5 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">Commander Output</span>
+              {isRunning && (
+                <div className="ml-auto flex items-center gap-1.5 text-xs text-purple-500">
+                  <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse" />
+                  <span>Streaming...</span>
+                </div>
+              )}
+            </div>
+            <div
+              ref={scrollRef}
+              className="flex-1 overflow-auto px-3 py-2"
+            >
+              <pre className="text-xs font-mono text-foreground/80 whitespace-pre-wrap">
+                {stdoutContent}
+              </pre>
+            </div>
+          </div>
+        )}
+
+        {/* Working indicator (shown only when no output yet) */}
+        {isRunning && !stdoutContent && (
           <div className={cn(
             "rounded-lg border p-4 border-purple-500/30 bg-purple-500/5"
           )}>
@@ -135,7 +176,7 @@ export function CommanderTab({
         )}
 
         {/* Empty state */}
-        {!hasSession && !isRunning && (
+        {!hasSession && !isRunning && !stdoutContent && (
           <div className="flex flex-col items-center justify-center h-48 text-center">
             <Brain className="w-12 h-12 text-muted-foreground/30 mb-4" />
             <p className="text-sm text-muted-foreground">

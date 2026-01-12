@@ -161,6 +161,7 @@ export class GatewayServer {
         statusWatcher: this.statusWatcher,
         clients: this.clients,
         send: (ws, msg) => this.send(ws, msg),
+        getCommanderPtySessionId: () => this.commanderSession.getPtySessionId(),
       };
     }
     return this._ptyDeps;

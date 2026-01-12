@@ -285,7 +285,9 @@ export class CommanderSessionManager extends EventEmitter {
     });
 
     this.ptySessionId = ptyInfo.sessionId;
-    this.status = "working";
+    // Don't set status to "working" here - PTY is waiting for input
+    // Status will be set to "working" in writePrompt() when we send a prompt
+    this.status = "waiting_for_input";
 
     // Register with session store
     this.sessionStore.addFromPty({
@@ -459,11 +461,11 @@ export class CommanderSessionManager extends EventEmitter {
 
   /**
    * Encode path for Claude's project directory naming.
-   * Claude replaces / with - in path encoding.
+   * Claude replaces both / and . with - in path encoding.
    */
   private encodePathForClaude(cwdPath: string): string {
-    // Replace leading / and all / with -
-    return cwdPath.replace(/\//g, "-");
+    // Replace / and . with -
+    return cwdPath.replace(/[\/\.]/g, "-");
   }
 
   // ===========================================================================

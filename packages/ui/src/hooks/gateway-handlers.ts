@@ -35,6 +35,7 @@ export interface GatewayStateSetters {
   setActiveJob: React.Dispatch<React.SetStateAction<JobState | null>>;
   setLastError: React.Dispatch<React.SetStateAction<string | null>>;
   setCommanderState: React.Dispatch<React.SetStateAction<CommanderState>>;
+  setCommanderEvents: React.Dispatch<React.SetStateAction<SequencedSessionEvent[]>>;
 }
 
 /**
@@ -299,6 +300,32 @@ export function handleCommanderReady(
   console.log("[GATEWAY] Commander ready for input");
 }
 
+export function handleCommanderStdout(
+  message: Record<string, unknown>,
+  setters: GatewayStateSetters
+): void {
+  const sessionId = message.session_id as string;
+  const seq = message.seq as number;
+  const eventData = message.event as SessionEvent;
+
+  const sequencedEvent: SequencedSessionEvent = {
+    ...eventData,
+    seq,
+    sessionId,
+  };
+
+  setters.setCommanderEvents((prev) => {
+    // Insert in order by seq (events may arrive out of order)
+    const insertIndex = prev.findIndex((e) => e.seq > seq);
+    if (insertIndex === -1) {
+      return [...prev, sequencedEvent];
+    }
+    const newEvents = [...prev];
+    newEvents.splice(insertIndex, 0, sequencedEvent);
+    return newEvents;
+  });
+}
+
 // ============================================================================
 // Error Handler
 // ============================================================================
@@ -335,6 +362,7 @@ const messageHandlers: Record<string, MessageHandler> = {
   "commander.state": handleCommanderState,
   "commander.queued": handleCommanderQueued,
   "commander.ready": handleCommanderReady,
+  "commander.stdout": handleCommanderStdout,
 };
 
 /**
