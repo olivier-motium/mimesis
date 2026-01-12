@@ -2,5 +2,15 @@
 node_modules
 dist/
 
-# Runtime status file (written by hooks, watched by daemon)
+# Runtime status files (written by hooks, watched by daemon)
 .claude/status.md
+.claude/status.*.md
+.claude/status.v5.*.md
+.claude/compacted.*.marker
+**/packages/**/.claude/status.md
+**/packages/**/.claude/status.*.md
+**/packages/**/.claude/status.v5.*.md
+**/packages/**/.claude/compacted.*.marker
+
+# Generated exports
+commander-module-export.md
