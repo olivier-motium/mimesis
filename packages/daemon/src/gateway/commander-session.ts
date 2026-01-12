@@ -695,9 +695,11 @@ export class CommanderSessionManager extends EventEmitter {
    * Emit state change event.
    */
   private emitStateChange(): void {
+    const state = this.getState();
+    console.log(`[COMMANDER] Emitting state change: status=${state.status}, ptySessionId=${state.ptySessionId}, claudeSessionId=${state.claudeSessionId}`);
     this.emitEvent({
       type: "commander.state",
-      state: this.getState(),
+      state,
     });
   }
 }

@@ -55,6 +55,11 @@ export function CommanderTab({
   const hasSession = commanderState.ptySessionId !== null;
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Debug: Log state changes
+  useEffect(() => {
+    console.log(`[COMMANDER UI] State update: status=${commanderState.status}, isRunning=${isRunning}, ptySessionId=${commanderState.ptySessionId}`);
+  }, [commanderState.status, isRunning, commanderState.ptySessionId]);
+
   // Extract and clean stdout content from events
   const stdoutContent = useMemo(() => {
     const rawContent = commanderEvents
@@ -62,7 +67,15 @@ export function CommanderTab({
       .map((e) => e.data)
       .join("");
 
-    return stripAnsi(rawContent);
+    const stripped = stripAnsi(rawContent);
+
+    // Debug logging
+    console.log(`[COMMANDER] Events count: ${commanderEvents.length}, Raw stdout length: ${rawContent.length}, Stripped length: ${stripped.length}`);
+    if (rawContent.length > 0 && rawContent.length < 2000) {
+      console.log(`[COMMANDER] Raw stdout (first 500 chars):`, rawContent.substring(0, 500));
+    }
+
+    return stripped;
   }, [commanderEvents]);
 
   // Auto-scroll to bottom when new content arrives

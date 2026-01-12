@@ -142,6 +142,7 @@ export function setupCommanderEventForwarding(
     // Forward Commander events to client
     switch (event.type) {
       case "commander.state":
+        console.log(`[COMMANDER] Broadcasting state to WebSocket client: status=${event.state.status}`);
         send(ws, {
           type: "commander.state",
           state: event.state,
