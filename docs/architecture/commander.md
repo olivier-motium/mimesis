@@ -1001,6 +1001,23 @@ Commander is ready for input (queue drained).
 }
 ```
 
+#### commander.stdout
+
+Commander PTY output (streaming to all clients).
+
+```typescript
+{
+  type: "commander.stdout",
+  session_id: string,
+  seq: number,
+  event: SessionEvent  // Usually { type: "stdout", data: string, timestamp: string }
+}
+```
+
+Unlike regular session events that only go to attached clients, Commander stdout is broadcast to ALL connected clients. This enables the Commander UI to display streaming output without explicit session attachment.
+
+Source: `packages/daemon/src/gateway/protocol.ts:298-303`
+
 ### Stream JSON Chunk Format
 
 Claude CLI's `--output-format stream-json` produces **JSONL log entries** (one per line), not API-level stream events. The UI handles both formats for compatibility.
@@ -1092,7 +1109,11 @@ CommanderTab
 ├── Header (status, queue count, reset button)
 ├── CommanderHistory (placeholder for past conversations)
 ├── Session info (session ID, first turn indicator)
-├── Working indicator (when processing)
+├── Streaming output display
+│   ├── Header with Terminal icon
+│   ├── "Streaming..." indicator (when working)
+│   └── Pre-formatted output (ANSI-stripped)
+├── Working indicator (when processing, no output yet)
 └── CommanderInput
     ├── Textarea (queue-aware placeholder)
     └── Submit/Cancel buttons
@@ -1106,10 +1127,11 @@ Source: `packages/ui/src/components/commander/CommanderTab.tsx`
 
 ```typescript
 interface CommanderTabProps {
-  commanderState: CommanderState;           // PTY session state
-  onSendPrompt: (prompt: string) => void;   // Uses gateway.sendCommanderPrompt
-  onCancel: () => void;                     // Uses gateway.cancelCommander (SIGINT)
-  onResetConversation: () => void;          // Uses gateway.resetCommander
+  commanderState: CommanderState;               // PTY session state
+  commanderEvents: SequencedSessionEvent[];     // PTY output events for streaming display
+  onSendPrompt: (prompt: string) => void;       // Uses gateway.sendCommanderPrompt
+  onCancel: () => void;                         // Uses gateway.cancelCommander (SIGINT)
+  onResetConversation: () => void;              // Uses gateway.resetCommander
 }
 
 interface CommanderState {
@@ -1126,10 +1148,42 @@ Features:
 - Queue indicator showing number of pending prompts
 - Status indicator (Working / Ready / Idle)
 - Session info showing Claude session ID
-- Working indicator with queue count
+- Streaming output display panel (when content available)
+- Working indicator with queue count (when no output yet)
 - Empty state when no PTY session exists
 
-The component is prompt-only - the gateway handles all PTY and queue state internally.
+### Streaming Output Display
+
+CommanderTab includes a real-time output panel showing PTY stdout:
+
+- **Output panel**: Shows `Commander Output` header with streaming indicator
+- **Auto-scroll**: Automatically scrolls to bottom as new content arrives
+- **ANSI stripping**: Raw PTY output contains terminal escape codes that are stripped before rendering
+
+```typescript
+// ANSI escape code stripping
+// Source: packages/ui/src/components/commander/CommanderTab.tsx:19-24
+const ANSI_REGEX = /\x1b\[[0-9;]*[a-zA-Z]|\x1b\][^\x07]*\x07|\x1b[()][AB012]|\x1b\[[\?]?[0-9;]*[hlm]/g;
+function stripAnsi(str: string): string {
+  return str.replace(ANSI_REGEX, "");
+}
+
+// Extract and clean stdout from events
+// Source: packages/ui/src/components/commander/CommanderTab.tsx:58-64
+const stdoutContent = useMemo(() => {
+  const rawContent = commanderEvents
+    .filter((e) => e.type === "stdout" && e.data)
+    .map((e) => e.data)
+    .join("");
+  return stripAnsi(rawContent);
+}, [commanderEvents]);
+```
+
+The streaming display:
+1. Filters `commanderEvents` for `stdout` type events
+2. Joins all `data` fields into a single string
+3. Strips ANSI escape codes for clean rendering
+4. Renders in a monospace `<pre>` element with auto-scroll
 
 ### CommanderInput
 
@@ -1361,6 +1415,39 @@ CommanderSessionManager.onStatusChange()
         ▼
 UI: Commander ready for next prompt
 ```
+
+### Commander Stdout Streaming Flow
+
+```
+PTY stdout data
+        │
+        ▼
+pty-session-handlers.ts:handlePtyOutput()
+        │
+        ├──▶ Regular sessions: Send to attached clients only
+        │
+        └──▶ Commander session detected?
+                  │
+                  ▼
+             gateway-server.ts: Check isCommanderSession()
+                  │
+                  ▼
+             Broadcast commander.stdout to ALL clients
+                  │
+                  ▼
+             UI: handleCommanderStdout() in gateway-handlers.ts
+                  │
+                  ▼
+             Append to commanderEvents[], maintain sequence order
+                  │
+                  ▼
+             CommanderTab: Extract stdout, strip ANSI, render
+```
+
+Key distinction: Unlike regular session events that only go to attached clients,
+Commander stdout is broadcast to ALL connected clients via the `commander.stdout`
+message type. This enables the Commander UI to display streaming output without
+explicit session attachment.
 
 ---
 
