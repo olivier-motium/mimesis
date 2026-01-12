@@ -1395,6 +1395,34 @@ unset ANTHROPIC_API_KEY
 
 **Documentation:** `docs/architecture/commander.md` updated with PTY architecture.
 
+### OpenTelemetry Conditional Span Pattern (Jan 2026)
+
+**Problem:** High-frequency polling operations (like outbox.poll every 1s) create noisy telemetry when spans are created unconditionally.
+
+**Solution:** Only create spans when there's actual work to process:
+
+```typescript
+private poll(): void {
+  const dbEvents = this.outboxRepo.getAfterCursor(this.cursor, 100);
+
+  // Skip span creation if no events (avoids noisy polling telemetry)
+  if (dbEvents.length === 0) {
+    return;
+  }
+
+  // Only trace when we have work to do
+  const tracer = getTracer();
+  const span = tracer.startSpan("outbox.poll", { attributes: {...} });
+  try {
+    // ... process events
+  } finally {
+    span.end();
+  }
+}
+```
+
+**Rule:** For polling operations, check for work BEFORE creating the span. This keeps traces meaningful while avoiding noise.
+
 ### ANSI Escape Code Stripping for PTY Output (Jan 2026)
 
 **Problem:** Commander PTY output showed garbled text with visible escape sequences like `[>1v`.

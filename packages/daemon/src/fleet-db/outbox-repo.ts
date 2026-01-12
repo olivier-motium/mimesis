@@ -7,6 +7,7 @@ import { eq, gt, and, desc, sql } from "drizzle-orm";
 import { getFleetDb, schema } from "./index.js";
 import type { OutboxEvent, NewOutboxEvent } from "./schema.js";
 import { OUTBOX_EVENT_TYPE } from "../config/fleet.js";
+import { getTracer } from "../telemetry/spans.js";
 
 export interface OutboxEventPayload {
   briefing?: {
@@ -93,19 +94,33 @@ export class OutboxRepo {
    * Returns the event ID.
    */
   insert(event: Omit<NewOutboxEvent, "ts" | "delivered">): number {
-    const db = getFleetDb();
-    const now = new Date().toISOString();
+    const tracer = getTracer();
+    const span = tracer.startSpan("outbox.insert", {
+      attributes: {
+        "outbox.event_type": event.type,
+        "outbox.project_id": event.projectId ?? "unknown",
+      },
+    });
 
-    const result = db
-      .insert(schema.outboxEvents)
-      .values({
-        ...event,
-        ts: now,
-        delivered: false,
-      })
-      .run();
+    try {
+      const db = getFleetDb();
+      const now = new Date().toISOString();
 
-    return Number(result.lastInsertRowid);
+      const result = db
+        .insert(schema.outboxEvents)
+        .values({
+          ...event,
+          ts: now,
+          delivered: false,
+        })
+        .run();
+
+      const eventId = Number(result.lastInsertRowid);
+      span.setAttribute("outbox.event_id", eventId);
+      return eventId;
+    } finally {
+      span.end();
+    }
   }
 
   /**

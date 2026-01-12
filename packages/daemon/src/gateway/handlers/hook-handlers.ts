@@ -8,6 +8,7 @@ import type { WebSocket } from "ws";
 import type { EventMergerManager } from "../event-merger.js";
 import { parseHookEvent, type HookEvent, type SessionEvent, type GatewayMessage } from "../protocol.js";
 import type { ClientState } from "./pty-session-handlers.js";
+import { getTracer } from "../../telemetry/spans.js";
 
 /**
  * Dependencies for hook handlers.
@@ -30,27 +31,42 @@ export function handleHookEvent(
   const hookEvent = parseHookEvent(line);
   if (!hookEvent) return;
 
-  const sessionId = hookEvent.fleet_session_id;
-  const merger = mergerManager.get(sessionId);
-  if (!merger) return;
+  const tracer = getTracer();
+  const span = tracer.startSpan("hook.event", {
+    attributes: {
+      "hook.session_id": hookEvent.fleet_session_id,
+      "hook.tool_name": hookEvent.tool_name ?? "unknown",
+      "hook.phase": hookEvent.phase ?? "unknown",
+    },
+  });
 
-  const seq = merger.addHookEvent(hookEvent);
-  if (seq < 0) return;
+  try {
+    const sessionId = hookEvent.fleet_session_id;
+    const merger = mergerManager.get(sessionId);
+    if (!merger) return;
 
-  // Create session event from hook
-  const event = hookToSessionEvent(hookEvent);
-  if (!event) return;
+    const seq = merger.addHookEvent(hookEvent);
+    if (seq < 0) return;
 
-  // Broadcast to attached clients
-  for (const [ws, state] of clients) {
-    if (state.attachedSession === sessionId) {
-      send(ws, {
-        type: "event",
-        session_id: sessionId,
-        seq,
-        event,
-      });
+    // Create session event from hook
+    const event = hookToSessionEvent(hookEvent);
+    if (!event) return;
+
+    span.setAttribute("hook.seq", seq);
+
+    // Broadcast to attached clients
+    for (const [ws, state] of clients) {
+      if (state.attachedSession === sessionId) {
+        send(ws, {
+          type: "event",
+          session_id: sessionId,
+          seq,
+          event,
+        });
+      }
     }
+  } finally {
+    span.end();
   }
 }
 

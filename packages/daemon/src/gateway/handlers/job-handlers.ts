@@ -7,6 +7,7 @@
 import type { WebSocket } from "ws";
 import type { JobManager, JobEventListener } from "../job-manager.js";
 import type { GatewayMessage } from "../protocol.js";
+import { getTracer, recordError } from "../../telemetry/spans.js";
 
 /**
  * Dependencies for job handlers.
@@ -43,6 +44,16 @@ export async function handleJobCreate(
   ws: WebSocket,
   message: JobCreateMessage
 ): Promise<void> {
+  const tracer = getTracer();
+  const span = tracer.startSpan("gateway.job.create", {
+    attributes: {
+      "job.type": message.job.type,
+      "job.project_id": message.job.project_id ?? "unknown",
+      "job.model": message.job.model,
+      "job.prompt_length": message.job.request.prompt.length,
+    },
+  });
+
   const { jobManager, send } = deps;
 
   const listener: JobEventListener = (event) => {
@@ -67,11 +78,14 @@ export async function handleJobCreate(
       listener
     );
   } catch (error) {
+    recordError(span, error as Error);
     send(ws, {
       type: "error",
       code: "JOB_CREATE_FAILED",
       message: error instanceof Error ? error.message : String(error),
     });
+  } finally {
+    span.end();
   }
 }
 
@@ -82,6 +96,17 @@ export function handleJobCancel(
   deps: JobHandlerDependencies,
   message: { job_id: number }
 ): void {
-  const { jobManager } = deps;
-  jobManager.cancelJob(message.job_id);
+  const tracer = getTracer();
+  const span = tracer.startSpan("gateway.job.cancel", {
+    attributes: {
+      "job.id": message.job_id,
+    },
+  });
+
+  try {
+    const { jobManager } = deps;
+    jobManager.cancelJob(message.job_id);
+  } finally {
+    span.end();
+  }
 }

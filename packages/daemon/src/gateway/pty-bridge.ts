@@ -17,7 +17,7 @@ import {
   SIGNAL_ESCALATION,
 } from "../config/index.js";
 import type { SessionEvent, StdoutEvent } from "./protocol.js";
-import { withSpan, addPtyAttributes } from "../telemetry/spans.js";
+import { getTracer, withSpan, addPtyAttributes } from "../telemetry/spans.js";
 import { recordPtyActive, recordError as recordErrorMetric } from "../telemetry/metrics.js";
 
 export interface PtyBridgeCallbacks {
@@ -72,91 +72,106 @@ export class PtyBridge {
    * Create a new PTY session.
    */
   async create(options: CreatePtyOptions): Promise<PtySessionInfo> {
-    const sessionId = `s_${randomUUID().replace(/-/g, "").substring(0, 12)}`;
-    const { projectId, cwd, command, cols, rows, env } = options;
-
-    const termCols = cols ?? PTY_DEFAULT_COLS;
-    const termRows = rows ?? PTY_DEFAULT_ROWS;
-
-    // Default command is claude CLI
-    const shellCommand = command ?? ["claude"];
-    const shell = shellCommand[0];
-    const args = shellCommand.slice(1);
-
-    // Build environment with FLEET_SESSION_ID for hooks
-    const spawnEnv: Record<string, string> = {
-      ...(process.env as Record<string, string>),
-      ...env,
-      TERM: "xterm-256color",
-      COLORTERM: "truecolor",
-      FLEET_SESSION_ID: sessionId,
-    };
-
-    // Spawn the PTY process
-    const proc = pty.spawn(shell, args, {
-      name: "xterm-256color",
-      cols: termCols,
-      rows: termRows,
-      cwd,
-      env: spawnEnv,
+    const tracer = getTracer();
+    const span = tracer.startSpan("pty.create", {
+      attributes: {
+        "pty.project_id": options.projectId,
+        "pty.cwd": options.cwd,
+        "pty.command": (options.command ?? ["claude"]).join(" "),
+      },
     });
 
-    const now = new Date().toISOString();
+    try {
+      const sessionId = `s_${randomUUID().replace(/-/g, "").substring(0, 12)}`;
+      const { projectId, cwd, command, cols, rows, env } = options;
 
-    // Create PID file for crash recovery
-    await mkdir(FLEET_SESSIONS_DIR, { recursive: true });
-    const pidFile = path.join(FLEET_SESSIONS_DIR, `${sessionId}.pid`);
-    await writeFile(pidFile, JSON.stringify({
-      pid: proc.pid,
-      sessionId,
-      projectId,
-      cwd,
-      createdAt: now,
-    }));
+      const termCols = cols ?? PTY_DEFAULT_COLS;
+      const termRows = rows ?? PTY_DEFAULT_ROWS;
 
-    const session: PtyProcess = {
-      sessionId,
-      projectId,
-      process: proc,
-      cwd,
-      createdAt: now,
-      cols: termCols,
-      rows: termRows,
-      pidFile,
-    };
+      // Default command is claude CLI
+      const shellCommand = command ?? ["claude"];
+      const shell = shellCommand[0];
+      const args = shellCommand.slice(1);
 
-    this.sessions.set(sessionId, session);
-
-    // Update PTY session count metric
-    recordPtyActive(this.sessions.size);
-
-    // Handle PTY output
-    proc.onData((data) => {
-      const event: StdoutEvent = {
-        type: "stdout",
-        data,
-        timestamp: new Date().toISOString(),
+      // Build environment with FLEET_SESSION_ID for hooks
+      const spawnEnv: Record<string, string> = {
+        ...(process.env as Record<string, string>),
+        ...env,
+        TERM: "xterm-256color",
+        COLORTERM: "truecolor",
+        FLEET_SESSION_ID: sessionId,
       };
-      this.onOutput(sessionId, event);
-    });
 
-    // Handle PTY exit
-    proc.onExit(({ exitCode, signal }) => {
-      this.cleanup(sessionId);
-      this.onExit(sessionId, exitCode, signal ? String(signal) : undefined);
-    });
+      // Spawn the PTY process
+      const proc = pty.spawn(shell, args, {
+        name: "xterm-256color",
+        cols: termCols,
+        rows: termRows,
+        cwd,
+        env: spawnEnv,
+      });
 
-    console.log(`[PTY] Created session ${sessionId} for project ${projectId} (pid=${proc.pid})`);
+      const now = new Date().toISOString();
 
-    return {
-      sessionId,
-      projectId,
-      pid: proc.pid,
-      cwd,
-      createdAt: now,
-      cols: termCols,
-      rows: termRows,
-    };
+      // Create PID file for crash recovery
+      await mkdir(FLEET_SESSIONS_DIR, { recursive: true });
+      const pidFile = path.join(FLEET_SESSIONS_DIR, `${sessionId}.pid`);
+      await writeFile(pidFile, JSON.stringify({
+        pid: proc.pid,
+        sessionId,
+        projectId,
+        cwd,
+        createdAt: now,
+      }));
+
+      const session: PtyProcess = {
+        sessionId,
+        projectId,
+        process: proc,
+        cwd,
+        createdAt: now,
+        cols: termCols,
+        rows: termRows,
+        pidFile,
+      };
+
+      this.sessions.set(sessionId, session);
+
+      // Update PTY session count metric
+      recordPtyActive(this.sessions.size);
+
+      // Handle PTY output
+      proc.onData((data) => {
+        const event: StdoutEvent = {
+          type: "stdout",
+          data,
+          timestamp: new Date().toISOString(),
+        };
+        this.onOutput(sessionId, event);
+      });
+
+      // Handle PTY exit
+      proc.onExit(({ exitCode, signal }) => {
+        this.cleanup(sessionId);
+        this.onExit(sessionId, exitCode, signal ? String(signal) : undefined);
+      });
+
+      span.setAttribute("pty.session_id", sessionId);
+      span.setAttribute("pty.pid", proc.pid);
+      console.log(`[PTY] Created session ${sessionId} for project ${projectId} (pid=${proc.pid})`);
+
+      return {
+        sessionId,
+        projectId,
+        pid: proc.pid,
+        cwd,
+        createdAt: now,
+        cols: termCols,
+        rows: termRows,
+      };
+    } finally {
+      span.end();
+    }
   }
 
   /**
@@ -241,32 +256,50 @@ export class PtyBridge {
     const session = this.sessions.get(sessionId);
     if (!session) return;
 
-    // Signal escalation: SIGINT -> SIGTERM -> SIGKILL
-    const signals: Array<{ signal: NodeJS.Signals; delayMs: number }> = [
-      { signal: "SIGINT", delayMs: SIGNAL_ESCALATION.SIGINT_TO_SIGTERM_MS },
-      { signal: "SIGTERM", delayMs: SIGNAL_ESCALATION.SIGTERM_TO_SIGKILL_MS },
-      { signal: "SIGKILL", delayMs: 1000 },
-    ];
+    const tracer = getTracer();
+    const span = tracer.startSpan("pty.stop", {
+      attributes: {
+        "pty.session_id": sessionId,
+        "pty.project_id": session.projectId,
+        "pty.pid": session.process.pid,
+      },
+    });
 
-    for (const { signal, delayMs } of signals) {
-      try {
-        process.kill(-session.process.pid, signal);
-        console.log(`[PTY] Sent ${signal} to session ${sessionId}`);
+    try {
+      // Signal escalation: SIGINT -> SIGTERM -> SIGKILL
+      const signals: Array<{ signal: NodeJS.Signals; delayMs: number }> = [
+        { signal: "SIGINT", delayMs: SIGNAL_ESCALATION.SIGINT_TO_SIGTERM_MS },
+        { signal: "SIGTERM", delayMs: SIGNAL_ESCALATION.SIGTERM_TO_SIGKILL_MS },
+        { signal: "SIGKILL", delayMs: 1000 },
+      ];
 
-        // Wait for process to exit or timeout
-        const exited = await this.waitForExit(sessionId, delayMs);
-        if (exited) {
-          console.log(`[PTY] Session ${sessionId} exited after ${signal}`);
-          return;
+      for (const { signal, delayMs } of signals) {
+        try {
+          process.kill(-session.process.pid, signal);
+          console.log(`[PTY] Sent ${signal} to session ${sessionId}`);
+
+          // Wait for process to exit or timeout
+          const exited = await this.waitForExit(sessionId, delayMs);
+          if (exited) {
+            console.log(`[PTY] Session ${sessionId} exited after ${signal}`);
+            span.setAttribute("pty.exit_signal", signal);
+            return;
+          }
+        } catch {
+          // Process may have already exited
+          if (!this.sessions.has(sessionId)) {
+            span.setAttribute("pty.exit_signal", "already_exited");
+            return;
+          }
         }
-      } catch {
-        // Process may have already exited
-        if (!this.sessions.has(sessionId)) return;
       }
-    }
 
-    console.log(`[PTY] Session ${sessionId} did not respond to signals, forcing cleanup`);
-    this.cleanup(sessionId);
+      console.log(`[PTY] Session ${sessionId} did not respond to signals, forcing cleanup`);
+      span.setAttribute("pty.exit_signal", "forced_cleanup");
+      this.cleanup(sessionId);
+    } finally {
+      span.end();
+    }
   }
 
   /**

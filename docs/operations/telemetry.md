@@ -41,8 +41,57 @@ Located at `packages/daemon/src/config/telemetry.ts`:
 ## Spans
 
 Key spans traced:
-- `db.initialize` - Database setup
-- HTTP requests (auto-instrumented)
+
+### Infrastructure
+| Span | Description |
+|------|-------------|
+| `db.initialize` | Database setup |
+| HTTP requests | Auto-instrumented |
+
+### Commander Operations
+| Span | Description | Key Attributes |
+|------|-------------|----------------|
+| `commander.sendPrompt` | Prompt sent to Claude | `prompt_length`, `queue_size`, `action` |
+| `commander.reset` | Session reset | `queue_cleared_count` |
+| `commander.ensureSession` | Session creation/resume | `is_resume`, `session_id` |
+| `commander.writePrompt` | Prompt written to PTY | `turn_count`, `has_prelude` |
+| `commander.drainQueue` | Queue drain operation | `remaining_items` |
+
+### Gateway Handlers
+| Span | Description | Key Attributes |
+|------|-------------|----------------|
+| `gateway.commander.send` | WebSocket prompt send | `prompt_length` |
+| `gateway.commander.reset` | WebSocket reset request | - |
+| `gateway.commander.cancel` | WebSocket cancel request | - |
+| `gateway.job.create` | Job creation request | `project_id`, `prompt_length` |
+| `gateway.job.cancel` | Job cancellation request | `job_id` |
+
+### Job Operations
+| Span | Description | Key Attributes |
+|------|-------------|----------------|
+| `job.create` | Job created | `project_id`, `prompt_length`, `queued` |
+| `job.cancel` | Job cancelled | `job_id` |
+| `job.start` | Job started | `job_id`, `project_id` |
+| `job.execute` | Job executed | `job_id`, `duration_ms` |
+
+### Hook Events
+| Span | Description | Key Attributes |
+|------|-------------|----------------|
+| `hook.event` | Hook event processed | `event_type`, `session_id`, `phase` |
+
+### Outbox Operations
+| Span | Description | Key Attributes |
+|------|-------------|----------------|
+| `outbox.insert` | Event inserted to outbox | `event_type`, `project_id` |
+| `outbox.poll` | Outbox poll (only when events exist) | `cursor`, `events_found` |
+| `outbox.broadcast` | Event broadcast to listeners | `event_id`, `listener_count` |
+
+### Briefing & PTY
+| Span | Description | Key Attributes |
+|------|-------------|----------------|
+| `briefing.ingest` | Briefing file ingested | `project_id`, `session_id` |
+| `pty.create` | PTY session created | `project_id`, `pid`, `command` |
+| `pty.stop` | PTY session stopped | `session_id`, `exit_signal` |
 
 ## MCP Server Integration
 

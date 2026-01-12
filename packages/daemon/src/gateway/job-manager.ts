@@ -12,6 +12,7 @@ import { JobRunner, type JobRequest, type JobResult } from "./job-runner.js";
 import { JobRepo } from "../fleet-db/job-repo.js";
 import { MAX_CONCURRENT_JOBS, MAX_JOBS_PER_PROJECT, JOB_STATUS } from "../config/index.js";
 import type { StreamJsonChunk, JobStreamMessage, JobStartedMessage, JobCompletedMessage } from "./protocol.js";
+import { getTracer, recordError } from "../telemetry/spans.js";
 
 export type JobEventListener = (event: JobStartedMessage | JobStreamMessage | JobCompletedMessage) => void;
 
@@ -57,48 +58,84 @@ export class JobManager {
    * Returns jobId when job starts (not when queued).
    */
   async createJob(request: JobRequest, listener: JobEventListener): Promise<number> {
-    // Check per-project limit
-    if (request.projectId && this.projectJobs.has(request.projectId)) {
-      throw new Error(`Project ${request.projectId} already has a running job`);
-    }
-
-    // If under global limit, start immediately
-    if (this.running.size < MAX_CONCURRENT_JOBS) {
-      return this.startJob(request, listener);
-    }
-
-    // Queue the job
-    return new Promise((resolve, reject) => {
-      this.queue.push({ request, listener, resolve, reject });
-      console.log(`[JOBS] Job queued (queue size: ${this.queue.length})`);
+    const tracer = getTracer();
+    const span = tracer.startSpan("job.create", {
+      attributes: {
+        "job.type": request.type,
+        "job.project_id": request.projectId ?? "unknown",
+        "job.model": request.model,
+        "job.prompt_length": request.request.prompt.length,
+        "job.running_count": this.running.size,
+        "job.queue_size": this.queue.length,
+      },
     });
+
+    try {
+      // Check per-project limit
+      if (request.projectId && this.projectJobs.has(request.projectId)) {
+        throw new Error(`Project ${request.projectId} already has a running job`);
+      }
+
+      // If under global limit, start immediately
+      if (this.running.size < MAX_CONCURRENT_JOBS) {
+        const jobId = await this.startJob(request, listener);
+        span.setAttribute("job.action", "started");
+        span.setAttribute("job.id", jobId);
+        return jobId;
+      }
+
+      // Queue the job
+      span.setAttribute("job.action", "queued");
+      return new Promise((resolve, reject) => {
+        this.queue.push({ request, listener, resolve, reject });
+        console.log(`[JOBS] Job queued (queue size: ${this.queue.length})`);
+      });
+    } catch (error) {
+      recordError(span, error as Error);
+      throw error;
+    } finally {
+      span.end();
+    }
   }
 
   /**
    * Cancel a job.
    */
   cancelJob(jobId: number): boolean {
-    const job = this.running.get(jobId);
-    if (!job) {
-      // Can't cancel queued jobs yet
-      return false;
-    }
-
-    job.runner.abort();
-    this.jobRepo.markFailed(jobId, "Job was cancelled");
-
-    // Notify listener
-    job.listener({
-      type: "job.completed",
-      job_id: jobId,
-      ok: false,
-      error: "Job was cancelled",
+    const tracer = getTracer();
+    const span = tracer.startSpan("job.cancel", {
+      attributes: {
+        "job.id": jobId,
+      },
     });
 
-    this.removeRunningJob(jobId);
-    this.processQueue();
+    try {
+      const job = this.running.get(jobId);
+      if (!job) {
+        // Can't cancel queued jobs yet
+        span.setAttribute("job.cancelled", false);
+        return false;
+      }
 
-    return true;
+      job.runner.abort();
+      this.jobRepo.markFailed(jobId, "Job was cancelled");
+
+      // Notify listener
+      job.listener({
+        type: "job.completed",
+        job_id: jobId,
+        ok: false,
+        error: "Job was cancelled",
+      });
+
+      this.removeRunningJob(jobId);
+      this.processQueue();
+
+      span.setAttribute("job.cancelled", true);
+      return true;
+    } finally {
+      span.end();
+    }
   }
 
   /**
@@ -138,64 +175,82 @@ export class JobManager {
    * Start a job immediately.
    */
   private async startJob(request: JobRequest, listener: JobEventListener): Promise<number> {
-    // Create job in database
-    const jobId = this.jobRepo.create({
-      type: request.type,
-      model: request.model,
-      request: {
-        prompt: request.request.prompt,
-        systemPrompt: request.request.systemPrompt,
+    const tracer = getTracer();
+    const span = tracer.startSpan("job.start", {
+      attributes: {
+        "job.type": request.type,
+        "job.project_id": request.projectId ?? "unknown",
+        "job.model": request.model,
       },
-      projectId: request.projectId,
-      repoRoot: request.repoRoot,
     });
 
-    // Mark as started
-    this.jobRepo.markStarted(jobId);
-
-    // Track per-project
-    if (request.projectId) {
-      this.projectJobs.set(request.projectId, jobId);
-    }
-
-    // Notify listener
-    listener({
-      type: "job.started",
-      job_id: jobId,
-      project_id: request.projectId,
-    });
-
-    // Create runner
-    const runner = new JobRunner();
-
-    // Store running job
-    const runningJob: RunningJob = {
-      jobId,
-      projectId: request.projectId,
-      runner,
-      listener,
-    };
-    this.running.set(jobId, runningJob);
-
-    // Collect stream chunks for storage
-    const streamChunks: StreamJsonChunk[] = [];
-
-    // Run the job
-    const onChunk = (chunk: StreamJsonChunk) => {
-      streamChunks.push(chunk);
-
-      // Forward to listener
-      listener({
-        type: "job.stream",
-        job_id: jobId,
-        chunk,
+    try {
+      // Create job in database
+      const jobId = this.jobRepo.create({
+        type: request.type,
+        model: request.model,
+        request: {
+          prompt: request.request.prompt,
+          systemPrompt: request.request.systemPrompt,
+        },
+        projectId: request.projectId,
+        repoRoot: request.repoRoot,
       });
-    };
 
-    // Execute asynchronously
-    this.executeJob(jobId, request, runner, listener, streamChunks);
+      span.setAttribute("job.id", jobId);
 
-    return jobId;
+      // Mark as started
+      this.jobRepo.markStarted(jobId);
+
+      // Track per-project
+      if (request.projectId) {
+        this.projectJobs.set(request.projectId, jobId);
+      }
+
+      // Notify listener
+      listener({
+        type: "job.started",
+        job_id: jobId,
+        project_id: request.projectId,
+      });
+
+      // Create runner
+      const runner = new JobRunner();
+
+      // Store running job
+      const runningJob: RunningJob = {
+        jobId,
+        projectId: request.projectId,
+        runner,
+        listener,
+      };
+      this.running.set(jobId, runningJob);
+
+      // Collect stream chunks for storage
+      const streamChunks: StreamJsonChunk[] = [];
+
+      // Run the job
+      const onChunk = (chunk: StreamJsonChunk) => {
+        streamChunks.push(chunk);
+
+        // Forward to listener
+        listener({
+          type: "job.stream",
+          job_id: jobId,
+          chunk,
+        });
+      };
+
+      // Execute asynchronously
+      this.executeJob(jobId, request, runner, listener, streamChunks);
+
+      return jobId;
+    } catch (error) {
+      recordError(span, error as Error);
+      throw error;
+    } finally {
+      span.end();
+    }
   }
 
   /**
@@ -208,6 +263,16 @@ export class JobManager {
     listener: JobEventListener,
     streamChunks: StreamJsonChunk[]
   ): Promise<void> {
+    const tracer = getTracer();
+    const span = tracer.startSpan("job.execute", {
+      attributes: {
+        "job.id": jobId,
+        "job.type": request.type,
+        "job.project_id": request.projectId ?? "unknown",
+        "job.model": request.model,
+      },
+    });
+
     try {
       const result = await runner.run(request, (chunk) => {
         streamChunks.push(chunk);
@@ -236,6 +301,9 @@ export class JobManager {
           streamChunks
         );
 
+        span.setAttribute("job.ok", true);
+        span.setAttribute("job.stream_chunks", streamChunks.length);
+
         listener({
           type: "job.completed",
           job_id: jobId,
@@ -249,6 +317,9 @@ export class JobManager {
       } else {
         this.jobRepo.markFailed(jobId, result.error ?? "Unknown error");
 
+        span.setAttribute("job.ok", false);
+        span.setAttribute("job.error", result.error ?? "Unknown error");
+
         listener({
           type: "job.completed",
           job_id: jobId,
@@ -259,6 +330,7 @@ export class JobManager {
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.jobRepo.markFailed(jobId, errorMessage);
+      recordError(span, error as Error);
 
       listener({
         type: "job.completed",
@@ -269,6 +341,7 @@ export class JobManager {
     } finally {
       this.removeRunningJob(jobId);
       this.processQueue();
+      span.end();
     }
   }
 

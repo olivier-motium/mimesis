@@ -9,6 +9,7 @@ import { OutboxRepo } from "../fleet-db/outbox-repo.js";
 import type { OutboxEvent as DbOutboxEvent } from "../fleet-db/schema.js";
 import { OUTBOX_POLL_INTERVAL_MS } from "../config/index.js";
 import type { FleetEventMessage, FleetEventPayload } from "./protocol.js";
+import { getTracer } from "../telemetry/spans.js";
 
 // Re-export with parsed payload for convenience
 export interface OutboxEvent {
@@ -114,25 +115,42 @@ export class OutboxTailer {
 
   /**
    * Poll for new events.
+   * Note: Only creates a span when there are events to process (to avoid noisy telemetry).
    */
   private poll(): void {
     try {
       const dbEvents = this.outboxRepo.getAfterCursor(this.cursor, 100);
 
-      if (dbEvents.length === 0) return;
+      // Skip span creation if no events (avoids noisy polling telemetry)
+      if (dbEvents.length === 0) {
+        return;
+      }
 
-      for (const dbEvent of dbEvents) {
-        const event = toOutboxEvent(dbEvent);
-        const message = this.toFleetEventMessage(event);
-        this.broadcast(message);
+      // Only trace when we have work to do
+      const tracer = getTracer();
+      const span = tracer.startSpan("outbox.poll", {
+        attributes: {
+          "outbox.cursor": this.cursor,
+          "outbox.events_found": dbEvents.length,
+        },
+      });
 
-        // Update cursor
-        if (event.eventId > this.cursor) {
-          this.cursor = event.eventId;
+      try {
+        for (const dbEvent of dbEvents) {
+          const event = toOutboxEvent(dbEvent);
+          const message = this.toFleetEventMessage(event);
+          this.broadcast(message);
+
+          // Update cursor
+          if (event.eventId > this.cursor) {
+            this.cursor = event.eventId;
+          }
+
+          // Mark as delivered
+          this.outboxRepo.markDelivered(event.eventId);
         }
-
-        // Mark as delivered
-        this.outboxRepo.markDelivered(event.eventId);
+      } finally {
+        span.end();
       }
     } catch (error) {
       console.error("[OUTBOX] Poll error:", error);
@@ -143,12 +161,25 @@ export class OutboxTailer {
    * Broadcast event to all listeners.
    */
   private broadcast(event: FleetEventMessage): void {
-    for (const listener of this.listeners) {
-      try {
-        listener(event);
-      } catch (error) {
-        console.error("[OUTBOX] Listener error:", error);
+    const tracer = getTracer();
+    const span = tracer.startSpan("outbox.broadcast", {
+      attributes: {
+        "outbox.event_id": event.event_id,
+        "outbox.event_type": event.event.type,
+        "outbox.listener_count": this.listeners.size,
+      },
+    });
+
+    try {
+      for (const listener of this.listeners) {
+        try {
+          listener(event);
+        } catch (error) {
+          console.error("[OUTBOX] Listener error:", error);
+        }
       }
+    } finally {
+      span.end();
     }
   }
 

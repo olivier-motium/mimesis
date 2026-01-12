@@ -8,6 +8,7 @@ import { ProjectRepo, generateProjectId } from "./project-repo.js";
 import { BriefingRepo } from "./briefing-repo.js";
 import { OutboxRepo } from "./outbox-repo.js";
 import { parseStatusV5, tryParseStatusV5, type StatusV5 } from "./status-v5-parser.js";
+import { getTracer, recordError } from "../telemetry/spans.js";
 
 export interface IngestionResult {
   success: boolean;
@@ -52,13 +53,20 @@ export class BriefingIngestor {
    * @returns Ingestion result with IDs or error
    */
   ingest(input: IngestionInput): IngestionResult {
-    const sqlite = getFleetSqlite();
-    if (!sqlite) {
-      // Ensure DB is initialized
-      getFleetDb();
-    }
+    const tracer = getTracer();
+    const span = tracer.startSpan("briefing.ingest", {
+      attributes: {
+        "briefing.content_length": input.content.length,
+      },
+    });
 
     try {
+      const sqlite = getFleetSqlite();
+      if (!sqlite) {
+        // Ensure DB is initialized
+        getFleetDb();
+      }
+
       // Parse the status file
       const parsed = parseStatusV5(input.content);
       const fm = parsed.frontmatter;
@@ -69,6 +77,7 @@ export class BriefingIngestor {
       const gitRemote = fm.git_remote ?? input.gitRemote;
 
       if (!repoName || !repoRoot) {
+        span.setAttribute("briefing.error", "missing_fields");
         return {
           success: false,
           error: "Missing required fields: repo_name and repo_root",
@@ -77,6 +86,8 @@ export class BriefingIngestor {
 
       // Generate or use provided project ID
       const projectId = fm.project_id ?? generateProjectId(repoName, gitRemote);
+      span.setAttribute("briefing.project_id", projectId);
+      span.setAttribute("briefing.session_id", fm.session_id ?? "unknown");
 
       // Run in transaction
       const result = this.ingestTransactional({
@@ -88,12 +99,25 @@ export class BriefingIngestor {
         markdown: parsed.markdown,
       });
 
+      if (result.success) {
+        span.setAttribute("briefing.success", true);
+        span.setAttribute("briefing.is_duplicate", result.isDuplicate ?? false);
+        if (result.briefingId) {
+          span.setAttribute("briefing.id", result.briefingId);
+        }
+      } else {
+        span.setAttribute("briefing.success", false);
+      }
+
       return result;
     } catch (error) {
+      recordError(span, error as Error);
       return {
         success: false,
         error: error instanceof Error ? error.message : String(error),
       };
+    } finally {
+      span.end();
     }
   }
 
