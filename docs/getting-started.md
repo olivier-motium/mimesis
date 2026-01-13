@@ -60,13 +60,14 @@ Each session shows:
 
 ## Commander (Meta-Agent)
 
-Mimesis includes **Commander**, a meta-agent that orchestrates jobs across your fleet. Key features:
+Mimesis includes **Commander**, an Opus-powered meta-agent for cross-project intelligence. Key features:
 
-- **Headless Jobs**: Run Claude Code prompts without interactive sessions
-- **Session Resumption**: Jobs maintain context via `claude -p "<prompt>" --resume <session-id>`
-- **Semantic Briefings**: Cross-project intelligence summaries
+- **Persistent PTY Session**: Interactive Claude session with native hook support
+- **Fleet Prelude**: Injects recent activity from all projects before each turn
+- **Prompt Queue**: Queues prompts when busy, drains automatically on completion
+- **Semantic Briefings**: AI-analyzed summaries with impact levels and doc drift risk
 
-Commander sessions appear in the Roster alongside regular sessions. See [Commander Architecture](architecture/commander.md) for full details.
+Toggle between agent Timeline and Commander chat using the tabs in the UI. See [Commander Architecture](architecture/commander.md) for full details.
 
 ## Verify It's Working
 
