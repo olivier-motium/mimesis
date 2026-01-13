@@ -76,7 +76,7 @@ Real-time monitoring dashboard for Claude Code sessions.
 | **Session Watcher** | Monitors `~/.claude/projects/` for JSONL changes | [README](../README.md#daemon) |
 | **Fleet Gateway** | WebSocket server for PTY sessions and real-time events (port 4452) | [Gateway Architecture](architecture/gateway.md) |
 | **Session Lifecycle** | Session states, compaction, segment chains, work chains | [Session Lifecycle](architecture/session-lifecycle.md) |
-| **File-Based Status** | Claude Code hooks write status to `.claude/status.v5.<session_id>.md` | [Commander Architecture](architecture/commander.md#statusv5-schema) |
+| **File-Based Status** | Claude Code hooks write status to `.claude/status.v5.<session_id>.md` | [Commander Architecture](architecture/commander.md#statusv5-file-format) |
 | **Fleet DB** | SQLite ledger for briefings, jobs, projects | [Fleet DB Schema](architecture/fleet-db.md) |
 | **Telemetry** | OpenTelemetry traces/metrics exported to Logfire | [Telemetry](operations/telemetry.md) |
 
