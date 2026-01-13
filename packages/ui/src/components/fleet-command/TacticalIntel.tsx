@@ -79,7 +79,7 @@ export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disc
           {mission}
         </div>
         <div className="inspector-hud__context">
-          {session.gitBranch && (
+          {session.gitBranch && mission !== session.gitBranch && (
             <span className="inspector-hud__chip">
               <GitBranch size={10} />
               {session.gitBranch}
@@ -132,7 +132,7 @@ export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disc
         </div>
         <div className="inspector-state__content">
           <div className="inspector-state__row">
-            <span className="inspector-state__label">Now:</span>
+            <span className="inspector-state__label">Status:</span>
             <span className={`inspector-state__value inspector-state__value--${status}`}>{nowText}</span>
           </div>
           <div className="inspector-state__row">
@@ -148,7 +148,7 @@ export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disc
               <Clock size={10} />
             </span>
             <span className="inspector-state__value">
-              Last activity {formatTimeAgo(session.lastActivityAt)}
+              {formatTimeAgo(session.lastActivityAt)}
             </span>
           </div>
         </div>
@@ -162,7 +162,7 @@ export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disc
         </div>
         <div className="inspector-output__content">
           {session.recentOutput.length === 0 ? (
-            <div className="inspector-output__empty">No recent output</div>
+            <div className="inspector-output__empty">Output will appear as agent works</div>
           ) : (
             session.recentOutput.slice(-5).map((output, i) => (
               <div key={i} className={`inspector-output__entry inspector-output__entry--${output.role}`}>

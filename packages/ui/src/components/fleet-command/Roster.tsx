@@ -91,7 +91,7 @@ export function Roster({
             <input
               type="text"
               className="fleet-roster__search-input"
-              placeholder="Filter Units..."
+              placeholder="Search sessions..."
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
             />

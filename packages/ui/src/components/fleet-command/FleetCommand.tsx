@@ -9,7 +9,7 @@
  * Connects to Fleet Gateway via WebSocket for realtime updates.
  */
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { CommandBar } from "./CommandBar";
 import { Roster } from "./Roster";
 import { TacticalIntel } from "./TacticalIntel";
@@ -21,6 +21,7 @@ import { countSessionsByStatus } from "../ops-table/utils";
 import { useGateway } from "../../hooks/useGateway";
 import { useSessionEvents } from "../../hooks/useSessionEvents";
 import { useFleetKeyboard } from "../../hooks/useFleetKeyboard";
+import { getEffectiveStatus } from "@/lib/sessionStatus";
 import type { FleetCommandProps } from "./types";
 import type { StatusFilter } from "../ops-table/types";
 
@@ -67,6 +68,22 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
     // Attach to new session (request events from seq 0 for full history)
     gateway.attachSession(sessionId, 0);
   }, [gateway]);
+
+  // Auto-select first running agent when none selected (improves empty Tactical Intel UX)
+  useEffect(() => {
+    if (selectedSessionId || sessions.length === 0) return;
+
+    // Find the first running session to auto-select
+    const runningSession = sessions.find((s) => {
+      const { status } = getEffectiveStatus(s);
+      return status === "working" || (status === "waiting" && s.hasPendingToolUse);
+    });
+
+    if (runningSession) {
+      const chainId = runningSession.workChainId ?? runningSession.sessionId;
+      handleSelectSession(chainId);
+    }
+  }, [selectedSessionId, sessions, handleSelectSession]);
 
   // Handle send stdin
   const handleSendStdin = useCallback((sessionId: string, data: string) => {

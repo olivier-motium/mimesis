@@ -109,18 +109,51 @@ export function parsePlanSteps(session: {
 // Mission Card Helpers (Ops-first Bridge)
 // ============================================
 
+/**
+ * Strip system tags and their content from text for cleaner display.
+ * Removes <local-command-caveat>...</local-command-caveat>, <system-reminder>...</system-reminder>, etc.
+ */
+function stripSystemTags(text: string): string {
+  return text
+    // Remove system tags and their entire content
+    .replace(/<local-command-caveat>[\s\S]*?<\/local-command-caveat>/gi, "")
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/gi, "")
+    .replace(/<command-message>[\s\S]*?<\/command-message>/gi, "")
+    .replace(/<command-name>[\s\S]*?<\/command-name>/gi, "")
+    .replace(/<command-args>[\s\S]*?<\/command-args>/gi, "")
+    .replace(/<local-command-stdout>[\s\S]*?<\/local-command-stdout>/gi, "")
+    // Remove any remaining standalone tags
+    .replace(/<[^>]+>/g, "")
+    // Normalize whitespace
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /** Get mission title (workChainName with fallback to originalPrompt) */
 export function getMissionText(session: {
   workChainName?: string | null;
   originalPrompt?: string;
+  gitBranch?: string | null;
+  sessionId?: string;
 }): string {
   if (session.workChainName) {
-    return session.workChainName;
+    const cleaned = stripSystemTags(session.workChainName);
+    if (cleaned) return cleaned;
   }
   if (session.originalPrompt) {
-    // Truncate to 60 chars and clean up
-    const cleaned = session.originalPrompt.replace(/\s+/g, " ").trim();
-    return cleaned.length > 60 ? cleaned.slice(0, 57) + "..." : cleaned;
+    const cleaned = stripSystemTags(session.originalPrompt);
+    if (cleaned) {
+      return cleaned.length > 60 ? cleaned.slice(0, 57) + "..." : cleaned;
+    }
+  }
+  // Fallback: use branch name or session ID
+  if (session.gitBranch) {
+    return session.gitBranch.length > 20
+      ? session.gitBranch.slice(0, 17) + "..."
+      : session.gitBranch;
+  }
+  if (session.sessionId) {
+    return `Session ${session.sessionId.slice(-8)}`;
   }
   return "Untitled";
 }

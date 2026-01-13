@@ -88,7 +88,7 @@ export function StatusStrip({
   }> = [
     { filter: "waiting", label: "Needs Input", count: counts.waiting, alwaysShow: true },
     { filter: "error", label: "Errors", count: counts.error, alwaysShow: false },
-    { filter: "stale", label: "Stale", count: counts.stale, alwaysShow: false },
+    { filter: "stale", label: "Slow", count: counts.stale, alwaysShow: false },
     { filter: "working", label: "Running", count: counts.working, alwaysShow: true },
   ];
 

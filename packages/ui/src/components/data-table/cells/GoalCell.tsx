@@ -11,20 +11,29 @@ interface GoalCellProps {
 }
 
 /**
- * Strip XML-like tags from goal text for cleaner display.
- * Handles <command-message>, <local-command-caveat>, etc.
+ * Strip system tags and their content from text for cleaner display.
+ * Removes <local-command-caveat>...</local-command-caveat>, <system-reminder>...</system-reminder>, etc.
  */
-function stripXmlTags(text: string): string {
+function stripSystemTags(text: string): string {
   return text
-    .replace(/<[^>]+>/g, "") // Remove all XML-like tags
-    .replace(/\s+/g, " ") // Normalize whitespace
+    // Remove system tags and their entire content
+    .replace(/<local-command-caveat>[\s\S]*?<\/local-command-caveat>/gi, "")
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/gi, "")
+    .replace(/<command-message>[\s\S]*?<\/command-message>/gi, "")
+    .replace(/<command-name>[\s\S]*?<\/command-name>/gi, "")
+    .replace(/<command-args>[\s\S]*?<\/command-args>/gi, "")
+    .replace(/<local-command-stdout>[\s\S]*?<\/local-command-stdout>/gi, "")
+    // Remove any remaining standalone tags
+    .replace(/<[^>]+>/g, "")
+    // Normalize whitespace
+    .replace(/\s+/g, " ")
     .trim()
 }
 
 export function GoalCell({ session }: GoalCellProps) {
   const { fileStatusValue } = getEffectiveStatus(session)
   const rawText = session.goal || session.originalPrompt
-  const cleanText = stripXmlTags(rawText)
+  const cleanText = stripSystemTags(rawText)
   const displayText = cleanText.length > 60 ? cleanText.slice(0, 57) + "..." : cleanText
 
   return (
