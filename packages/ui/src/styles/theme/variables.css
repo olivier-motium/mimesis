@@ -1,0 +1,30 @@
+/* ===========================================
+   MIMESIS - Fleet Command Theme
+   =========================================== */
+
+:root {
+  /* Mimesis Color Palette - Refined Professional */
+  --nb-black: #0a0a0b;
+  --nb-black-light: #0e0e10;
+  --nb-terminal: #060607;
+  --nb-sidebar: #0c0c0d;
+  --nb-yellow: #d4a574;
+  --nb-yellow-glow: rgba(212, 165, 116, 0.25);
+  --nb-yellow-dim: #a68455;
+  --nb-green: #5a8f75;
+  --nb-green-glow: rgba(90, 143, 117, 0.25);
+  --nb-orange: #cc8844;
+  --nb-red: #c45858;
+  --nb-border: #252528;
+  --nb-border-dim: #1a1a1c;
+  --nb-text: #9a9aa0;
+  --nb-text-bright: #e8e8ec;
+  --nb-text-dim: #5a5a62;
+  --nb-text-muted: #3d3d42;
+
+  /* shadcn/ui CSS variables (mapped to Mimesis theme) */
+  --background: var(--nb-sidebar);
+  --foreground: var(--nb-text-bright);
+  --border: var(--nb-border);
+  --muted-foreground: var(--nb-text-dim);
+}

@@ -1,0 +1,237 @@
+/* ===========================================
+   Mission Card (Ops-first Bridge)
+   =========================================== */
+
+.mission-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: transparent;
+  border-left: 2px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  margin: 2px 8px;
+}
+
+.mission-card:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.mission-card:focus-visible {
+  outline: 2px solid var(--nb-yellow);
+  outline-offset: 2px;
+}
+
+.mission-card--selected {
+  background: rgba(212, 165, 116, 0.04);
+  border-color: rgba(212, 165, 116, 0.12);
+  border-left-color: var(--nb-yellow-dim);
+}
+
+/* Status-based left border coloring */
+.mission-card.mission-card__status--working {
+  border-left-color: var(--nb-green);
+}
+
+.mission-card.mission-card__status--waiting {
+  border-left-color: var(--nb-yellow);
+}
+
+.mission-card.mission-card__status--error {
+  border-left-color: var(--nb-red);
+}
+
+.mission-card--selected.mission-card__status--working,
+.mission-card--selected.mission-card__status--waiting,
+.mission-card--selected.mission-card__status--error {
+  border-left-color: var(--nb-yellow);
+}
+
+/* Header: Status icon + Title + Chips */
+.mission-card__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mission-card__status-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.mission-card__status-icon.mission-card__status--working {
+  color: var(--nb-green);
+}
+
+.mission-card__status-icon.mission-card__status--waiting {
+  color: var(--nb-yellow);
+}
+
+.mission-card__status-icon.mission-card__status--idle {
+  color: var(--nb-text-dim);
+}
+
+.mission-card__status-icon.mission-card__status--error {
+  color: var(--nb-red);
+}
+
+.mission-card__title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--nb-text-bright);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mission-card__chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.mission-card__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--nb-text-dim);
+  background: var(--nb-terminal);
+  border-radius: 3px;
+}
+
+.mission-card__chip--compaction {
+  color: var(--nb-yellow-dim);
+}
+
+/* Now line */
+.mission-card__now {
+  font-size: 11px;
+  color: var(--nb-text);
+  font-family: var(--font-mono);
+  padding-left: 20px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Footer: Last + Updated */
+.mission-card__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-left: 20px;
+}
+
+.mission-card__last {
+  flex: 1;
+  font-size: 10px;
+  color: var(--nb-text-muted);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mission-card__updated {
+  font-size: 10px;
+  color: var(--nb-text-muted);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* ===========================================
+   Mission Cell (DataTable consolidated column)
+   =========================================== */
+
+.mission-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 0;
+  min-width: 0;
+}
+
+.mission-cell__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.mission-cell__title {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--nb-text-bright);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.mission-cell__chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.mission-cell__chip {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  background: var(--nb-black-light);
+  border: 1px solid var(--nb-border-dim);
+  border-radius: 3px;
+  font-size: 10px;
+  color: var(--nb-text-dim);
+  font-family: var(--font-mono);
+}
+
+.mission-cell__chip svg {
+  opacity: 0.6;
+}
+
+.mission-cell__chip--repo {
+  color: var(--nb-text-muted);
+}
+
+.mission-cell__now {
+  font-size: 11px;
+  color: var(--nb-text);
+  font-family: var(--font-mono);
+}
+
+.mission-cell__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.mission-cell__last {
+  flex: 1;
+  font-size: 10px;
+  color: var(--nb-text-muted);
+  font-style: italic;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.mission-cell__updated {
+  font-size: 10px;
+  color: var(--nb-text-dim);
+  flex-shrink: 0;
+}

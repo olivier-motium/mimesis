@@ -1,0 +1,432 @@
+/* ===========================================
+   Inspector Panel (new TacticalIntel layout)
+   =========================================== */
+
+/* Session HUD - top section with mission/status */
+.inspector-hud {
+  padding: 16px;
+  background: transparent;
+  border-bottom: 1px solid var(--nb-border-dim);
+}
+
+.inspector-hud__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.inspector-hud__status {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.inspector-hud__status--working {
+  color: var(--nb-green);
+}
+
+.inspector-hud__status--waiting {
+  color: var(--nb-yellow);
+}
+
+.inspector-hud__status--idle {
+  color: var(--nb-text-dim);
+}
+
+.inspector-hud__status--error {
+  color: var(--nb-red);
+}
+
+.inspector-hud__time {
+  font-size: 10px;
+  color: var(--nb-text-muted);
+}
+
+.inspector-hud__mission {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--nb-text-bright);
+  line-height: 1.4;
+  margin-bottom: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.inspector-hud__context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.inspector-hud__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  background: var(--nb-terminal);
+  border: 1px solid var(--nb-border-dim);
+  border-radius: 3px;
+  font-size: 10px;
+  color: var(--nb-text-dim);
+  font-family: var(--font-mono);
+}
+
+.inspector-hud__chip--compaction {
+  color: var(--nb-yellow-dim);
+}
+
+/* Ask/Decide Section - shown when waiting for approval */
+/* Made prominent as this is the most critical action */
+.inspector-ask {
+  padding: 16px;
+  background: rgba(212, 165, 116, 0.08);
+  border: 1px solid rgba(212, 165, 116, 0.2);
+  border-radius: 8px;
+  margin: 0 12px 12px;
+}
+
+.inspector-ask__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--nb-yellow);
+  margin-bottom: 12px;
+}
+
+.inspector-ask__icon {
+  color: var(--nb-yellow);
+}
+
+.inspector-ask__content {
+  background: var(--nb-black);
+  border-radius: 4px;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+
+.inspector-ask__tool {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.inspector-ask__tool-label {
+  font-size: 10px;
+  color: var(--nb-text-muted);
+}
+
+.inspector-ask__tool-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--nb-text-bright);
+  font-family: var(--font-mono);
+}
+
+.inspector-ask__target {
+  font-size: 10px;
+  color: var(--nb-text-dim);
+  font-family: var(--font-mono);
+  word-break: break-all;
+}
+
+.inspector-ask__hint {
+  font-size: 10px;
+  color: var(--nb-text-muted);
+  font-style: italic;
+}
+
+/* Ask/Decide Action Buttons - Made larger for easy clicking */
+.inspector-ask__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.inspector-ask__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  padding: 10px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.inspector-ask__btn:hover {
+  transform: translateY(-1px);
+}
+
+.inspector-ask__btn:active {
+  transform: translateY(0);
+}
+
+.inspector-ask__btn--approve {
+  background-color: var(--nb-green);
+  color: var(--nb-black);
+}
+
+.inspector-ask__btn--approve:hover {
+  background-color: hsl(152 30% 50%);
+}
+
+.inspector-ask__btn--deny {
+  background-color: var(--nb-red);
+  color: var(--nb-black);
+}
+
+.inspector-ask__btn--deny:hover {
+  background-color: hsl(0 45% 55%);
+}
+
+/* Live State Section */
+.inspector-state {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--nb-border-dim);
+}
+
+.inspector-state__header {
+  display: none; /* Hidden for minimal design - let content speak */
+}
+
+.inspector-state__content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.inspector-state__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+}
+
+.inspector-state__label {
+  display: flex;
+  align-items: center;
+  color: var(--nb-text-muted);
+  flex-shrink: 0;
+}
+
+.inspector-state__value {
+  color: var(--nb-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inspector-state__value--mono {
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+/* Status-specific styling for Live State value */
+.inspector-state__value--working {
+  color: var(--nb-green);
+  font-weight: 500;
+}
+
+.inspector-state__value--waiting {
+  color: var(--nb-yellow);
+  font-weight: 500;
+}
+
+.inspector-state__value--idle {
+  color: var(--nb-text-dim);
+}
+
+/* Recent Output Section */
+.inspector-output {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.inspector-output__header {
+  display: none; /* Hidden for minimal design */
+}
+
+.inspector-output__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.inspector-output__empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--nb-text-muted);
+  font-size: 11px;
+}
+
+.inspector-output__entry {
+  display: flex;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.inspector-output__entry:last-child {
+  border-bottom: none;
+}
+
+.inspector-output__entry--assistant,
+.inspector-output__entry--user,
+.inspector-output__entry--tool {
+  /* No background colors - minimal design */
+}
+
+.inspector-output__role {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--nb-text-muted);
+  flex-shrink: 0;
+  width: 28px;
+}
+
+.inspector-output__text {
+  font-size: 11px;
+  color: var(--nb-text);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* File Status Section (from .claude/status.md) */
+.inspector-file-status {
+  padding: 12px 16px;
+  background: var(--nb-terminal);
+  border-top: 1px solid var(--nb-border-dim);
+  margin-top: auto;
+}
+
+.inspector-file-status__header {
+  display: none; /* Hidden for minimal design */
+}
+
+.inspector-file-status__content {
+  font-size: 11px;
+  color: var(--nb-text);
+}
+
+.inspector-file-status__task {
+  font-weight: 500;
+  color: var(--nb-text-bright);
+  margin-bottom: 4px;
+}
+
+.inspector-file-status__summary {
+  color: var(--nb-text-dim);
+  line-height: 1.4;
+}
+
+/* Fleet Events Section */
+.inspector-fleet-events {
+  padding: 16px;
+}
+
+.inspector-fleet-events__header {
+  display: none; /* Hidden for minimal design */
+}
+
+.inspector-fleet-events__content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.inspector-fleet-events__entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 10px;
+  padding: 4px 6px;
+  background: var(--nb-terminal);
+  border-radius: 3px;
+}
+
+.inspector-fleet-events__type {
+  color: var(--nb-text-muted);
+  font-family: var(--font-mono);
+}
+
+.inspector-fleet-events__project {
+  color: var(--nb-text-dim);
+}
+
+/* Gateway Status Section - CRITICAL for streaming awareness */
+.inspector-gateway {
+  padding: 16px;
+  background: transparent;
+  margin-top: auto;
+}
+
+.inspector-gateway__header {
+  display: none; /* Hidden for minimal design */
+}
+
+.inspector-gateway__status {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Connected - Minimal */
+.inspector-gateway__status--connected {
+  color: var(--nb-green);
+}
+
+/* Connecting - Minimal */
+.inspector-gateway__status--connecting {
+  color: var(--nb-yellow);
+}
+
+/* Disconnected - Minimal */
+.inspector-gateway__status--disconnected {
+  color: var(--nb-red);
+}
+
+/* Gateway content and reconnect button */
+.inspector-gateway__content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inspector-gateway__reconnect {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--nb-text);
+  background: var(--nb-sidebar);
+  border: 1px solid var(--nb-border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.inspector-gateway__reconnect:hover {
+  background-color: var(--nb-black-light);
+  border-color: var(--nb-yellow);
+  color: var(--nb-yellow);
+}

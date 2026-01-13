@@ -1562,6 +1562,27 @@ Chaining multiple `claude -p` commands with `&&` in `run_in_background: true` do
 
 **Workaround:** Run them one at a time without full backgrounding, or use the Task tool to spawn sequential agents.
 
+## CSS Modular Architecture (Jan 2026)
+
+**Problem:** Single 2211-line `index.css` was difficult to maintain and navigate.
+
+**Solution:** Split into 16 modular files under `packages/ui/src/styles/`:
+
+```
+styles/
+├── base/          # Tailwind + @theme, root font settings
+├── theme/         # --nb-* color palette variables
+├── layouts/       # Grid layouts (fleet-command, agent-command, etc.)
+├── components/    # UI components (roster, timeline, inspector, etc.)
+└── states/        # Empty states, dialogs
+```
+
+**Key insight:** Vite handles CSS `@import` natively in development. No PostCSS config changes needed.
+
+**Files:**
+- `packages/ui/src/index.css` - Now imports-only (26 lines)
+- `packages/ui/src/styles/**/*.css` - 16 modular files
+
 ## Commander Event Architecture - Two-Bus Separation (Jan 2026)
 
 **Problem:** Commander was receiving ALL outbox events including high-frequency `silent` ones (session starts), causing context overflow with 10+ concurrent agents.

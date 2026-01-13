@@ -1,0 +1,24 @@
+/* ===========================================
+   Rename Work Chain Dialog
+   =========================================== */
+
+.rename-dialog__input {
+  width: 100%;
+  background: var(--nb-terminal);
+  border: 1px solid var(--nb-border);
+  border-radius: 4px;
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--nb-text-bright);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.rename-dialog__input:focus {
+  border-color: var(--nb-yellow);
+}
+
+.rename-dialog__input::placeholder {
+  color: var(--nb-text-muted);
+}

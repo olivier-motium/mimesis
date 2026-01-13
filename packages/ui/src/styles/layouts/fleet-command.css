@@ -1,0 +1,323 @@
+/* Fleet Command Main Container */
+.fleet-command {
+  display: grid;
+  height: 100vh;
+  width: 100%;
+  background: var(--nb-black);
+  color: var(--nb-text);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  user-select: none;
+  /* 2-row layout: Header spans all, content in 3 columns */
+  /* Filters moved into Roster for logical grouping */
+  grid-template-areas:
+    "header header header"
+    "roster viewport intel";
+  grid-template-columns: 260px 1fr 300px;
+  grid-template-rows: 48px 1fr;
+}
+
+/* Roster integrated filters */
+.fleet-roster__filters {
+  padding: 12px;
+  background: var(--nb-black);
+  border-bottom: 1px solid var(--nb-border-dim);
+}
+
+/* OpsTable zone */
+.fleet-table {
+  grid-area: table;
+  display: flex;
+  flex-direction: column;
+  background: var(--nb-terminal);
+  overflow: hidden;
+}
+
+/* TerminalDock zone */
+.fleet-dock {
+  grid-area: dock;
+  background: var(--nb-terminal);
+  border-top: 1px solid var(--nb-border);
+  overflow: hidden;
+}
+
+.fleet-dock__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 100%;
+  color: var(--nb-text-muted);
+  font-size: 13px;
+  font-family: var(--font-sans);
+  letter-spacing: 0.02em;
+}
+
+.fleet-dock__empty::before {
+  content: '';
+  width: 48px;
+  height: 48px;
+  border: 2px dashed var(--nb-border);
+  border-radius: 8px;
+  opacity: 0.5;
+}
+
+/* Zone: Command Bar (Top Header) - Modern minimal */
+.fleet-command-bar {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: var(--nb-black);
+}
+
+.fleet-command-bar__logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--nb-yellow);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.fleet-command-bar__divider {
+  width: 1px;
+  height: 16px;
+  background: var(--nb-border);
+  margin: 0 12px;
+}
+
+.fleet-command-bar__status {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--nb-text-dim);
+}
+
+.fleet-command-bar__online {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--nb-text-bright);
+}
+
+.fleet-command-bar__online-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--nb-green);
+}
+
+.fleet-command-bar__meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--nb-text-dim);
+}
+
+.fleet-command-bar__version {
+  padding: 4px 8px;
+  background: var(--nb-sidebar);
+  border: 1px solid var(--nb-border);
+  border-radius: 4px;
+  font-size: 10px;
+}
+
+/* Session info in header */
+.fleet-command-bar__session-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fleet-command-bar__session-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--nb-text-bright);
+}
+
+.fleet-command-bar__branch {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--nb-text-dim);
+}
+
+.fleet-command-bar__status-badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.fleet-command-bar__status-badge--working {
+  color: var(--nb-green);
+}
+
+.fleet-command-bar__status-badge--waiting {
+  color: var(--nb-yellow);
+}
+
+.fleet-command-bar__status-badge--idle {
+  color: var(--nb-text-dim);
+}
+
+/* Commander toggle button */
+.fleet-command-bar__commander-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--nb-text-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.fleet-command-bar__commander-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--nb-text);
+}
+
+.fleet-command-bar__commander-btn--active {
+  background: rgba(212, 165, 116, 0.1);
+  border-color: rgba(212, 165, 116, 0.2);
+  color: var(--nb-yellow);
+}
+
+/* Terminal dock styles - Minimal */
+.terminal-dock {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border: 1px solid var(--nb-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.terminal-dock-header {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  background: var(--nb-sidebar);
+  border-bottom: 1px solid var(--nb-border);
+}
+
+.terminal-dock-body {
+  flex: 1;
+  min-height: 0;
+  background: var(--nb-terminal);
+}
+
+/* Scrollbar styling for Fleet Command - Minimal */
+.fleet-command ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.fleet-command ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.fleet-command ::-webkit-scrollbar-thumb {
+  background: var(--nb-border);
+  border-radius: 3px;
+}
+
+.fleet-command ::-webkit-scrollbar-thumb:hover {
+  background: var(--nb-text-muted);
+}
+
+/* Table Styling - Minimal */
+.fleet-table [data-slot="table-row"] {
+  transition: background 0.15s ease;
+}
+
+.fleet-table [data-slot="table-row"]:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.fleet-table [data-slot="table-row"][data-state="selected"] {
+  background: rgba(212, 165, 116, 0.05);
+}
+
+.fleet-table [data-slot="table-header"] {
+  background: var(--nb-sidebar);
+}
+
+.fleet-table [data-slot="table-head"] {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--nb-text-muted);
+}
+
+/* Hide TanStack Router devtools completely */
+button[aria-label*="TanStack"],
+button[title*="TanStack"],
+[class*="TanStackRouterDevtools"],
+[class*="RouterDevtools"],
+/* Target the devtools toggle button at bottom-left */
+[style*="position: fixed"][style*="bottom"][style*="left"]:has(svg),
+/* Target any floating panel from TanStack */
+div[style*="position: fixed"][style*="z-index"]:has(button[aria-label*="TanStack"]),
+/* Fallback: hide by bottom/left fixed positioning */
+body > div[style*="position: fixed"]:last-child {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Table container - Minimal */
+.fleet-table > div {
+  border-radius: 6px;
+  border-color: var(--nb-border);
+}
+
+/* Focus ring styling for accessibility */
+.fleet-command :focus-visible {
+  outline: 2px solid var(--nb-yellow);
+  outline-offset: 2px;
+}
+
+/* Button hover - Minimal */
+.fleet-command button:not(:disabled) {
+  transition: opacity 0.15s ease;
+}
+
+.fleet-command button:not(:disabled):hover {
+  opacity: 0.85;
+}
+
+/* Status filter badges - Minimal */
+.fleet-filters button {
+  transition: opacity 0.15s ease;
+  border-radius: 6px;
+}
+
+.fleet-filters button:hover {
+  opacity: 0.9;
+}
+
+.fleet-filters button:active {
+  opacity: 0.8;
+}
+
+/* Terminal area container - handles HUD spacing */
+.fleet-viewport__terminal-area {
+  padding-top: 80px; /* Space for HUD overlay */
+}

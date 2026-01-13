@@ -1,0 +1,50 @@
+/* Zone C: Tactical Intel (Right Sidebar) - Minimal */
+.fleet-intel {
+  grid-area: intel;
+  display: flex;
+  flex-direction: column;
+  background: var(--nb-black);
+  overflow: hidden;
+}
+
+.fleet-intel__section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.fleet-intel__section--artifacts {
+  flex: 0 0 33%;
+  background: var(--nb-terminal);
+  border-top: 1px solid var(--nb-border);
+}
+
+.fleet-intel__section-header {
+  display: none; /* Hide redundant section headers for minimal design */
+}
+
+.fleet-intel__section-icon {
+  width: 12px;
+  height: 12px;
+}
+
+.fleet-intel__section-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+/* Empty state for intel panel - Minimal */
+.fleet-intel__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--nb-text-muted);
+  font-size: 13px;
+  font-family: var(--font-sans);
+  text-align: center;
+  padding: 32px;
+}

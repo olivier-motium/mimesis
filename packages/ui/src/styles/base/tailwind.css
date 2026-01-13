@@ -1,0 +1,53 @@
+/* Tailwind v4 CSS-first configuration */
+@import "tailwindcss";
+
+/* Custom theme configuration */
+@theme {
+  /* Fonts - Plus Jakarta Sans for distinctive body, Space Grotesk for headings */
+  --font-sans: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", system-ui, sans-serif;
+  --font-heading: "Space Grotesk Variable", "Space Grotesk", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", monospace;
+
+  /* shadcn/ui semantic colors (mapped to Mimesis palette) */
+  --color-background: #0a0a0c;
+  --color-foreground: #fafafa;
+  --color-border: #27272a;
+  --color-muted-foreground: #52525b;
+
+  /* Popover/dropdown backgrounds */
+  --color-popover: #0a0a0c;
+  --color-popover-foreground: #fafafa;
+
+  /* Accent colors for hover states */
+  --color-accent: #27272a;
+  --color-accent-foreground: #fafafa;
+
+  /* Primary (warm amber accent - refined from banana yellow) */
+  --color-primary: #d4a574;
+  --color-primary-foreground: #09090b;
+
+  /* Secondary (muted) */
+  --color-secondary: #27272a;
+  --color-secondary-foreground: #fafafa;
+
+  /* Destructive (muted rose) */
+  --color-destructive: #c45858;
+
+  /* Muted backgrounds */
+  --color-muted: #18181b;
+
+  /* Form inputs */
+  --color-input: #27272a;
+  --color-ring: #d4a574;
+
+  /* Card (same as popover for consistency) */
+  --color-card: #0a0a0c;
+  --color-card-foreground: #fafafa;
+
+  /* Status colors (refined minimal palette) */
+  --color-status-working: hsl(152 25% 45%);
+  --color-status-waiting: hsl(35 45% 55%);
+  --color-status-error: hsl(0 40% 50%);
+  --color-status-idle: hsl(215 12% 42%);
+
+}

@@ -1,0 +1,69 @@
+/* ===========================================
+   Terminal View (Center)
+   =========================================== */
+
+.terminal-view {
+  grid-area: terminal;
+  display: flex;
+  flex-direction: column;
+  background: var(--nb-terminal);
+  min-width: 0;
+}
+
+.terminal-view__content {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.terminal-view__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  color: var(--nb-text-muted);
+}
+
+.terminal-view__empty-icon {
+  width: 48px;
+  height: 48px;
+  opacity: 0.3;
+}
+
+.terminal-view__empty-icon--error {
+  color: var(--nb-red);
+  opacity: 1;
+}
+
+.terminal-view__empty-text {
+  font-size: 14px;
+}
+
+.terminal-view__empty-text--error {
+  color: var(--nb-red);
+}
+
+.terminal-view__empty-hint {
+  font-size: 12px;
+  color: var(--nb-text-dim);
+}
+
+.terminal-view__retry-btn {
+  padding: 8px 16px;
+  background: var(--nb-sidebar);
+  border: 1px solid var(--nb-border);
+  border-radius: 4px;
+  color: var(--nb-text);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.terminal-view__retry-btn:hover {
+  background: var(--nb-black-light);
+  border-color: var(--nb-yellow);
+  color: var(--nb-yellow);
+}

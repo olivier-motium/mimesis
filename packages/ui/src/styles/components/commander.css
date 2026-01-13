@@ -1,0 +1,9 @@
+/* ===========================================
+   Commander Output - Minimal
+   =========================================== */
+
+/* Scroll styling */
+.overflow-auto {
+  scrollbar-width: thin;
+  scrollbar-color: var(--nb-border) transparent;
+}

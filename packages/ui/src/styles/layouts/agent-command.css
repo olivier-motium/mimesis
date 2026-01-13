@@ -1,0 +1,86 @@
+/* ===========================================
+   Agent Command Layout
+   =========================================== */
+
+.agent-command {
+  display: grid;
+  grid-template-areas:
+    "header header header"
+    "sidebar terminal intel";
+  grid-template-columns: 280px 1fr 320px;
+  grid-template-rows: 48px 1fr;
+  height: 100vh;
+  width: 100%;
+  background: var(--nb-black);
+  color: var(--nb-text);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Agent Command Header - Minimal */
+.agent-command__header {
+  grid-area: header;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 0 16px;
+  background: var(--nb-black-light);
+  border-bottom: 1px solid var(--nb-border);
+}
+
+.agent-command__logo {
+  color: var(--nb-yellow);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+}
+
+.agent-command__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  color: var(--nb-text-bright);
+}
+
+.agent-command__online-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--nb-green);
+  /* Clean, no glow or animation */
+}
+
+.agent-command__status-text {
+  color: var(--nb-text-dim);
+}
+
+.agent-command__agents {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--nb-text-dim);
+}
+
+/* Scrollbar styling for Agent Command */
+.agent-command ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.agent-command ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.agent-command ::-webkit-scrollbar-thumb {
+  background: var(--nb-border);
+  border-radius: 3px;
+}
+
+.agent-command ::-webkit-scrollbar-thumb:hover {
+  background: var(--nb-text-muted);
+}

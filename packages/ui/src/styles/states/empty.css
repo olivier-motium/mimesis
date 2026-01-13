@@ -1,0 +1,99 @@
+/* ===========================================
+   Empty States - Minimal
+   =========================================== */
+
+/* Timeline Empty State */
+.timeline-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.timeline-empty__icon {
+  color: var(--nb-text-muted);
+  opacity: 0.5;
+}
+
+.timeline-empty__title {
+  font-family: var(--font-heading);
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--nb-text-dim);
+  letter-spacing: 0.05em;
+}
+
+.timeline-empty__subtitle {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--nb-text-muted);
+  max-width: 280px;
+  line-height: 1.5;
+}
+
+/* Roster Empty State - Minimal */
+.roster-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  text-align: center;
+  gap: 12px;
+}
+
+.roster-empty__icon {
+  color: var(--nb-text-muted);
+  opacity: 0.4;
+}
+
+.roster-empty__text {
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--nb-text-dim);
+}
+
+.roster-empty__hint {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  color: var(--nb-text-muted);
+  max-width: 160px;
+  line-height: 1.4;
+}
+
+/* TacticalIntel Empty State - Minimal */
+.intel-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+  padding: 32px;
+  text-align: center;
+}
+
+.intel-empty__icon {
+  color: var(--nb-text-muted);
+  opacity: 0.4;
+}
+
+.intel-empty__title {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--nb-text-dim);
+}
+
+.intel-empty__subtitle {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  color: var(--nb-text-muted);
+  max-width: 200px;
+  line-height: 1.5;
+}
