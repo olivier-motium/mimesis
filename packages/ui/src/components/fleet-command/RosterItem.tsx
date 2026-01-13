@@ -64,7 +64,7 @@ export function RosterItem({ session, isSelected, onSelect, compact }: RosterIte
         }
       }}
     >
-      {/* Line 1: Status + Mission + Chips */}
+      {/* Line 1: Status + Mission + Time */}
       <div className="mission-card__header">
         <span className={`mission-card__status-icon ${getStatusClass()}`}>
           {getStatusIcon()}
@@ -72,44 +72,15 @@ export function RosterItem({ session, isSelected, onSelect, compact }: RosterIte
         <span className="mission-card__title" title={mission}>
           {mission}
         </span>
-        <div className="mission-card__chips">
-          {showBranchChip && (
-            <span className="mission-card__chip" title={session.gitBranch!}>
-              <GitBranch size={10} />
-              {session.gitBranch!.length > 12
-                ? session.gitBranch!.slice(0, 9) + "..."
-                : session.gitBranch}
-            </span>
-          )}
-          {session.compactionCount > 0 && (
-            <span
-              className="mission-card__chip mission-card__chip--compaction"
-              title={`Compacted ${session.compactionCount} time${session.compactionCount === 1 ? "" : "s"}`}
-            >
-              ↻{session.compactionCount}
-            </span>
-          )}
-        </div>
+        <span className="mission-card__updated">
+          {updatedText}
+        </span>
       </div>
 
-      {/* Line 2: Current status (only if not compact) */}
-      {!compact && (
+      {/* Line 2: Brief status (only if not compact and has meaningful info) */}
+      {!compact && nowText && nowText !== "Idle" && (
         <div className="mission-card__now">
           {nowText}
-        </div>
-      )}
-
-      {/* Line 3: Last output + Time (only if not compact) */}
-      {!compact && (
-        <div className="mission-card__footer">
-          {lastText && (
-            <span className="mission-card__last" title={lastText}>
-              {lastText}
-            </span>
-          )}
-          <span className="mission-card__updated">
-            {updatedText}
-          </span>
         </div>
       )}
     </div>

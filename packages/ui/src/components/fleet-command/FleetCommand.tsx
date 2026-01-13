@@ -16,7 +16,6 @@ import { TacticalIntel } from "./TacticalIntel";
 import { Timeline } from "../timeline/Timeline";
 import { SessionInput } from "../session-input/SessionInput";
 import { CommanderTab } from "../commander/CommanderTab";
-import { StatusStrip } from "../StatusStrip";
 import { countSessionsByStatus } from "../ops-table/utils";
 import { useGateway } from "../../hooks/useGateway";
 import { useSessionEvents } from "../../hooks/useSessionEvents";
@@ -146,16 +145,7 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
         showCommander={showCommander}
       />
 
-      {/* StatusStrip */}
-      <div className="fleet-filters">
-        <StatusStrip
-          counts={statusCounts}
-          activeFilter={filter}
-          onFilterChange={setFilter}
-        />
-      </div>
-
-      {/* Left: Roster */}
+      {/* Left: Roster with integrated filters */}
       <Roster
         sessions={sessions}
         selectedSessionId={selectedSessionId}
@@ -163,6 +153,9 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         compact={false}
+        statusCounts={statusCounts}
+        activeFilter={filter}
+        onFilterChange={setFilter}
       />
 
       {/* Center: Timeline or Commander */}

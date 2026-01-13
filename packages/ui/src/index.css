@@ -106,22 +106,20 @@ body {
   font-family: var(--font-mono);
   overflow: hidden;
   user-select: none;
-  /* Standard 3-column layout: Roster | Timeline | TacticalIntel */
+  /* 2-row layout: Header spans all, content in 3 columns */
+  /* Filters moved into Roster for logical grouping */
   grid-template-areas:
     "header header header"
-    "roster viewport intel"
-    "filters filters filters";
-  grid-template-columns: 240px 1fr 280px;
-  grid-template-rows: 48px 1fr 40px;
+    "roster viewport intel";
+  grid-template-columns: 260px 1fr 300px;
+  grid-template-rows: 48px 1fr;
 }
 
-/* StatusStrip filter bar - Minimal */
-.fleet-filters {
-  grid-area: filters;
-  display: flex;
-  align-items: center;
-  padding: 0 16px;
+/* Roster integrated filters */
+.fleet-roster__filters {
+  padding: 12px;
   background: var(--nb-black);
+  border-bottom: 1px solid var(--nb-border-dim);
 }
 
 /* OpsTable zone */
@@ -410,11 +408,9 @@ body {
   padding: 8px 12px;
   background: transparent;
   font-family: var(--font-sans);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
-  color: var(--nb-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  color: var(--nb-text-dim);
   border: none;
   width: 100%;
   text-align: left;
@@ -829,8 +825,9 @@ body {
 
 /* Session HUD - top section with mission/status */
 .inspector-hud {
-  padding: 20px 16px;
+  padding: 16px;
   background: transparent;
+  border-bottom: 1px solid var(--nb-border-dim);
 }
 
 .inspector-hud__header {
@@ -907,9 +904,11 @@ body {
 }
 
 /* Ask/Decide Section - shown when waiting for approval */
+/* Made prominent as this is the most critical action */
 .inspector-ask {
   padding: 16px;
-  background: rgba(212, 165, 116, 0.04);
+  background: rgba(212, 165, 116, 0.08);
+  border: 1px solid rgba(212, 165, 116, 0.2);
   border-radius: 8px;
   margin: 0 12px 12px;
 }
@@ -967,21 +966,23 @@ body {
   font-style: italic;
 }
 
-/* Ask/Decide Action Buttons */
+/* Ask/Decide Action Buttons - Made larger for easy clicking */
 .inspector-ask__actions {
   display: flex;
   gap: 8px;
-  margin-top: 8px;
+  margin-top: 12px;
 }
 
 .inspector-ask__btn {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  font-size: 11px;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  padding: 10px 16px;
+  font-size: 12px;
   font-weight: 600;
-  border-radius: 4px;
+  border-radius: 6px;
   border: none;
   cursor: pointer;
   transition: background-color 0.15s ease, transform 0.1s ease;
@@ -1015,7 +1016,8 @@ body {
 
 /* Live State Section */
 .inspector-state {
-  padding: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--nb-border-dim);
 }
 
 .inspector-state__header {
@@ -1129,8 +1131,10 @@ body {
 
 /* File Status Section (from .claude/status.md) */
 .inspector-file-status {
-  padding: 16px;
-  background: transparent;
+  padding: 12px 16px;
+  background: var(--nb-terminal);
+  border-top: 1px solid var(--nb-border-dim);
+  margin-top: auto;
 }
 
 .inspector-file-status__header {
@@ -1405,18 +1409,18 @@ body > div[style*="position: fixed"]:last-child {
 .mission-card {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   padding: 10px 12px;
   background: transparent;
   border-left: 2px solid transparent;
   border-radius: 4px;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
   margin: 2px 8px;
 }
 
 .mission-card:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .mission-card:focus-visible {
@@ -1542,8 +1546,9 @@ body > div[style*="position: fixed"]:last-child {
 
 .mission-card__updated {
   font-size: 10px;
-  color: var(--nb-text-dim);
+  color: var(--nb-text-muted);
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 /* ===========================================

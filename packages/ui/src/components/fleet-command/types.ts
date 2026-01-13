@@ -3,6 +3,7 @@
  */
 
 import type { Session } from "../../types/schema";
+import type { StatusCounts, StatusFilter } from "../ops-table/types";
 
 /** Plan step from file status */
 export interface PlanStep {
@@ -24,6 +25,12 @@ export interface RosterProps {
   onSearchChange: (query: string) => void;
   /** Compact mode for focus view (narrower width) */
   compact?: boolean;
+  /** Status counts for filter badges (optional, enables integrated filters) */
+  statusCounts?: StatusCounts;
+  /** Current active filter */
+  activeFilter?: StatusFilter;
+  /** Filter change handler */
+  onFilterChange?: (filter: StatusFilter) => void;
 }
 
 /** Props for RosterItem (Mission Card) */

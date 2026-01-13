@@ -17,25 +17,19 @@
  * └─────────────────────────┘
  */
 
-import { GitBranch, AlertTriangle, Wifi, WifiOff, Loader2, Check, X, RefreshCw } from "lucide-react";
+import { GitBranch, AlertTriangle, WifiOff, Loader2, Check, X } from "lucide-react";
 import { getMissionText, getNowText, formatTimeAgo } from "./constants";
 import { getEffectiveStatus } from "@/lib/sessionStatus";
 import type { TacticalIntelProps } from "./types";
 
 export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disconnected", onQuickAction, onReconnect }: TacticalIntelProps) {
-  // Empty state
+  // Empty state - minimal and helpful
   if (!session) {
     return (
       <aside className="fleet-intel">
         <div className="intel-empty">
-          <div className="intel-empty__icon">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-            </svg>
-          </div>
-          <div className="intel-empty__title">Tactical Intel</div>
-          <div className="intel-empty__subtitle">Select an agent to view status and details</div>
+          <div className="intel-empty__title">Select an agent</div>
+          <div className="intel-empty__subtitle">Click on an agent in the roster to view its status and details</div>
         </div>
       </aside>
     );
@@ -157,24 +151,7 @@ export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disc
         </div>
       </div>
 
-      {/* Recent Output Section - Minimal */}
-      <div className="inspector-output">
-        <div className="inspector-output__content">
-          {session.recentOutput.length === 0 ? (
-            <div className="inspector-output__empty">Waiting for output...</div>
-          ) : (
-            session.recentOutput.slice(-4).map((output, i) => (
-              <div key={i} className={`inspector-output__entry inspector-output__entry--${output.role}`}>
-                <span className="inspector-output__text" title={output.content}>
-                  {output.content.length > 120
-                    ? output.content.slice(0, 117) + "..."
-                    : output.content}
-                </span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
+      {/* Recent Output removed - Timeline is the primary view */}
 
       {/* File Status (if available) - Minimal */}
       {session.fileStatus && (session.fileStatus.task || session.fileStatus.summary) && (

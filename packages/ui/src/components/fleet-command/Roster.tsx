@@ -7,11 +7,14 @@
  *   1. Needs Attention (waiting with pending tool)
  *   2. Running (working status)
  *   3. Idle (collapsed by default)
+ *
+ * Integrates status filter badges when statusCounts prop is provided.
  */
 
 import { useState } from "react";
 import { Search, ChevronDown, ChevronRight } from "lucide-react";
 import { RosterItem } from "./RosterItem";
+import { StatusStrip } from "../StatusStrip";
 import { getEffectiveStatus } from "@/lib/sessionStatus";
 import type { RosterProps } from "./types";
 import type { Session } from "@/types/schema";
@@ -44,12 +47,26 @@ export function Roster({
   searchQuery,
   onSearchChange,
   compact = false,
+  statusCounts,
+  activeFilter = "all",
+  onFilterChange,
 }: RosterProps) {
   // Idle section collapsed by default
   const [idleExpanded, setIdleExpanded] = useState(false);
 
-  // Filter sessions by search query
+  // Filter sessions by search query and status filter
   const filteredSessions = sessions.filter((session) => {
+    // Apply status filter first
+    if (activeFilter !== "all") {
+      const { status, fileStatusValue } = getEffectiveStatus(session);
+      if (activeFilter === "waiting" && !(status === "waiting" && session.hasPendingToolUse)) return false;
+      if (activeFilter === "working" && status !== "working") return false;
+      if (activeFilter === "idle" && status !== "idle") return false;
+      if (activeFilter === "error" && fileStatusValue !== "error") return false;
+      if (activeFilter === "stale" && status !== "stale") return false;
+    }
+
+    // Then apply search query
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -83,7 +100,18 @@ export function Roster({
 
   return (
     <aside className={rosterClass}>
-      {/* Hide search in compact mode */}
+      {/* Status filter badges - integrated at top */}
+      {!compact && statusCounts && onFilterChange && (
+        <div className="fleet-roster__filters">
+          <StatusStrip
+            counts={statusCounts}
+            activeFilter={activeFilter}
+            onFilterChange={onFilterChange}
+          />
+        </div>
+      )}
+
+      {/* Search - below filters */}
       {!compact && (
         <div className="fleet-roster__search">
           <div className="fleet-roster__search-wrapper">
