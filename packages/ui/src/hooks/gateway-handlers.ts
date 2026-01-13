@@ -16,7 +16,7 @@ import type {
   JobStreamChunk,
   JobResult,
   CommanderState,
-} from "./useGateway";
+} from "./gateway-types";
 
 // ============================================================================
 // Handler Types

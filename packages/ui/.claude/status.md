@@ -1,20 +1,30 @@
 ---
 status: completed
-updated: 2026-01-12T09:15:00Z
-task: Commander stateful conversation refactor
+updated: 2026-01-13T07:45:00Z
+task: Decompose useGateway.ts hook as part of QA audit fixes
 ---
 
 ## Summary
 
-Refactored Commander from stateless headless jobs to persistent conversations using Claude Code's `--continue` flag.
+Completed Fix #11 from the QA audit: decomposed the `useGateway.ts` hook from 556 lines to 357 lines (-36%).
 
 ### Changes Made
-- Added `conversations` table to SQLite schema for tracking conversation state
-- Created `ConversationRepo` with CRUD operations and singleton Commander pattern
-- Created `FleetPreludeBuilder` for context injection from outbox events
-- Updated `JobRunner` to support `--continue`, `--resume`, `--append-system-prompt`
-- Added `commander.send` and `commander.reset` protocol messages
-- Created `commander-handlers.ts` with gateway integration
-- Updated `useGateway` hook with `sendCommanderPrompt()` and `resetCommander()`
-- Updated `CommanderTab` with "New Conversation" button and new props
-- Updated `commander.md` documentation with new architecture
+
+1. **Created `gateway-types.ts`** (143 lines)
+   - Extracted all type definitions (SessionState, TrackedSession, FleetEvent, etc.)
+   - Clean separation of types from implementation
+
+2. **Created `gateway-connection.ts`** (200 lines)
+   - Extracted singleton WebSocket connection manager
+   - Clean API: `connectGateway()`, `sendGatewayMessage()`, `subscribeToMessages()`, etc.
+   - Survives HMR and React Strict Mode
+
+3. **Simplified `useGateway.ts`** (357 lines)
+   - Now imports from extracted modules
+   - Re-exports types for backward compatibility
+   - Cleaner hook composition
+
+### Verification
+- TypeScript compilation: ✅
+- UI production build: ✅
+- All 284 daemon tests pass: ✅

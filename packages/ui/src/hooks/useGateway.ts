@@ -2,236 +2,52 @@
  * useGateway - Fleet Gateway WebSocket connection and state management.
  *
  * Provides:
- * - WebSocket connection to the gateway
+ * - WebSocket connection to the gateway (via singleton connection manager)
  * - Session lifecycle management (create, attach, detach)
  * - Fleet event subscription
  * - Headless job management (Commander)
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { config } from "../config";
+import {
+  connectGateway,
+  sendGatewayMessage,
+  subscribeToMessages,
+  subscribeToStatus,
+  getConnectionStatus,
+  sendPing,
+} from "./gateway-connection";
 import { dispatchMessage, type GatewayStateSetters, type GatewayRefs } from "./gateway-handlers";
 
-// Gateway config (from centralized config)
-const GATEWAY_URL = config.gateway.wsUrl;
-const RECONNECT_DELAY_MS = config.gateway.reconnectDelayMs;
-const MAX_RECONNECT_ATTEMPTS = config.gateway.maxReconnectAttempts;
+// Re-export types for consumers
+export type {
+  SessionState,
+  TrackedSession,
+  FleetEvent,
+  SessionEvent,
+  SequencedSessionEvent,
+  JobState,
+  JobStreamChunk,
+  JobResult,
+  JobCreateRequest,
+  CommanderState,
+  GatewayStatus,
+} from "./gateway-types";
+
+import type {
+  SessionState,
+  TrackedSession,
+  FleetEvent,
+  SequencedSessionEvent,
+  JobState,
+  JobCreateRequest,
+  CommanderState,
+  GatewayStatus,
+} from "./gateway-types";
 
 // ============================================================================
-// Singleton Connection Manager (survives HMR and Strict Mode)
+// Hook Result Interface
 // ============================================================================
-
-interface ConnectionManager {
-  ws: WebSocket | null;
-  reconnectTimer: ReturnType<typeof setTimeout> | null;
-  reconnectAttempts: number;
-  subscribers: Set<(message: Record<string, unknown>) => void>;
-  statusListeners: Set<(status: GatewayStatus) => void>;
-  lastStatus: GatewayStatus;
-}
-
-// Type augmentation for globalThis (proper typing instead of double cast)
-declare global {
-  // eslint-disable-next-line no-var
-  var __gatewayManager: ConnectionManager | undefined;
-}
-
-// Global singleton that survives HMR
-const connectionManager: ConnectionManager = globalThis.__gatewayManager ?? {
-  ws: null,
-  reconnectTimer: null,
-  reconnectAttempts: 0,
-  subscribers: new Set(),
-  statusListeners: new Set(),
-  lastStatus: "disconnected",
-};
-globalThis.__gatewayManager = connectionManager;
-
-function notifyStatus(status: GatewayStatus) {
-  connectionManager.lastStatus = status;
-  connectionManager.statusListeners.forEach((listener) => listener(status));
-}
-
-function notifyMessage(message: Record<string, unknown>) {
-  connectionManager.subscribers.forEach((subscriber) => subscriber(message));
-}
-
-function connectSingleton(fromEventId: number) {
-  // Don't connect if already connected or connecting
-  if (connectionManager.ws?.readyState === WebSocket.OPEN || connectionManager.ws?.readyState === WebSocket.CONNECTING) {
-    return;
-  }
-
-  notifyStatus("connecting");
-
-  const ws = new WebSocket(GATEWAY_URL);
-  connectionManager.ws = ws;
-
-  ws.onopen = () => {
-    notifyStatus("connected");
-    connectionManager.reconnectAttempts = 0;
-
-    // Subscribe to fleet events
-    ws.send(JSON.stringify({
-      type: "fleet.subscribe",
-      from_event_id: fromEventId,
-    }));
-
-    // Request session list (v5.2 - unified session store)
-    ws.send(JSON.stringify({
-      type: "sessions.list",
-    }));
-  };
-
-  ws.onmessage = (event) => {
-    try {
-      const message = JSON.parse(event.data);
-      notifyMessage(message);
-    } catch {
-      // Message parse errors are non-fatal
-    }
-  };
-
-  ws.onerror = () => {
-    // WebSocket errors trigger onclose, no separate handling needed
-  };
-
-  ws.onclose = () => {
-    notifyStatus("disconnected");
-    connectionManager.ws = null;
-
-    // Only reconnect if there are subscribers
-    if (connectionManager.subscribers.size === 0) {
-      return;
-    }
-
-    // Attempt reconnect
-    if (connectionManager.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-      connectionManager.reconnectAttempts++;
-      const delay = RECONNECT_DELAY_MS * Math.min(connectionManager.reconnectAttempts, 5);
-      connectionManager.reconnectTimer = setTimeout(() => connectSingleton(fromEventId), delay);
-    }
-  };
-}
-
-function sendMessage(message: Record<string, unknown>) {
-  if (connectionManager.ws?.readyState === WebSocket.OPEN) {
-    connectionManager.ws.send(JSON.stringify(message));
-  }
-}
-
-// ============================================================================
-// Types (mirrored from daemon/gateway/protocol.ts)
-// ============================================================================
-
-export interface SessionState {
-  sessionId: string;
-  projectId: string;
-  pid: number;
-  status: "working" | "waiting" | "idle";
-  attachedClients: number;
-}
-
-/**
- * Tracked session from gateway session store (v5.2).
- * Unified representation of sessions from both watcher and PTY sources.
- */
-export interface TrackedSession {
-  sessionId: string;
-  projectId?: string;
-  cwd: string;
-  status: "working" | "waiting" | "idle";
-  source: "watcher" | "pty";
-  lastActivityAt: string;
-  createdAt: string;
-  gitBranch?: string | null;
-  gitRepoUrl?: string | null;
-  originalPrompt?: string | null;
-  fileStatus?: {
-    status: string;
-    updated: string;
-    task?: string;
-    summary?: string;
-    blockedOn?: string;
-    error?: string;
-    currentFile?: string;
-    toolCount?: number;
-    todos?: Array<{ content: string; status: string }>;
-  } | null;
-  pid?: number;
-}
-
-export interface FleetEvent {
-  eventId: number;
-  ts: string;
-  type: string;
-  projectId?: string;
-  briefingId?: number;
-  data: unknown;
-}
-
-export interface SessionEvent {
-  type: "stdout" | "tool" | "text" | "thinking" | "progress" | "status_change";
-  timestamp: string;
-  // stdout
-  data?: string;
-  // tool
-  phase?: "pre" | "post";
-  tool_name?: string;
-  tool_input?: unknown;
-  tool_result?: unknown;
-  ok?: boolean;
-  // text
-  text?: string;
-  // thinking
-  thinking?: string;
-  // status_change
-  status?: "working" | "waiting" | "idle";
-}
-
-export interface JobState {
-  jobId: number;
-  projectId?: string;
-  status: "running" | "completed" | "failed";
-  events: JobStreamChunk[];
-  result?: JobResult;
-  error?: string;
-}
-
-export interface JobStreamChunk {
-  type: string;
-  // Various stream-json fields
-  [key: string]: unknown;
-}
-
-export interface JobResult {
-  text?: string;
-  thinking?: string;
-  toolUses?: Array<{ id: string; name: string; input: unknown }>;
-}
-
-/**
- * Commander state (PTY-based Commander).
- */
-export interface CommanderState {
-  status: "idle" | "working" | "waiting_for_input";
-  ptySessionId: string | null;
-  claudeSessionId: string | null;
-  queuedPrompts: number;
-  isFirstTurn: boolean;
-}
-
-export type GatewayStatus = "connecting" | "connected" | "disconnected";
-
-// ============================================================================
-// Hook
-// ============================================================================
-
-/** Session event with sequence number for ordering */
-export interface SequencedSessionEvent extends SessionEvent {
-  seq: number;
-  sessionId: string;
-}
 
 export interface UseGatewayResult {
   status: GatewayStatus;
@@ -269,22 +85,13 @@ export interface UseGatewayResult {
   lastError: string | null;
 }
 
-export interface JobCreateRequest {
-  type: string;
-  projectId?: string;
-  repoRoot?: string;
-  model: "opus" | "sonnet" | "haiku";
-  request: {
-    prompt: string;
-    systemPrompt?: string;
-    maxTurns?: number;
-    disallowedTools?: string[];
-  };
-}
+// ============================================================================
+// Hook Implementation
+// ============================================================================
 
 export function useGateway(): UseGatewayResult {
   // Connection state (synced from singleton)
-  const [status, setStatus] = useState<GatewayStatus>(connectionManager.lastStatus);
+  const [status, setStatus] = useState<GatewayStatus>(getConnectionStatus());
   const [lastError, setLastError] = useState<string | null>(null);
 
   // Fleet events
@@ -346,18 +153,17 @@ export function useGateway(): UseGatewayResult {
   };
 
   // Handle incoming messages (delegates to handler registry)
-  // Empty deps: stateSetters contains stable setState functions, gatewayRefs contains stable refs
   const handleMessage = useCallback((message: Record<string, unknown>) => {
     dispatchMessage(message, stateSetters, gatewayRefs);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ============================================================================
-  // Session Management (uses singleton sendMessage)
+  // Session Management Actions
   // ============================================================================
 
   const createSession = useCallback((projectId: string, repoRoot: string) => {
-    sendMessage({
+    sendGatewayMessage({
       type: "session.create",
       project_id: projectId,
       repo_root: repoRoot,
@@ -365,7 +171,7 @@ export function useGateway(): UseGatewayResult {
   }, []);
 
   const attachSession = useCallback((sessionId: string, fromSeq = 0) => {
-    sendMessage({
+    sendGatewayMessage({
       type: "session.attach",
       session_id: sessionId,
       from_seq: fromSeq,
@@ -374,7 +180,7 @@ export function useGateway(): UseGatewayResult {
   }, []);
 
   const detachSession = useCallback((sessionId: string) => {
-    sendMessage({
+    sendGatewayMessage({
       type: "session.detach",
       session_id: sessionId,
     });
@@ -384,7 +190,7 @@ export function useGateway(): UseGatewayResult {
   }, []);
 
   const sendStdin = useCallback((sessionId: string, data: string) => {
-    sendMessage({
+    sendGatewayMessage({
       type: "session.stdin",
       session_id: sessionId,
       data,
@@ -392,7 +198,7 @@ export function useGateway(): UseGatewayResult {
   }, []);
 
   const sendSignal = useCallback((sessionId: string, signal: "SIGINT" | "SIGTERM" | "SIGKILL") => {
-    sendMessage({
+    sendGatewayMessage({
       type: "session.signal",
       session_id: sessionId,
       signal,
@@ -400,7 +206,7 @@ export function useGateway(): UseGatewayResult {
   }, []);
 
   const resizeSession = useCallback((sessionId: string, cols: number, rows: number) => {
-    sendMessage({
+    sendGatewayMessage({
       type: "session.resize",
       session_id: sessionId,
       cols,
@@ -417,15 +223,15 @@ export function useGateway(): UseGatewayResult {
   }, []);
 
   const requestSessionList = useCallback(() => {
-    sendMessage({ type: "sessions.list" });
+    sendGatewayMessage({ type: "sessions.list" });
   }, []);
 
   // ============================================================================
-  // Job Management (uses singleton sendMessage)
+  // Job Management Actions
   // ============================================================================
 
   const createJob = useCallback((request: JobCreateRequest) => {
-    sendMessage({
+    sendGatewayMessage({
       type: "job.create",
       job: request,
     });
@@ -435,7 +241,7 @@ export function useGateway(): UseGatewayResult {
     // Use functional update pattern to get current activeJob
     setActiveJob((currentJob) => {
       if (currentJob) {
-        sendMessage({
+        sendGatewayMessage({
           type: "job.cancel",
           job_id: currentJob.jobId,
         });
@@ -445,18 +251,18 @@ export function useGateway(): UseGatewayResult {
   }, []);
 
   // ============================================================================
-  // Commander Management (stateful conversation via gateway)
+  // Commander Management Actions
   // ============================================================================
 
   const sendCommanderPrompt = useCallback((prompt: string) => {
-    sendMessage({
+    sendGatewayMessage({
       type: "commander.send",
       prompt,
     });
   }, []);
 
   const resetCommander = useCallback(() => {
-    sendMessage({
+    sendGatewayMessage({
       type: "commander.reset",
     });
     // Clear events when resetting the conversation
@@ -473,7 +279,7 @@ export function useGateway(): UseGatewayResult {
   }, []);
 
   const cancelCommander = useCallback(() => {
-    sendMessage({
+    sendGatewayMessage({
       type: "commander.cancel",
     });
   }, []);
@@ -484,25 +290,22 @@ export function useGateway(): UseGatewayResult {
 
   useEffect(() => {
     // Subscribe to status updates
-    const statusListener = (newStatus: GatewayStatus) => {
+    const unsubscribeStatus = subscribeToStatus((newStatus) => {
       setStatus(newStatus);
       if (newStatus === "connected") {
         setLastError(null);
       }
-    };
-    connectionManager.statusListeners.add(statusListener);
+    });
 
     // Subscribe to messages
-    connectionManager.subscribers.add(handleMessage);
+    const unsubscribeMessages = subscribeToMessages(handleMessage);
 
     // Connect if not already connected (singleton handles deduplication)
-    connectSingleton(lastEventIdRef.current);
+    connectGateway(lastEventIdRef.current);
 
     return () => {
-      // Unsubscribe
-      connectionManager.statusListeners.delete(statusListener);
-      connectionManager.subscribers.delete(handleMessage);
-
+      unsubscribeStatus();
+      unsubscribeMessages();
       // Note: We don't close the connection here - the singleton stays alive
       // so other components or HMR reloads can reuse it
     };
@@ -516,9 +319,7 @@ export function useGateway(): UseGatewayResult {
   // Heartbeat
   useEffect(() => {
     const interval = setInterval(() => {
-      if (connectionManager.ws?.readyState === WebSocket.OPEN) {
-        connectionManager.ws.send(JSON.stringify({ type: "ping" }));
-      }
+      sendPing();
     }, 30000);
 
     return () => clearInterval(interval);
