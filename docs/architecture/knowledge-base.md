@@ -44,7 +44,9 @@ knowledge/
     ├── business-logic.md       # Domain rules, entities, workflows
     ├── known-issues.md         # Tech debt, gotchas, deferred decisions
     ├── activity.md             # 14-day briefing analysis (reality layer)
-    └── changelog.md            # Rolling 30-day + monthly rollups
+    ├── changelog.md            # Rolling 30-day + monthly rollups
+    └── audits/                 # First-principles audit results
+        └── 2026-01-13--src-auth.md
 ```
 
 ## Project Identity
@@ -91,6 +93,38 @@ source_files:
 
 Mimesis is a real-time monitoring dashboard for Claude Code sessions...
 ```
+
+### audits/ Directory
+
+First-principles audit results stored with YAML frontmatter:
+
+```yaml
+---
+schema: audit.v1
+project_id: mimesis__607a7a7c
+target: "src/auth"
+generated_at: 2026-01-13T09:22:00Z
+model: claude-opus-4-5-20251101
+inputs:
+  repo_commit: def4567
+  briefings_window: 14d
+evidence:
+  briefing_ids: [1234, 1240]
+---
+# First-Principles Audit: src/auth
+
+## Objective Re-derivation
+...
+
+## Pareto Frontier Options
+1. Option A: ...
+2. Option B: ...
+
+## Recommendation
+...
+```
+
+Audit files are named with format: `{date}--{target-slug}.md`
 
 ### activity.md (Reality Layer)
 
@@ -268,6 +302,38 @@ View knowledge summary for a project:
 # ## Recent Activity (14 days)
 # [content from activity.md]
 ```
+
+### /audit \<project\> \<target\>
+
+Perform a first-principles (zero-base) audit of a specific feature, module, or path:
+
+```
+/audit mimesis src/gateway
+
+# Output:
+# First-Principles Audit: src/gateway
+#
+# ## Objective Re-derivation
+# [Re-derives the objective from first principles]
+#
+# ## Current Implementation Map
+# [Maps the current implementation]
+#
+# ## Multi-Perspective Analysis
+# - Architecture perspective
+# - LLM-native simplification perspective
+# - Reliability/security perspective
+#
+# ## Pareto Frontier Options
+# 1. Option A: [Conservative approach]
+# 2. Option B: [Aggressive simplification]
+# 3. Option C: [Balanced approach]
+#
+# ## Recommendation
+# [Top recommendation with rollout plan]
+```
+
+The audit runs 3 parallel Opus subagents for comprehensive analysis and saves results to `audits/` directory.
 
 ### /improve \<project\>
 

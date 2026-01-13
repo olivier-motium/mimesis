@@ -468,6 +468,120 @@ Trigger KB sync for a specific project.
 
 ---
 
+## Audit API
+
+The Audit API provides access to first-principles audit results stored in the KB. Audits are created via the `/audit` command in Commander and stored in `~/.claude/commander/knowledge/<project_id>/audits/`.
+
+### `GET /audit/:projectId`
+List recent audits for a project.
+
+**Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| `projectId` | path | Project ID (e.g., `mimesis__607a7a7c`) |
+
+**Query Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| `limit` | number | Max audits to return (default: 10) |
+
+**Response:**
+```typescript
+{
+  success: true;
+  audits: Array<{
+    id: string;           // Filename-based ID (e.g., "2026-01-13--src-auth")
+    target: string;       // Audit target path
+    generatedAt: string;  // ISO timestamp
+    filename: string;     // Full filename
+    topRecommendation?: string;  // Extracted from content
+  }>;
+  total: number;
+}
+```
+
+**Errors:**
+- `404 Project not found in knowledge base`
+
+---
+
+### `GET /audit/:projectId/:auditId`
+Get a specific audit by ID.
+
+**Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| `projectId` | path | Project ID |
+| `auditId` | path | Audit ID (filename without extension) |
+
+**Response:**
+```typescript
+{
+  success: true;
+  audit: {
+    id: string;
+    target: string;
+    metadata: {
+      schema: "audit.v1";
+      projectId: string;
+      target: string;
+      generatedAt: string;
+      model: string;
+      inputs?: {
+        repoCommit?: string;
+        briefingsWindow?: string;
+      };
+      evidence?: {
+        briefingIds?: number[];
+      };
+    };
+    content: string;   // Full markdown content
+    filename: string;
+  };
+}
+```
+
+**Errors:**
+- `404 Project not found in knowledge base`
+- `404 Audit not found`
+
+---
+
+### `POST /audit/:projectId/save`
+Save an audit result (called by `/audit` skill).
+
+**Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| `projectId` | path | Project ID |
+
+**Request Body:**
+```typescript
+{
+  target: string;           // e.g., "src/auth"
+  content: string;          // Full markdown content
+  metadata: {
+    model: string;
+    repoCommit?: string;
+    briefingsWindow?: string;
+    briefingIds?: number[];
+  };
+}
+```
+
+**Response:**
+```typescript
+{
+  success: true;
+  auditId: string;   // Generated ID
+  path: string;      // File path where saved
+}
+```
+
+**Notes:** This endpoint creates an `audit_completed` outbox event for fleet-wide notification.
+
+---
+
 ## Hook Events
 
 ### `POST /hooks`
