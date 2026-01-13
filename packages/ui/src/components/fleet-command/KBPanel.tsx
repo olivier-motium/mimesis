@@ -46,17 +46,22 @@ function formatRelativeTime(isoString: string | null): string {
   return date.toLocaleDateString();
 }
 
-/** Get status badge for a project */
-function getStatusBadge(project: KBProject): {
+/** Status badge info with tooltip descriptions */
+interface StatusBadge {
   label: string;
   className: string;
   icon: typeof Check;
-} {
+  tooltip: string;
+}
+
+/** Get status badge for a project */
+function getStatusBadge(project: KBProject): StatusBadge {
   if (!project.hasKb) {
     return {
       label: "None",
       className: "bg-muted/30 text-muted-foreground",
       icon: X,
+      tooltip: "No knowledge base exists yet. Run /knowledge-sync to create one.",
     };
   }
   if (project.isStale) {
@@ -64,12 +69,14 @@ function getStatusBadge(project: KBProject): {
       label: "Stale",
       className: "bg-amber-500/15 text-amber-500",
       icon: AlertTriangle,
+      tooltip: "KB is over 7 days old and may be outdated. Consider syncing.",
     };
   }
   return {
     label: "Fresh",
     className: "bg-status-working/15 text-status-working",
     icon: Check,
+    tooltip: "KB was synced within the last 7 days.",
   };
 }
 
@@ -84,10 +91,10 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
   const [syncingAll, setSyncingAll] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
-  // Auto-dismiss sync message after 8 seconds
+  // Auto-dismiss sync message after 15 seconds (enough time to read the command)
   useEffect(() => {
     if (syncMessage) {
-      const timer = setTimeout(() => setSyncMessage(null), 8000);
+      const timer = setTimeout(() => setSyncMessage(null), 15000);
       return () => clearTimeout(timer);
     }
   }, [syncMessage]);
@@ -206,6 +213,7 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
           onClick={() => handleSyncAll()}
           disabled={syncingAll}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-purple-500 hover:bg-purple-500/10 transition-colors disabled:opacity-50"
+          title="Get command to sync all projects (run in Commander)"
         >
           {syncingAll ? (
             <Loader2 size={12} className="animate-spin" />
@@ -235,18 +243,29 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
 
       {/* Sync message feedback */}
       {syncMessage && (
-        <div className={`mx-4 mb-2 p-3 rounded-md ${
+        <div className={`mx-4 mt-2 mb-2 p-3 rounded-md ${
           syncMessage.startsWith("Error:")
             ? "bg-destructive/10 border border-destructive/20"
             : "bg-purple-500/10 border border-purple-500/20"
         }`}>
-          <div className={`text-xs font-medium mb-1 ${
-            syncMessage.startsWith("Error:") ? "text-destructive" : "text-purple-500"
-          }`}>
-            {syncMessage.startsWith("Error:") ? "Sync Failed" : "Sync Triggered"}
-          </div>
-          <div className="text-[11px] text-foreground/80 font-mono break-words">
-            {syncMessage}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1">
+              <div className={`text-xs font-medium mb-1 ${
+                syncMessage.startsWith("Error:") ? "text-destructive" : "text-purple-500"
+              }`}>
+                {syncMessage.startsWith("Error:") ? "Sync Failed" : "Run in Commander"}
+              </div>
+              <div className="text-[11px] text-foreground/80 font-mono break-words">
+                {syncMessage}
+              </div>
+            </div>
+            <button
+              onClick={() => setSyncMessage(null)}
+              className="p-1 rounded hover:bg-foreground/10 text-muted-foreground hover:text-foreground transition-colors"
+              title="Dismiss"
+            >
+              <X size={12} />
+            </button>
           </div>
         </div>
       )}
@@ -288,18 +307,21 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
                     </div>
                   </div>
 
-                  {/* Status badge */}
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium ${status.className}`}>
+                  {/* Status badge with tooltip */}
+                  <span
+                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium cursor-help ${status.className}`}
+                    title={status.tooltip}
+                  >
                     <StatusIcon size={10} />
                     {status.label}
                   </span>
 
-                  {/* Sync button */}
+                  {/* Get sync command button */}
                   <button
                     onClick={() => handleSyncProject(project.projectId)}
                     disabled={isSyncing}
                     className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors disabled:opacity-50"
-                    title={`Sync ${project.name}`}
+                    title={`Get sync command for ${project.name} (run in Commander)`}
                   >
                     {isSyncing ? (
                       <Loader2 size={12} className="animate-spin" />

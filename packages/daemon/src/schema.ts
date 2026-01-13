@@ -163,3 +163,64 @@ export {
   formatToolUse,
   getToolIcon,
 } from "./tools/index.js";
+
+// =============================================================================
+// KNOWLEDGE BASE SCHEMAS
+// =============================================================================
+// Shared types for the Commander Knowledge Base system
+
+/** KB sync type */
+export const KBSyncTypeSchema = z.enum(["full", "incremental"]);
+export type KBSyncType = z.infer<typeof KBSyncTypeSchema>;
+
+/** KB Project from API */
+export const KBProjectSchema = z.object({
+  projectId: z.string(),
+  name: z.string(),
+  lastSyncAt: z.string().nullable(),
+  syncType: KBSyncTypeSchema.nullable(),
+  lastCommitSeen: z.string().nullable(),
+  filesProcessed: z.number(),
+  briefingCount: z.number(),
+  isStale: z.boolean(),
+  hasKb: z.boolean(),
+});
+export type KBProject = z.infer<typeof KBProjectSchema>;
+
+/** KB Project details (single project view) */
+export const KBProjectDetailSchema = KBProjectSchema.extend({
+  files: z.array(z.string()),
+}).omit({ hasKb: true });
+export type KBProjectDetail = z.infer<typeof KBProjectDetailSchema>;
+
+/** KB Statistics */
+export const KBStatsSchema = z.object({
+  totalProjects: z.number(),
+  staleProjects: z.number(),
+  neverSynced: z.number(),
+  totalBriefings: z.number(),
+});
+export type KBStats = z.infer<typeof KBStatsSchema>;
+
+/** KB Summary content */
+export const KBSummarySchema = z.object({
+  projectId: z.string(),
+  frontmatter: z.record(z.string(), z.string()).nullable(),
+  content: z.string(),
+});
+export type KBSummary = z.infer<typeof KBSummarySchema>;
+
+/** KB Activity content */
+export const KBActivitySchema = z.object({
+  projectId: z.string(),
+  frontmatter: z.record(z.string(), z.string()).nullable(),
+  content: z.string(),
+});
+export type KBActivity = z.infer<typeof KBActivitySchema>;
+
+/** KB sync response */
+export const KBSyncResponseSchema = z.object({
+  message: z.string(),
+  hint: z.string(),
+});
+export type KBSyncResponse = z.infer<typeof KBSyncResponseSchema>;

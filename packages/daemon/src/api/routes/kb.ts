@@ -86,9 +86,17 @@ function parseFrontmatter(content: string): Record<string, string> | null {
   return result;
 }
 
-/** Read KB file content */
+/** Read KB file content with path traversal protection */
 function readKbFile(projectId: string, filename: string): string | null {
   const filePath = path.join(KNOWLEDGE_DIR, projectId, filename);
+
+  // Defense-in-depth: Ensure resolved path is still within KNOWLEDGE_DIR
+  const resolvedPath = path.resolve(filePath);
+  const resolvedKnowledgeDir = path.resolve(KNOWLEDGE_DIR);
+  if (!resolvedPath.startsWith(resolvedKnowledgeDir + path.sep)) {
+    return null;
+  }
+
   if (!fs.existsSync(filePath)) {
     return null;
   }
@@ -125,6 +133,42 @@ const SyncRequestSchema = z.object({
 });
 
 /**
+ * Project ID validation regex.
+ * Valid format: <repoName>__<hash> where:
+ * - repoName: alphanumeric, hyphens, underscores (no slashes or dots)
+ * - hash: 8+ hex characters
+ *
+ * Prevents path traversal attacks by rejecting:
+ * - ".." sequences
+ * - Forward or backslashes
+ * - Null bytes
+ */
+const PROJECT_ID_PATTERN = /^[a-zA-Z0-9_-]+__[a-f0-9]{8,}$/;
+
+/**
+ * Validate and sanitize project ID to prevent path traversal.
+ * Returns null if invalid.
+ */
+function validateProjectId(projectId: string): string | null {
+  // Reject null bytes, path separators, and traversal sequences
+  if (
+    projectId.includes("\0") ||
+    projectId.includes("/") ||
+    projectId.includes("\\") ||
+    projectId.includes("..")
+  ) {
+    return null;
+  }
+
+  // Must match expected format
+  if (!PROJECT_ID_PATTERN.test(projectId)) {
+    return null;
+  }
+
+  return projectId;
+}
+
+/**
  * Create the KB API routes.
  */
 export function createKbRoutes(): Hono {
@@ -151,6 +195,7 @@ export function createKbRoutes(): Hono {
 
       const kbProjects = listKbProjects();
       const aliases = loadAliases();
+      const fleetProjects = projectRepo.getActive();
 
       // Reverse aliases for lookup (projectId -> name)
       const reverseAliases: Record<string, string> = {};
@@ -158,19 +203,23 @@ export function createKbRoutes(): Hono {
         reverseAliases[projectId] = name;
       }
 
+      // Collect all project IDs for batch briefing count query
+      const allProjectIds = new Set<string>(kbProjects);
+      for (const project of fleetProjects) {
+        allProjectIds.add(project.projectId);
+      }
+
+      // Single batch query for briefing counts (avoids N+1)
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - KB_BRIEFING_WINDOW_DAYS);
+      const briefingCounts = briefingRepo.countByProjectsSince(
+        Array.from(allProjectIds),
+        cutoff
+      );
+
+      // Build KB project list
       const projects = kbProjects.map((projectId) => {
         const syncState = syncStateRepo.getSyncState(projectId, "main");
-
-        // Count 14-day briefings for this project
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - KB_BRIEFING_WINDOW_DAYS);
-        const briefings = briefingRepo.query({
-          projectId,
-          limit: 1000,
-        });
-        const recentBriefings = briefings.filter(
-          (b) => new Date(b.createdAt) >= cutoff
-        );
 
         return {
           projectId,
@@ -179,26 +228,15 @@ export function createKbRoutes(): Hono {
           syncType: syncState?.syncType ?? null,
           lastCommitSeen: syncState?.lastCommitSeen ?? null,
           filesProcessed: syncState?.filesProcessed ?? 0,
-          briefingCount: recentBriefings.length,
+          briefingCount: briefingCounts.get(projectId) ?? 0,
           isStale: isStale(syncState?.lastSyncAt ?? null),
           hasKb: true,
         };
       });
 
       // Also include projects from Fleet DB that don't have KB yet
-      const fleetProjects = projectRepo.getActive();
       for (const project of fleetProjects) {
         if (!kbProjects.includes(project.projectId)) {
-          const cutoff = new Date();
-          cutoff.setDate(cutoff.getDate() - KB_BRIEFING_WINDOW_DAYS);
-          const briefings = briefingRepo.query({
-            projectId: project.projectId,
-            limit: 1000,
-          });
-          const recentBriefings = briefings.filter(
-            (b) => new Date(b.createdAt) >= cutoff
-          );
-
           projects.push({
             projectId: project.projectId,
             name: project.repoName,
@@ -206,7 +244,7 @@ export function createKbRoutes(): Hono {
             syncType: null,
             lastCommitSeen: null,
             filesProcessed: 0,
-            briefingCount: recentBriefings.length,
+            briefingCount: briefingCounts.get(project.projectId) ?? 0,
             isStale: true,
             hasKb: false,
           });
@@ -231,7 +269,16 @@ export function createKbRoutes(): Hono {
    */
   kb.get("/kb/projects/:projectId", (c) => {
     try {
-      const projectId = c.req.param("projectId");
+      const rawProjectId = c.req.param("projectId");
+      const projectId = validateProjectId(rawProjectId);
+
+      if (!projectId) {
+        return c.json(
+          { success: false, error: "Invalid project ID format" },
+          400
+        );
+      }
+
       const projectDir = path.join(KNOWLEDGE_DIR, projectId);
 
       if (!fs.existsSync(projectDir)) {
@@ -253,13 +300,10 @@ export function createKbRoutes(): Hono {
       // Read file list
       const files = fs.readdirSync(projectDir).filter((f) => f.endsWith(".md"));
 
-      // Count briefings
+      // Count briefings (single efficient query with date filter in SQL)
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - KB_BRIEFING_WINDOW_DAYS);
-      const briefings = briefingRepo.query({ projectId, limit: 1000 });
-      const recentBriefings = briefings.filter(
-        (b) => new Date(b.createdAt) >= cutoff
-      );
+      const briefingCount = briefingRepo.countByProjectSince(projectId, cutoff);
 
       return c.json({
         success: true,
@@ -270,7 +314,7 @@ export function createKbRoutes(): Hono {
           syncType: syncState?.syncType ?? null,
           lastCommitSeen: syncState?.lastCommitSeen ?? null,
           filesProcessed: syncState?.filesProcessed ?? 0,
-          briefingCount: recentBriefings.length,
+          briefingCount,
           isStale: isStale(syncState?.lastSyncAt ?? null),
           files,
         },
@@ -285,7 +329,16 @@ export function createKbRoutes(): Hono {
    */
   kb.get("/kb/projects/:projectId/summary", (c) => {
     try {
-      const projectId = c.req.param("projectId");
+      const rawProjectId = c.req.param("projectId");
+      const projectId = validateProjectId(rawProjectId);
+
+      if (!projectId) {
+        return c.json(
+          { success: false, error: "Invalid project ID format" },
+          400
+        );
+      }
+
       const content = readKbFile(projectId, "summary.md");
 
       if (!content) {
@@ -324,7 +377,16 @@ export function createKbRoutes(): Hono {
    */
   kb.get("/kb/projects/:projectId/activity", (c) => {
     try {
-      const projectId = c.req.param("projectId");
+      const rawProjectId = c.req.param("projectId");
+      const projectId = validateProjectId(rawProjectId);
+
+      if (!projectId) {
+        return c.json(
+          { success: false, error: "Invalid project ID format" },
+          400
+        );
+      }
+
       const content = readKbFile(projectId, "activity.md");
 
       if (!content) {
@@ -384,17 +446,11 @@ export function createKbRoutes(): Hono {
       const syncedProjectIds = new Set(allSyncStates.map((s) => s.projectId));
       const neverSynced = kbProjects.filter((p) => !syncedProjectIds.has(p)).length;
 
-      // Count total 14-day briefings across all projects
-      let totalBriefings = 0;
+      // Count total 14-day briefings across all projects (single batch query)
       const cutoff = new Date();
       cutoff.setDate(cutoff.getDate() - KB_BRIEFING_WINDOW_DAYS);
-
-      for (const projectId of kbProjects) {
-        const briefings = briefingRepo.query({ projectId, limit: 1000 });
-        totalBriefings += briefings.filter(
-          (b) => new Date(b.createdAt) >= cutoff
-        ).length;
-      }
+      const briefingCounts = briefingRepo.countByProjectsSince(kbProjects, cutoff);
+      const totalBriefings = Array.from(briefingCounts.values()).reduce((a, b) => a + b, 0);
 
       return c.json({
         success: true,
@@ -438,7 +494,16 @@ export function createKbRoutes(): Hono {
    */
   kb.post("/kb/sync/:projectId", async (c) => {
     try {
-      const projectId = c.req.param("projectId");
+      const rawProjectId = c.req.param("projectId");
+      const projectId = validateProjectId(rawProjectId);
+
+      if (!projectId) {
+        return c.json(
+          { success: false, error: "Invalid project ID format" },
+          400
+        );
+      }
+
       const body = await c.req.json().catch(() => ({}));
       const parsed = SyncRequestSchema.safeParse(body);
       const full = parsed.success ? parsed.data.full : false;

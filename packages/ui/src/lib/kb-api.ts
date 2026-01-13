@@ -1,45 +1,22 @@
 /**
  * API client for Knowledge Base endpoints.
+ * Types imported from shared schema (@mimesis/daemon/schema).
  */
 
 import { config } from "../config";
+import type {
+  KBProject,
+  KBStats,
+  KBSummary,
+  KBActivity,
+  KBProjectDetail,
+  KBSyncResponse,
+} from "@mimesis/daemon/schema";
 
 const API_BASE = config.api.baseUrl;
 
-/** KB Project info from API */
-export interface KBProject {
-  projectId: string;
-  name: string;
-  lastSyncAt: string | null;
-  syncType: "full" | "incremental" | null;
-  lastCommitSeen: string | null;
-  filesProcessed: number;
-  briefingCount: number;
-  isStale: boolean;
-  hasKb: boolean;
-}
-
-/** KB Statistics */
-export interface KBStats {
-  totalProjects: number;
-  staleProjects: number;
-  neverSynced: number;
-  totalBriefings: number;
-}
-
-/** KB Summary response */
-export interface KBSummary {
-  projectId: string;
-  frontmatter: Record<string, string> | null;
-  content: string;
-}
-
-/** KB Activity response */
-export interface KBActivity {
-  projectId: string;
-  frontmatter: Record<string, string> | null;
-  content: string;
-}
+// Re-export types for convenience
+export type { KBProject, KBStats, KBSummary, KBActivity, KBProjectDetail, KBSyncResponse };
 
 /**
  * Make an API call with proper error handling.
@@ -85,32 +62,10 @@ export async function getKBProjects(): Promise<{
 /**
  * Get KB project details.
  */
-export async function getKBProject(
-  projectId: string
-): Promise<{
-  projectId: string;
-  name: string;
-  lastSyncAt: string | null;
-  syncType: "full" | "incremental" | null;
-  lastCommitSeen: string | null;
-  filesProcessed: number;
-  briefingCount: number;
-  isStale: boolean;
-  files: string[];
-}> {
+export async function getKBProject(projectId: string): Promise<KBProjectDetail> {
   const response = await apiCall<{
     success: boolean;
-    project: {
-      projectId: string;
-      name: string;
-      lastSyncAt: string | null;
-      syncType: "full" | "incremental" | null;
-      lastCommitSeen: string | null;
-      filesProcessed: number;
-      briefingCount: number;
-      isStale: boolean;
-      files: string[];
-    };
+    project: KBProjectDetail;
   }>(`/kb/projects/${encodeURIComponent(projectId)}`);
   return response.project;
 }
@@ -156,15 +111,10 @@ export async function getKBStats(): Promise<KBStats & { initialized: boolean }> 
  * Trigger KB sync for all projects.
  * Note: Returns instructions - actual sync requires Commander.
  */
-export async function triggerKBSync(full: boolean = false): Promise<{
-  message: string;
-  hint: string;
-}> {
+export async function triggerKBSync(full: boolean = false): Promise<KBSyncResponse> {
   const response = await apiCall<{
     success: boolean;
-    message: string;
-    hint: string;
-  }>("/kb/sync", {
+  } & KBSyncResponse>("/kb/sync", {
     method: "POST",
     body: JSON.stringify({ full }),
   });
@@ -178,15 +128,10 @@ export async function triggerKBSync(full: boolean = false): Promise<{
 export async function triggerProjectKBSync(
   projectId: string,
   full: boolean = false
-): Promise<{
-  message: string;
-  hint: string;
-}> {
+): Promise<KBSyncResponse> {
   const response = await apiCall<{
     success: boolean;
-    message: string;
-    hint: string;
-  }>(`/kb/sync/${encodeURIComponent(projectId)}`, {
+  } & KBSyncResponse>(`/kb/sync/${encodeURIComponent(projectId)}`, {
     method: "POST",
     body: JSON.stringify({ full }),
   });

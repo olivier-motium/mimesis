@@ -291,6 +291,183 @@ Get Commander conversation history.
 
 ---
 
+## Knowledge Base (KB)
+
+The KB API provides access to the Commander Knowledge Base, a two-layer distilled repository of project knowledge. See [Knowledge Base Architecture](../architecture/knowledge-base.md) for the full system design.
+
+### `GET /kb/projects`
+List all KB projects with sync state.
+
+**Response:**
+```typescript
+{
+  success: true;
+  initialized: boolean;  // false if KB not yet created
+  projects: Array<{
+    projectId: string;     // e.g., "mimesis__607a7a7c"
+    name: string;          // Human-friendly name from aliases
+    lastSyncAt: string | null;
+    syncType: "full" | "incremental" | null;
+    lastCommitSeen: string | null;
+    filesProcessed: number;
+    briefingCount: number;  // 14-day briefing count
+    isStale: boolean;       // >7 days since last sync
+    hasKb: boolean;         // KB directory exists
+  }>;
+  message?: string;  // When not initialized
+}
+```
+
+**Notes:** Returns both projects with existing KB directories and active Fleet DB projects that haven't been synced yet.
+
+---
+
+### `GET /kb/projects/:projectId`
+Get detailed KB project information.
+
+**Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| `projectId` | path | Project ID (e.g., `mimesis__607a7a7c`) |
+
+**Response:**
+```typescript
+{
+  success: true;
+  project: {
+    projectId: string;
+    name: string;
+    lastSyncAt: string | null;
+    syncType: "full" | "incremental" | null;
+    lastCommitSeen: string | null;
+    filesProcessed: number;
+    briefingCount: number;
+    isStale: boolean;
+    files: string[];  // Available .md files in KB
+  };
+}
+```
+
+**Errors:**
+- `400 Invalid project ID format` - Path traversal or malformed ID
+- `404 Project not found in knowledge base`
+
+---
+
+### `GET /kb/projects/:projectId/summary`
+Get the project summary from KB.
+
+**Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| `projectId` | path | Project ID |
+
+**Response:**
+```typescript
+{
+  success: true;
+  summary: {
+    projectId: string;
+    frontmatter: Record<string, string> | null;  // YAML metadata
+    content: string;  // Markdown body
+  };
+}
+```
+
+---
+
+### `GET /kb/projects/:projectId/activity`
+Get the project activity summary (Reality Layer).
+
+**Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| `projectId` | path | Project ID |
+
+**Response:**
+```typescript
+{
+  success: true;
+  activity: {
+    projectId: string;
+    frontmatter: Record<string, string> | null;
+    content: string;
+  };
+}
+```
+
+**Notes:** The activity file contains analysis of 14-day briefings: top changed areas, recurring blockers, and operational patterns.
+
+---
+
+### `GET /kb/stats`
+Get fleet-wide KB statistics.
+
+**Response:**
+```typescript
+{
+  success: true;
+  initialized: boolean;
+  stats: {
+    totalProjects: number;
+    staleProjects: number;  // >7 days since sync
+    neverSynced: number;
+    totalBriefings: number;  // 14-day count across all projects
+  };
+}
+```
+
+---
+
+### `POST /kb/sync`
+Trigger KB sync for all projects.
+
+**Request Body:**
+```typescript
+{
+  full?: boolean;  // Force full re-distill (default: false)
+}
+```
+
+**Response:**
+```typescript
+{
+  success: true;
+  message: string;  // Command to run in Commander
+  hint: string;
+}
+```
+
+**Notes:** Returns instructions for running `/knowledge-sync` in Commander. Actual sync requires Claude invocation for doc distillation.
+
+---
+
+### `POST /kb/sync/:projectId`
+Trigger KB sync for a specific project.
+
+**Parameters:**
+| Name | Type | Description |
+|------|------|-------------|
+| `projectId` | path | Project ID |
+
+**Request Body:**
+```typescript
+{
+  full?: boolean;  // Force full re-distill
+}
+```
+
+**Response:**
+```typescript
+{
+  success: true;
+  message: string;  // Command to run in Commander
+  hint: string;
+}
+```
+
+---
+
 ## Hook Events
 
 ### `POST /hooks`

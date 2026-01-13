@@ -3,7 +3,7 @@
  * Manages session completion briefings with idempotent insert.
  */
 
-import { eq, desc, and, sql } from "drizzle-orm";
+import { eq, desc, and, sql, inArray } from "drizzle-orm";
 import { getFleetDb, schema } from "./index.js";
 import type { Briefing, NewBriefing } from "./schema.js";
 
@@ -256,5 +256,70 @@ export class BriefingRepo {
       .orderBy(desc(schema.briefings.createdAt))
       .limit(limit)
       .all();
+  }
+
+  /**
+   * Count briefings for a project since a given date.
+   * More efficient than fetching all and filtering in JS.
+   */
+  countByProjectSince(projectId: string, since: Date): number {
+    const db = getFleetDb();
+    const sinceStr = since.toISOString();
+    const result = db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(schema.briefings)
+      .where(
+        and(
+          eq(schema.briefings.projectId, projectId),
+          sql`${schema.briefings.createdAt} >= ${sinceStr}`
+        )
+      )
+      .get();
+    return result?.count ?? 0;
+  }
+
+  /**
+   * Batch count briefings since a date for multiple projects.
+   * Returns a Map of projectId -> count.
+   * Single SQL query instead of N queries.
+   */
+  countByProjectsSince(
+    projectIds: string[],
+    since: Date
+  ): Map<string, number> {
+    if (projectIds.length === 0) {
+      return new Map();
+    }
+
+    const db = getFleetDb();
+    const sinceStr = since.toISOString();
+
+    // Use Drizzle's inArray for proper parameterized query
+    const results = db
+      .select({
+        projectId: schema.briefings.projectId,
+        count: sql<number>`COUNT(*)`,
+      })
+      .from(schema.briefings)
+      .where(
+        and(
+          inArray(schema.briefings.projectId, projectIds),
+          sql`${schema.briefings.createdAt} >= ${sinceStr}`
+        )
+      )
+      .groupBy(schema.briefings.projectId)
+      .all();
+
+    const countMap = new Map<string, number>();
+    // Initialize all projectIds with 0
+    for (const id of projectIds) {
+      countMap.set(id, 0);
+    }
+    // Set actual counts
+    for (const row of results) {
+      countMap.set(row.projectId, row.count);
+    }
+
+    return countMap;
   }
 }
