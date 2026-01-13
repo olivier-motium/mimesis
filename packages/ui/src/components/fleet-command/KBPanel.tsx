@@ -82,11 +82,14 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
   const [state, actions] = useKBState(true, 30000); // Auto-refresh every 30s
   const [syncingProject, setSyncingProject] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const handleSyncAll = async (full: boolean = false) => {
     setSyncingAll(true);
+    setSyncMessage(null);
     try {
       const result = await actions.syncAll(full);
+      setSyncMessage(result.message);
       onSyncMessage?.(result.message);
     } finally {
       setSyncingAll(false);
@@ -95,8 +98,10 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
 
   const handleSyncProject = async (projectId: string, full: boolean = false) => {
     setSyncingProject(projectId);
+    setSyncMessage(null);
     try {
       const result = await actions.syncProject(projectId, full);
+      setSyncMessage(result.message);
       onSyncMessage?.(result.message);
     } finally {
       setSyncingProject(null);
@@ -124,20 +129,26 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
           Knowledge Base Not Initialized
         </h3>
         <p className="text-xs text-muted-foreground mb-4 max-w-[240px]">
-          {state.message || "Run /knowledge-sync to populate the knowledge base."}
+          {syncMessage || state.message || "Run /knowledge-sync to populate the knowledge base."}
         </p>
-        <button
-          onClick={() => handleSyncAll()}
-          disabled={syncingAll}
-          className="flex items-center gap-2 px-4 py-2 rounded-md bg-purple-500/10 text-purple-500 text-sm font-medium hover:bg-purple-500/20 transition-colors disabled:opacity-50"
-        >
-          {syncingAll ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <RefreshCw size={14} />
-          )}
-          Initialize KB
-        </button>
+        {syncMessage ? (
+          <div className="text-xs text-purple-500 bg-purple-500/10 px-3 py-2 rounded-md font-mono">
+            /knowledge-sync
+          </div>
+        ) : (
+          <button
+            onClick={() => handleSyncAll()}
+            disabled={syncingAll}
+            className="flex items-center gap-2 px-4 py-2 rounded-md bg-purple-500/10 text-purple-500 text-sm font-medium hover:bg-purple-500/20 transition-colors disabled:opacity-50"
+          >
+            {syncingAll ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <RefreshCw size={14} />
+            )}
+            Initialize KB
+          </button>
+        )}
       </div>
     );
   }
