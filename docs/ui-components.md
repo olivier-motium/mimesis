@@ -260,25 +260,32 @@ Shows fleet events and session details.
 - `session: Session | null` - Selected session
 - `fleetEvents: FleetEvent[]` - Fleet event stream
 - `gatewayStatus: GatewayStatus` - Connection status
-- `showCommander?: boolean` - When true, shows Fleet Intel mode instead of session details
-- `commanderState?: CommanderState` - Commander status (for Fleet Intel display)
-- `sessions?: Session[]` - All sessions (for fleet stats in Commander mode)
+- `showCommander?: boolean` - When true, shows Commander status instead of agent inspector
+- `commanderState?: CommanderState` - Commander status
+- `sessions?: Session[]` - All sessions (for fleet stats)
 
-**Modes:**
-1. **Session Mode** (default) - Shows selected session details, pending actions, live state
-2. **Commander Mode** (showCommander=true) - Shows Fleet Intel with agent counts, Commander status, and fleet events
+**Layout:** Always shows Fleet Overview at top, with contextual sections below.
 
-**Session Mode Sections:**
-1. **Session HUD** - Status badge, mission, git context
-2. **Ask/Decide** - Pending tool approval actions (only when waiting)
-3. **Live State** - Current activity and working directory
-4. **File Status** - Task and summary from status file
+```
+┌─────────────────────────┐
+│ FLEET INTEL             │ ← Always visible header
+├─────────────────────────┤
+│ Fleet Stats (2x2 grid)  │ ← Agents, Working, Attention, Idle
+├─────────────────────────┤
+│ AGENT INSPECTOR         │ ← Only when session selected
+│ Mission + Status        │
+├─────────────────────────┤
+│ QUICK ACTIONS           │ ← Only when needs approval
+└─────────────────────────┘
+```
 
-**Commander Mode Sections:**
-1. **Fleet Overview** - Header with "Fleet Intel" title
-2. **Fleet Stats** - Agent counts (working, attention needed, idle)
-3. **Commander Status** - Thinking/Ready state and queued prompts
-4. **Fleet Events** - Recent cross-project events
+**Sections:**
+1. **Fleet Overview** - Always visible: stats grid showing agent counts (Agents, Working, Attention, Idle)
+2. **Commander Status** - When `showCommander=true`: Thinking/Ready state and queued prompts
+3. **Agent Inspector** - When session selected: mission, status, git context, pending actions
+4. **Empty State** - When no session: card with "Select an agent" hint and keyboard shortcuts
+5. **Fleet Events** - Recent cross-project activity (pushed to bottom)
+6. **Gateway Status** - Only when disconnected: reconnect button
 
 ---
 

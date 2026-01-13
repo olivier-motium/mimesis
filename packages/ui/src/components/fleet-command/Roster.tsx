@@ -131,16 +131,26 @@ export function Roster({
         {filteredSessions.length === 0 ? (
           <div className="roster-empty">
             <div className="roster-empty__icon">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="10" />
-                <path d="M8 12h8M12 8v8" />
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                <path d="M16 3.13a4 4 0 0 1 0 7.75" />
               </svg>
             </div>
             <div className="roster-empty__text">
               {searchQuery ? "No matching agents" : "No active agents"}
             </div>
             {!searchQuery && (
-              <div className="roster-empty__hint">Agents will appear when sessions start</div>
+              <div className="roster-empty__hint">
+                Agents will appear when sessions start
+              </div>
+            )}
+            {!searchQuery && (
+              <div className="mt-3 text-[10px] text-muted-foreground">
+                <kbd className="px-1.5 py-0.5 bg-muted rounded font-mono">Ctrl+Tab</kbd>
+                <span className="ml-1">to open Commander</span>
+              </div>
             )}
           </div>
         ) : (

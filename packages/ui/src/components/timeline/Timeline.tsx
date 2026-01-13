@@ -156,12 +156,25 @@ export function Timeline({
       {events.length === 0 && (
         <div className="timeline-empty">
           <div className="timeline-empty__icon">
-            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <line x1="3" y1="9" x2="21" y2="9" />
+              <line x1="9" y1="21" x2="9" y2="9" />
             </svg>
           </div>
           <div className="timeline-empty__title">Awaiting Activity</div>
           <div className="timeline-empty__subtitle">Events will appear here as the session progresses</div>
+          <div className="flex items-center gap-3 mt-4 text-[10px] text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 bg-muted rounded font-mono">↑</kbd>
+              <kbd className="px-1.5 py-0.5 bg-muted rounded font-mono">↓</kbd>
+              <span>navigate</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <kbd className="px-1.5 py-0.5 bg-muted rounded font-mono">Ctrl+Tab</kbd>
+              <span>Commander</span>
+            </span>
+          </div>
         </div>
       )}
 

@@ -1,10 +1,10 @@
 /**
  * CommandBar - Top header for Fleet Command
  *
- * Shows: Logo, session info (when selected), gateway status, agent counts
+ * Shows: Logo, view indicator, agent counts, Commander toggle
  */
 
-import { Cpu, Brain, Loader2 } from "lucide-react";
+import { Cpu, Brain, Loader2, LayoutDashboard, Terminal } from "lucide-react";
 import { getEffectiveStatus } from "../../lib/sessionStatus";
 import type { CommandBarProps } from "./types";
 
@@ -16,12 +16,6 @@ export function CommandBar({
   onToggleCommander,
   showCommander = false,
 }: CommandBarProps) {
-  // Get status if session is selected
-  const sessionStatus = selectedSession ? getEffectiveStatus(selectedSession) : null;
-  const statusLabel = sessionStatus?.status === "working" ? "Working"
-    : sessionStatus?.status === "waiting" ? "Waiting"
-    : "Idle";
-
   return (
     <header className="fleet-command-bar">
       <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
@@ -31,7 +25,29 @@ export function CommandBar({
           <span>MIMESIS</span>
         </div>
 
-        {/* Agent count - Minimal */}
+        {/* View indicator */}
+        <div className="fleet-command-bar__divider" />
+        <div className="fleet-command-bar__status">
+          {showCommander ? (
+            <span style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--nb-yellow)" }}>
+              <Brain size={12} />
+              Commander
+            </span>
+          ) : selectedSession ? (
+            <span style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--nb-text)" }}>
+              <Terminal size={12} />
+              {selectedSession.workChainName || selectedSession.gitBranch || "Agent"}
+            </span>
+          ) : (
+            <span style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--nb-text-dim)" }}>
+              <LayoutDashboard size={12} />
+              Fleet Overview
+            </span>
+          )}
+        </div>
+
+        {/* Agent count */}
+        <div className="fleet-command-bar__divider" />
         <div className="fleet-command-bar__status">
           <span style={{ color: workingCount > 0 ? "var(--nb-green)" : "var(--nb-text-dim)" }}>
             {workingCount} active
@@ -44,14 +60,16 @@ export function CommandBar({
       </div>
 
       <div className="fleet-command-bar__meta">
-        {/* Commander toggle */}
+        {/* Commander toggle with label */}
         {onToggleCommander && (
           <button
             className={`fleet-command-bar__commander-btn ${showCommander ? "fleet-command-bar__commander-btn--active" : ""}`}
             onClick={onToggleCommander}
             title="Toggle Commander (Ctrl+Tab)"
+            style={{ width: "auto", paddingLeft: 10, paddingRight: 10, gap: 6 }}
           >
             <Brain size={14} />
+            <span style={{ fontSize: 11, fontWeight: 500 }}>Commander</span>
           </button>
         )}
       </div>

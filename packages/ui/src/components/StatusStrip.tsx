@@ -137,11 +137,13 @@ function StatusBadge({ filter, label, count, isActive, needsAttention, onClick }
     <button
       type="button"
       onClick={onClick}
+      title={`${label}: ${count}`}
       className={cn(
         "inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition-all cursor-pointer",
         isActive
           ? [styles.bgActive, styles.text]
-          : [styles.bg, styles.text, "opacity-60 hover:opacity-100"]
+          : [styles.bg, styles.text, "opacity-60 hover:opacity-100"],
+        needsAttention && "animate-pulse"
       )}
     >
       {count}
