@@ -1532,6 +1532,31 @@ watch(sessionsDir, { ignoreInitial: true, depth: 0 })
 
 **Rule:** On macOS, always watch directories directly instead of glob patterns when you need `add` events for new files. FSEvents handles directory watching reliably but glob pattern matching is unreliable.
 
+## Headless Claude Code Usage Pattern (Jan 2026)
+
+**Running slash commands via headless mode:**
+```bash
+claude -p "/command-name optional args" --allowedTools "Read,Write,Edit,Glob,Grep,Bash(*),Task,mcp__*"
+```
+
+**Key flags:**
+- `-p` / `--print` - Non-interactive (headless) mode
+- `--allowedTools` - Auto-approve tools without prompts (comma-separated, supports wildcards)
+- `--output-format json` - For structured output
+- `--output-format stream-json --verbose` - For streaming (requires `--verbose`)
+- `--continue` / `-c` - Continue most recent conversation
+- `--resume <id>` - Resume specific session
+- `--max-turns N` - Limit agentic turns
+
+**Sequential runs in background:**
+```bash
+echo "=== RUN 1 ===" && claude -p "/command" --allowedTools "..." && \
+echo "=== RUN 2 ===" && claude -p "/command" --allowedTools "..." && \
+echo "=== RUN 3 ===" && claude -p "/command" --allowedTools "..."
+```
+
+**Note:** MCP tools require `mcp__<server>__*` pattern in allowedTools.
+
 ## Commander Event Architecture - Two-Bus Separation (Jan 2026)
 
 **Problem:** Commander was receiving ALL outbox events including high-frequency `silent` ones (session starts), causing context overflow with 10+ concurrent agents.

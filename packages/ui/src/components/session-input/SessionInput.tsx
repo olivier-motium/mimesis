@@ -142,15 +142,17 @@ export function SessionInput({
           <button
             onClick={handleCancel}
             className={cn(
-              "flex items-center justify-center",
-              "w-10 h-10 rounded-lg",
+              "flex items-center justify-center gap-1.5",
+              "h-10 px-3 rounded-lg",
               "bg-red-500/10 text-red-500",
               "hover:bg-red-500/20 transition-colors",
-              "focus:outline-none focus:ring-2 focus:ring-red-500/50"
+              "focus:outline-none focus:ring-2 focus:ring-red-500/50",
+              "text-sm font-medium"
             )}
             title="Cancel (SIGINT)"
           >
             <Square className="w-4 h-4" />
+            <span>Cancel</span>
           </button>
         )}
 
@@ -159,19 +161,23 @@ export function SessionInput({
           onClick={handleSubmit}
           disabled={!canSubmit}
           className={cn(
-            "flex items-center justify-center",
-            "w-10 h-10 rounded-lg",
+            "flex items-center justify-center gap-1.5",
+            "h-10 px-4 rounded-lg",
             "bg-primary text-primary-foreground",
             "hover:bg-primary/90 transition-colors",
             "disabled:opacity-50 disabled:cursor-not-allowed",
-            "focus:outline-none focus:ring-2 focus:ring-ring"
+            "focus:outline-none focus:ring-2 focus:ring-ring",
+            "text-sm font-medium"
           )}
           title="Send (Enter)"
         >
           {isWorking ? (
             <Loader2 className="w-4 h-4 animate-spin" />
           ) : (
-            <Send className="w-4 h-4" />
+            <>
+              <Send className="w-4 h-4" />
+              <span>Send</span>
+            </>
           )}
         </button>
       </div>

@@ -16,6 +16,7 @@ import {
   subscribeToStatus,
   getConnectionStatus,
   sendPing,
+  forceReconnect,
 } from "./gateway-connection";
 import { dispatchMessage, type GatewayStateSetters, type GatewayRefs } from "./gateway-handlers";
 
@@ -81,6 +82,8 @@ export interface UseGatewayResult {
   cancelCommander: () => void;
   clearCommanderEvents: () => void;
   clearCommanderContentEvents: () => void;
+  // Reconnection
+  reconnect: () => void;
   // Errors
   lastError: string | null;
 }
@@ -226,6 +229,11 @@ export function useGateway(): UseGatewayResult {
     sendGatewayMessage({ type: "sessions.list" });
   }, []);
 
+  // Manual reconnect (resets attempts and forces new connection)
+  const reconnect = useCallback(() => {
+    forceReconnect(lastEventIdRef.current);
+  }, []);
+
   // ============================================================================
   // Job Management Actions
   // ============================================================================
@@ -352,6 +360,7 @@ export function useGateway(): UseGatewayResult {
     cancelCommander,
     clearCommanderEvents,
     clearCommanderContentEvents,
+    reconnect,
     lastError,
   };
 }

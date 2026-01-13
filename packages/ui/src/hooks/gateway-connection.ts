@@ -198,3 +198,26 @@ export function sendPing(): void {
     connectionManager.ws.send(JSON.stringify({ type: "ping" }));
   }
 }
+
+/**
+ * Force reconnect to gateway (manual retry).
+ * Resets reconnect attempts and immediately tries to connect.
+ */
+export function forceReconnect(fromEventId: number): void {
+  // Clear any pending reconnect timer
+  if (connectionManager.reconnectTimer) {
+    clearTimeout(connectionManager.reconnectTimer);
+    connectionManager.reconnectTimer = null;
+  }
+
+  // Close existing connection if any
+  if (connectionManager.ws) {
+    connectionManager.ws.onclose = null; // Prevent auto-reconnect
+    connectionManager.ws.close();
+    connectionManager.ws = null;
+  }
+
+  // Reset attempts and connect
+  connectionManager.reconnectAttempts = 0;
+  connectGateway(fromEventId);
+}

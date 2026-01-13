@@ -4,7 +4,7 @@
  * Shows: Logo, session info (when selected), gateway status, agent counts
  */
 
-import { Cpu, Layers, GitBranch, Brain, Wifi, WifiOff, Loader2 } from "lucide-react";
+import { Cpu, Brain, Loader2 } from "lucide-react";
 import { getEffectiveStatus } from "../../lib/sessionStatus";
 import type { CommandBarProps } from "./types";
 

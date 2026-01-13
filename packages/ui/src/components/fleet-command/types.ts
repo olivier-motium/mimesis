@@ -55,6 +55,10 @@ export interface TacticalIntelProps {
   }>;
   /** Gateway connection status */
   gatewayStatus?: "connecting" | "connected" | "disconnected";
+  /** Quick action handler for approve/deny (sends y/n to stdin) */
+  onQuickAction?: (action: "approve" | "deny") => void;
+  /** Manual reconnect handler */
+  onReconnect?: () => void;
 }
 
 /** Props for CommandBar */

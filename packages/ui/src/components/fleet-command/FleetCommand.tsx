@@ -110,6 +110,18 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
     gateway.resetCommander();
   }, [gateway]);
 
+  // Handle quick approve/deny action (sends y/n to stdin)
+  const handleQuickAction = useCallback((action: "approve" | "deny") => {
+    if (!selectedSessionId) return;
+    const response = action === "approve" ? "y\n" : "n\n";
+    gateway.sendStdin(selectedSessionId, response);
+  }, [selectedSessionId, gateway]);
+
+  // Handle manual gateway reconnect
+  const handleReconnect = useCallback(() => {
+    gateway.reconnect();
+  }, [gateway]);
+
   // Keyboard navigation (extracted to hook)
   useFleetKeyboard({
     sessions,
@@ -190,6 +202,8 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
         session={selectedSession}
         fleetEvents={gateway.fleetEvents}
         gatewayStatus={gateway.status}
+        onQuickAction={selectedSessionId ? handleQuickAction : undefined}
+        onReconnect={handleReconnect}
       />
     </div>
   );

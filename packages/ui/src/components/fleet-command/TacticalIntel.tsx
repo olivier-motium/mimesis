@@ -17,12 +17,12 @@
  * └─────────────────────────┘
  */
 
-import { GitBranch, AlertTriangle, CheckCircle2, Clock, Terminal, FolderOpen, MessageSquare, Wifi, WifiOff, Loader2, Bell } from "lucide-react";
+import { GitBranch, AlertTriangle, Wifi, WifiOff, Loader2, Check, X, RefreshCw } from "lucide-react";
 import { getMissionText, getNowText, formatTimeAgo } from "./constants";
 import { getEffectiveStatus } from "@/lib/sessionStatus";
 import type { TacticalIntelProps } from "./types";
 
-export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disconnected" }: TacticalIntelProps) {
+export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disconnected", onQuickAction, onReconnect }: TacticalIntelProps) {
   // Empty state
   if (!session) {
     return (
@@ -118,60 +118,56 @@ export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disc
               </div>
             )}
           </div>
-          <div className="inspector-ask__hint">
-            Attach terminal to approve or deny
-          </div>
+          {onQuickAction ? (
+            <div className="inspector-ask__actions">
+              <button
+                className="inspector-ask__btn inspector-ask__btn--approve"
+                onClick={() => onQuickAction("approve")}
+              >
+                <Check size={14} />
+                Approve
+              </button>
+              <button
+                className="inspector-ask__btn inspector-ask__btn--deny"
+                onClick={() => onQuickAction("deny")}
+              >
+                <X size={14} />
+                Deny
+              </button>
+            </div>
+          ) : (
+            <div className="inspector-ask__hint">
+              Select session to approve or deny
+            </div>
+          )}
         </div>
       )}
 
-      {/* Live State Section */}
+      {/* Live State Section - Minimal */}
       <div className="inspector-state">
-        <div className="inspector-state__header">
-          <Terminal size={12} />
-          Live State
-        </div>
         <div className="inspector-state__content">
           <div className="inspector-state__row">
-            <span className="inspector-state__label">Status:</span>
             <span className={`inspector-state__value inspector-state__value--${status}`}>{nowText}</span>
           </div>
           <div className="inspector-state__row">
-            <span className="inspector-state__label">
-              <FolderOpen size={10} />
-            </span>
             <span className="inspector-state__value inspector-state__value--mono" title={session.cwd}>
-              {session.cwd.length > 30 ? "..." + session.cwd.slice(-27) : session.cwd}
-            </span>
-          </div>
-          <div className="inspector-state__row">
-            <span className="inspector-state__label">
-              <Clock size={10} />
-            </span>
-            <span className="inspector-state__value">
-              {formatTimeAgo(session.lastActivityAt)}
+              {session.cwd.length > 35 ? "..." + session.cwd.slice(-32) : session.cwd}
             </span>
           </div>
         </div>
       </div>
 
-      {/* Recent Output Section */}
+      {/* Recent Output Section - Minimal */}
       <div className="inspector-output">
-        <div className="inspector-output__header">
-          <MessageSquare size={12} />
-          Recent Output
-        </div>
         <div className="inspector-output__content">
           {session.recentOutput.length === 0 ? (
-            <div className="inspector-output__empty">Output will appear as agent works</div>
+            <div className="inspector-output__empty">Waiting for output...</div>
           ) : (
-            session.recentOutput.slice(-5).map((output, i) => (
+            session.recentOutput.slice(-4).map((output, i) => (
               <div key={i} className={`inspector-output__entry inspector-output__entry--${output.role}`}>
-                <span className="inspector-output__role">
-                  {output.role === "assistant" ? "AI" : output.role === "user" ? "You" : "Tool"}
-                </span>
                 <span className="inspector-output__text" title={output.content}>
-                  {output.content.length > 100
-                    ? output.content.slice(0, 97) + "..."
+                  {output.content.length > 120
+                    ? output.content.slice(0, 117) + "..."
                     : output.content}
                 </span>
               </div>
@@ -180,13 +176,9 @@ export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disc
         </div>
       </div>
 
-      {/* File Status (if available) */}
-      {session.fileStatus && (
+      {/* File Status (if available) - Minimal */}
+      {session.fileStatus && (session.fileStatus.task || session.fileStatus.summary) && (
         <div className="inspector-file-status">
-          <div className="inspector-file-status__header">
-            <CheckCircle2 size={12} />
-            Status File
-          </div>
           <div className="inspector-file-status__content">
             {session.fileStatus.task && (
               <div className="inspector-file-status__task">
@@ -202,40 +194,26 @@ export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disc
         </div>
       )}
 
-      {/* Fleet Events (recent) */}
-      {fleetEvents.length > 0 && (
-        <div className="inspector-fleet-events">
-          <div className="inspector-fleet-events__header">
-            <Bell size={12} />
-            Fleet Events
-          </div>
-          <div className="inspector-fleet-events__content">
-            {fleetEvents.slice(-5).reverse().map((event) => (
-              <div key={event.eventId} className="inspector-fleet-events__entry">
-                <span className="inspector-fleet-events__type">{event.type}</span>
-                {event.projectId && (
-                  <span className="inspector-fleet-events__project">
-                    {event.projectId.split("__")[0]}
-                  </span>
-                )}
-              </div>
-            ))}
+      {/* Gateway Status - Minimal, only show when disconnected */}
+      {gatewayStatus !== "connected" && (
+        <div className="inspector-gateway">
+          <div className="inspector-gateway__content">
+            <span className={`inspector-gateway__status inspector-gateway__status--${gatewayStatus}`}>
+              {gatewayStatus === "connecting" && <Loader2 size={12} className="animate-spin" />}
+              {gatewayStatus === "disconnected" && <WifiOff size={12} />}
+              {gatewayStatus === "connecting" ? "Connecting..." : "Disconnected"}
+            </span>
+            {gatewayStatus === "disconnected" && onReconnect && (
+              <button
+                className="inspector-gateway__reconnect"
+                onClick={onReconnect}
+              >
+                Reconnect
+              </button>
+            )}
           </div>
         </div>
       )}
-
-      {/* Gateway Status */}
-      <div className="inspector-gateway">
-        <div className="inspector-gateway__header">
-          {gatewayStatus === "connected" && <Wifi size={12} />}
-          {gatewayStatus === "connecting" && <Loader2 size={12} className="animate-spin" />}
-          {gatewayStatus === "disconnected" && <WifiOff size={12} />}
-          Gateway
-        </div>
-        <div className={`inspector-gateway__status inspector-gateway__status--${gatewayStatus}`}>
-          {gatewayStatus === "connected" ? "Connected" : gatewayStatus === "connecting" ? "Connecting..." : "Disconnected"}
-        </div>
-      </div>
     </aside>
   );
 }
