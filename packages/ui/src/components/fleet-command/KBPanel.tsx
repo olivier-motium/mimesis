@@ -23,6 +23,7 @@ import {
   X,
   FileText,
   Loader2,
+  Search,
 } from "lucide-react";
 import { useKBState } from "../../hooks/useKBState";
 import type { KBProject } from "../../lib/kb-api";
@@ -127,6 +128,13 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
     } finally {
       setSyncingProject(null);
     }
+  };
+
+  const handleAuditProject = (projectName: string) => {
+    // Show the /audit command for the user to run in Commander
+    const message = `Use /audit ${projectName} <target> command in Commander to audit a specific feature or path.`;
+    setSyncMessage(message);
+    onSyncMessage?.(message);
   };
 
   // Loading state
@@ -316,19 +324,31 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
                     {status.label}
                   </span>
 
-                  {/* Get sync command button */}
-                  <button
-                    onClick={() => handleSyncProject(project.projectId)}
-                    disabled={isSyncing}
-                    className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors disabled:opacity-50"
-                    title={`Get sync command for ${project.name} (run in Commander)`}
-                  >
-                    {isSyncing ? (
-                      <Loader2 size={12} className="animate-spin" />
-                    ) : (
-                      <RefreshCw size={12} />
-                    )}
-                  </button>
+                  {/* Action buttons */}
+                  <div className="flex items-center gap-1">
+                    {/* Audit button */}
+                    <button
+                      onClick={() => handleAuditProject(project.name)}
+                      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-purple-500 hover:text-purple-400 hover:bg-purple-500/10 transition-colors"
+                      title={`First-principles audit for ${project.name} (run /audit in Commander)`}
+                    >
+                      <Search size={12} />
+                    </button>
+
+                    {/* Sync button */}
+                    <button
+                      onClick={() => handleSyncProject(project.projectId)}
+                      disabled={isSyncing}
+                      className="flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted/30 transition-colors disabled:opacity-50"
+                      title={`Get sync command for ${project.name} (run in Commander)`}
+                    >
+                      {isSyncing ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <RefreshCw size={12} />
+                      )}
+                    </button>
+                  </div>
                 </div>
               );
             })}
@@ -339,8 +359,9 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
       {/* Footer hint */}
       <div className="px-4 py-2 border-t border-border/50 bg-muted/10">
         <p className="text-[10px] text-muted-foreground">
-          Use <code className="px-1 py-0.5 bg-muted rounded font-mono">/kb &lt;project&gt;</code> or{" "}
-          <code className="px-1 py-0.5 bg-muted rounded font-mono">/improve &lt;project&gt;</code> in Commander
+          Use <code className="px-1 py-0.5 bg-muted rounded font-mono">/kb</code>,{" "}
+          <code className="px-1 py-0.5 bg-muted rounded font-mono">/improve</code>, or{" "}
+          <code className="px-1 py-0.5 bg-muted rounded font-mono">/audit</code> in Commander
         </p>
       </div>
     </div>

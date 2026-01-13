@@ -34,6 +34,12 @@ export interface OutboxEventPayload {
     status: string;
     projectId?: string;
   };
+  audit?: {
+    target: string;
+    topRecommendation: string;
+    optionsCount: number;
+    artifactPath: string;
+  };
   error?: {
     message: string;
     code?: string;
@@ -222,6 +228,39 @@ export class OutboxRepo {
       projectId: projectId ?? null,
       briefingId: null,
       payloadJson: JSON.stringify({ ...payload, jobId }),
+    });
+  }
+
+  /**
+   * Insert an audit_completed event.
+   * Used to notify Commander that an audit has completed.
+   *
+   * @param projectId - The project that was audited
+   * @param target - The audit target (e.g., "src/gateway")
+   * @param payload - Audit result details (topRecommendation, optionsCount, artifactPath)
+   * @param broadcastLevel - Visibility level ("mention" or "highlight")
+   */
+  insertAuditCompleted(
+    projectId: string,
+    target: string,
+    payload: {
+      topRecommendation: string;
+      optionsCount: number;
+      artifactPath: string;
+    },
+    broadcastLevel: "mention" | "highlight" = "mention"
+  ): number {
+    return this.insert({
+      type: OUTBOX_EVENT_TYPE.AUDIT_COMPLETED,
+      projectId,
+      briefingId: null,
+      broadcastLevel,
+      payloadJson: JSON.stringify({
+        audit: {
+          target,
+          ...payload,
+        },
+      }),
     });
   }
 

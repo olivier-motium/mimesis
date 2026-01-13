@@ -137,3 +137,106 @@ export async function triggerProjectKBSync(
   });
   return { message: response.message, hint: response.hint };
 }
+
+// ============================================================================
+// Audit API Functions
+// ============================================================================
+
+/**
+ * Audit summary for list views.
+ */
+export interface AuditSummary {
+  id: string;
+  target: string;
+  generatedAt: string;
+  filename: string;
+  topRecommendation?: string;
+}
+
+/**
+ * Audit metadata schema.
+ */
+export interface AuditMetadata {
+  schema: "audit.v1";
+  projectId: string;
+  target: string;
+  generatedAt: string;
+  model: string;
+  inputs?: {
+    repoCommit?: string;
+    briefingsWindow?: string;
+  };
+  evidence?: {
+    briefingIds?: number[];
+  };
+}
+
+/**
+ * Full audit detail with content.
+ */
+export interface AuditDetail {
+  id: string;
+  target: string;
+  metadata: AuditMetadata;
+  content: string;
+  filename: string;
+}
+
+/**
+ * Get recent audits for a project.
+ */
+export async function getProjectAudits(
+  projectId: string,
+  limit: number = 10
+): Promise<{ audits: AuditSummary[]; total: number }> {
+  const response = await apiCall<{
+    success: boolean;
+    projectId: string;
+    audits: AuditSummary[];
+    total: number;
+  }>(`/audit/${encodeURIComponent(projectId)}?limit=${limit}`);
+  return { audits: response.audits, total: response.total };
+}
+
+/**
+ * Get a specific audit by ID.
+ */
+export async function getAuditContent(
+  projectId: string,
+  auditId: string
+): Promise<AuditDetail> {
+  const response = await apiCall<{
+    success: boolean;
+    audit: AuditDetail;
+  }>(`/audit/${encodeURIComponent(projectId)}/${encodeURIComponent(auditId)}`);
+  return response.audit;
+}
+
+/**
+ * Save an audit result.
+ * Called by the /audit skill to persist results.
+ */
+export async function saveAuditResult(
+  projectId: string,
+  data: {
+    target: string;
+    content: string;
+    metadata?: {
+      model?: string;
+      inputs?: { repoCommit?: string; briefingsWindow?: string };
+      evidence?: { briefingIds?: number[] };
+    };
+    topRecommendation?: string;
+    optionsCount?: number;
+  }
+): Promise<{ auditId: string; path: string }> {
+  const response = await apiCall<{
+    success: boolean;
+    auditId: string;
+    path: string;
+  }>(`/audit/${encodeURIComponent(projectId)}/save`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+  return { auditId: response.auditId, path: response.path };
+}

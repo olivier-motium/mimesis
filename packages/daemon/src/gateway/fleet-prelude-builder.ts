@@ -268,6 +268,15 @@ Use this context to provide informed, cross-project intelligence.`;
         }
         break;
 
+      case OUTBOX_EVENT_TYPE.AUDIT_COMPLETED:
+        if (payload.audit) {
+          const { target, topRecommendation, optionsCount } = payload.audit;
+          const projectId = event.projectId ?? "unknown";
+          const optionsInfo = optionsCount > 0 ? ` (${optionsCount} options analyzed)` : "";
+          return `- ${ts}: 📋 Audit completed: **${projectId}** → ${target}${optionsInfo}\n  Top recommendation: ${topRecommendation}`;
+        }
+        break;
+
       case OUTBOX_EVENT_TYPE.ERROR:
         if (payload.error) {
           return `- ${ts}: 🚨 Error: ${payload.error.message}`;

@@ -18,6 +18,7 @@ import { createStreamRoutes } from "./routes/stream.js";
 import { createHooksRoutes } from "./routes/hooks.js";
 import { createFleetRoutes } from "./routes/fleet.js";
 import { createKbRoutes } from "./routes/kb.js";
+import { createAuditRoutes } from "./routes/audit.js";
 
 // Re-export types for consumers
 export type { RouterDependencies } from "./types.js";
@@ -57,6 +58,7 @@ export function createApiRouter(deps: RouterDependencies): Hono {
   api.route("/", createHooksRoutes(deps));
   api.route("/", createFleetRoutes());
   api.route("/", createKbRoutes());
+  api.route("/", createAuditRoutes());
 
   return api;
 }

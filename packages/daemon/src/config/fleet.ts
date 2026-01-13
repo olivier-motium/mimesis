@@ -30,6 +30,9 @@ export const KNOWLEDGE_ALIASES_FILE = path.join(KNOWLEDGE_DIR, "aliases.json");
 /** Directory for by-name symlinks */
 export const KNOWLEDGE_BY_NAME_DIR = path.join(KNOWLEDGE_DIR, "by-name");
 
+/** Subdirectory name for audit results within project KB */
+export const KNOWLEDGE_AUDITS_SUBDIR = "audits";
+
 /** Default staleness threshold for KB (days) */
 export const KB_STALE_DAYS = 7;
 
@@ -135,6 +138,7 @@ export const OUTBOX_EVENT_TYPE = {
   DOC_DRIFT_WARNING: "doc_drift_warning",
   SKILL_UPDATED: "skill_updated",
   JOB_COMPLETED: "job_completed",
+  AUDIT_COMPLETED: "audit_completed",
   ERROR: "error",
 } as const;
 
