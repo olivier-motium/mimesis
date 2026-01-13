@@ -51,6 +51,8 @@ export function Timeline({
 }: TimelineProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const wasAtBottomRef = useRef(true);
+  // Suppress scroll-away detection during programmatic scrolling
+  const isAutoScrollingRef = useRef(false);
 
   // Virtualized list
   const virtualizer = useVirtualizer({
@@ -64,9 +66,15 @@ export function Timeline({
   // Scroll to bottom when new events arrive (if at bottom)
   useEffect(() => {
     if (!isScrolledAway && events.length > 0) {
+      // Suppress scroll-away detection during auto-scroll
+      isAutoScrollingRef.current = true;
       // Allow virtualizer to measure before scrolling
       requestAnimationFrame(() => {
         virtualizer.scrollToIndex(events.length - 1, { align: "end" });
+        // Clear suppression after scroll animation settles
+        setTimeout(() => {
+          isAutoScrollingRef.current = false;
+        }, 100);
       });
     }
   }, [events.length, isScrolledAway, virtualizer]);
@@ -75,6 +83,9 @@ export function Timeline({
   const handleScroll = useCallback(() => {
     const container = parentRef.current;
     if (!container) return;
+
+    // Ignore scroll events during programmatic auto-scrolling
+    if (isAutoScrollingRef.current) return;
 
     const { scrollTop, scrollHeight, clientHeight } = container;
     const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
@@ -158,8 +169,12 @@ export function Timeline({
       {isScrolledAway && events.length > 0 && (
         <button
           onClick={() => {
+            isAutoScrollingRef.current = true;
             virtualizer.scrollToIndex(events.length - 1, { align: "end" });
             onScrolledAwayChange(false);
+            setTimeout(() => {
+              isAutoScrollingRef.current = false;
+            }, 100);
           }}
           className={cn(
             "sticky bottom-4 left-1/2 -translate-x-1/2 z-10",

@@ -8,14 +8,14 @@
  * - Cancel button sends SIGINT
  */
 
-import { useRef, useEffect, useMemo } from "react";
+import { useRef, useEffect, useMemo, useState, useCallback } from "react";
 import type { CommanderState, SequencedSessionEvent } from "../../hooks/useGateway";
 import { useCommanderEvents } from "../../hooks/useCommanderEvents";
 import { cn } from "../../lib/utils";
 import { CommanderHistory } from "./CommanderHistory";
 import { CommanderInput } from "./CommanderInput";
 import { CommanderTimeline } from "./CommanderTimeline";
-import { Brain, Sparkles, RotateCcw, Clock, Terminal } from "lucide-react";
+import { Brain, Sparkles, RotateCcw, Clock, Terminal, ChevronDown } from "lucide-react";
 import { Button } from "../ui/button";
 import { stripAnsi } from "../../lib/ansi";
 
@@ -52,6 +52,11 @@ export function CommanderTab({
   const hasSession = commanderState.ptySessionId !== null;
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Scroll tracking - same pattern as Timeline
+  const [isScrolledAway, setScrolledAway] = useState(false);
+  const wasAtBottomRef = useRef(true);
+  const isAutoScrollingRef = useRef(false);
+
   // Process structured content events for timeline display
   const { events: structuredEvents, hasContent } = useCommanderEvents(commanderContentEvents);
 
@@ -71,12 +76,49 @@ export function CommanderTab({
     return stripAnsi(stdoutEvents);
   }, [commanderEvents, hasContent]);
 
-  // Auto-scroll to bottom when new content arrives
-  useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  // Handle scroll to detect when user scrolls away
+  const handleScroll = useCallback(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+
+    // Ignore scroll events during programmatic auto-scrolling
+    if (isAutoScrollingRef.current) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
+
+    // Only notify of changes
+    if (isAtBottom && isScrolledAway) {
+      setScrolledAway(false);
+    } else if (!isAtBottom && !isScrolledAway && wasAtBottomRef.current) {
+      setScrolledAway(true);
     }
-  }, [structuredEvents.length]);
+
+    wasAtBottomRef.current = isAtBottom;
+  }, [isScrolledAway]);
+
+  // Auto-scroll to bottom when new content arrives (if at bottom)
+  useEffect(() => {
+    if (scrollRef.current && !isScrolledAway) {
+      isAutoScrollingRef.current = true;
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      setTimeout(() => {
+        isAutoScrollingRef.current = false;
+      }, 100);
+    }
+  }, [structuredEvents.length, rawStdoutContent, isScrolledAway]);
+
+  // Scroll to bottom handler
+  const scrollToBottom = useCallback(() => {
+    if (scrollRef.current) {
+      isAutoScrollingRef.current = true;
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      setScrolledAway(false);
+      setTimeout(() => {
+        isAutoScrollingRef.current = false;
+      }, 100);
+    }
+  }, []);
 
   return (
     <div className={cn("flex flex-col h-full", className)}>
@@ -167,9 +209,28 @@ export function CommanderTab({
             </div>
             <div
               ref={scrollRef}
-              className="flex-1 overflow-auto px-3 py-2"
+              className="flex-1 overflow-auto px-3 py-2 relative"
+              onScroll={handleScroll}
             >
               <CommanderTimeline events={structuredEvents} />
+              {/* Scroll to bottom button */}
+              {isScrolledAway && structuredEvents.length > 0 && (
+                <button
+                  onClick={scrollToBottom}
+                  className={cn(
+                    "sticky bottom-2 left-1/2 -translate-x-1/2 z-10",
+                    "px-3 py-1.5 rounded-full",
+                    "bg-purple-500 text-white",
+                    "shadow-lg hover:bg-purple-600",
+                    "text-xs font-medium",
+                    "flex items-center gap-1",
+                    "transition-opacity"
+                  )}
+                >
+                  <ChevronDown className="w-3 h-3" />
+                  New messages
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -189,11 +250,30 @@ export function CommanderTab({
             </div>
             <div
               ref={scrollRef}
-              className="flex-1 overflow-auto px-3 py-2"
+              className="flex-1 overflow-auto px-3 py-2 relative"
+              onScroll={handleScroll}
             >
               <pre className="text-xs font-mono text-foreground/90 whitespace-pre-wrap">
                 {rawStdoutContent}
               </pre>
+              {/* Scroll to bottom button */}
+              {isScrolledAway && rawStdoutContent && (
+                <button
+                  onClick={scrollToBottom}
+                  className={cn(
+                    "sticky bottom-2 left-1/2 -translate-x-1/2 z-10",
+                    "px-3 py-1.5 rounded-full",
+                    "bg-purple-500 text-white",
+                    "shadow-lg hover:bg-purple-600",
+                    "text-xs font-medium",
+                    "flex items-center gap-1",
+                    "transition-opacity"
+                  )}
+                >
+                  <ChevronDown className="w-3 h-3" />
+                  New messages
+                </button>
+              )}
             </div>
           </div>
         )}
