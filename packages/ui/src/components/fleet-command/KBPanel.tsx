@@ -14,7 +14,7 @@
  * └─────────────────────────────────────────┘
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   RefreshCw,
   Database,
@@ -84,6 +84,14 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
   const [syncingAll, setSyncingAll] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
+  // Auto-dismiss sync message after 8 seconds
+  useEffect(() => {
+    if (syncMessage) {
+      const timer = setTimeout(() => setSyncMessage(null), 8000);
+      return () => clearTimeout(timer);
+    }
+  }, [syncMessage]);
+
   const handleSyncAll = async (full: boolean = false) => {
     setSyncingAll(true);
     setSyncMessage(null);
@@ -91,6 +99,9 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
       const result = await actions.syncAll(full);
       setSyncMessage(result.message);
       onSyncMessage?.(result.message);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Sync failed";
+      setSyncMessage(`Error: ${msg}`);
     } finally {
       setSyncingAll(false);
     }
@@ -103,6 +114,9 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
       const result = await actions.syncProject(projectId, full);
       setSyncMessage(result.message);
       onSyncMessage?.(result.message);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Sync failed";
+      setSyncMessage(`Error: ${msg}`);
     } finally {
       setSyncingProject(null);
     }
@@ -216,6 +230,24 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
           <span className="text-muted-foreground">
             <span className="font-medium text-foreground">{state.stats.totalBriefings}</span> briefings (14d)
           </span>
+        </div>
+      )}
+
+      {/* Sync message feedback */}
+      {syncMessage && (
+        <div className={`mx-4 mb-2 p-3 rounded-md ${
+          syncMessage.startsWith("Error:")
+            ? "bg-destructive/10 border border-destructive/20"
+            : "bg-purple-500/10 border border-purple-500/20"
+        }`}>
+          <div className={`text-xs font-medium mb-1 ${
+            syncMessage.startsWith("Error:") ? "text-destructive" : "text-purple-500"
+          }`}>
+            {syncMessage.startsWith("Error:") ? "Sync Failed" : "Sync Triggered"}
+          </div>
+          <div className="text-[11px] text-foreground/80 font-mono break-words">
+            {syncMessage}
+          </div>
         </div>
       )}
 
