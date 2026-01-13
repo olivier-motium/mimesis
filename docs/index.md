@@ -51,18 +51,12 @@ Real-time monitoring dashboard for Claude Code sessions.
 | [Configuration Reference](architecture/configuration-reference.md) | All config modules |
 | [UI Components](ui-components.md) | React component hierarchy |
 | [Daemon APIs](api/daemon-api.md) | Internal service documentation |
-| [spec.md](../spec.md) | Log format specification and types |
 
 ### Specifications
-
-Implementation specifications for Fleet Commander versions:
 
 | Document | Version | Status |
 |----------|---------|--------|
 | [SPEC_6.md](../SPEC_6.md) | v5.1 | **Current Implementation** |
-| [FLEET_CMD_SPEC_V5.md](../FLEET_CMD_SPEC_V5.md) | v5 | Design spec |
-| [FLEET_CMD_SPEC_V3.md](../FLEET_CMD_SPEC_V3.md) | v3 | Historical |
-| [FLEET_CMD_SPEC.md](../FLEET_CMD_SPEC.md) | v1 | Historical |
 
 ### Reference Documentation
 

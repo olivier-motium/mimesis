@@ -217,5 +217,5 @@ docs(api): add gateway protocol reference
 ## Related Documentation
 
 - [Getting Started](getting-started.md) - Quick start guide
-- [Architecture Overview](architecture/overview.md) - System design
+- [Architecture Overview](../README.md) - System design and overview
 - [Configuration Reference](architecture/configuration-reference.md) - Config options

@@ -58,6 +58,16 @@ Each session shows:
 - Hook-based goal and summary from `.claude/status.md`
 - Current git branch
 
+## Commander (Meta-Agent)
+
+Mimesis includes **Commander**, a meta-agent that orchestrates jobs across your fleet. Key features:
+
+- **Headless Jobs**: Run Claude Code prompts without interactive sessions
+- **Session Resumption**: Jobs maintain context via `claude -p "<prompt>" --resume <session-id>`
+- **Semantic Briefings**: Cross-project intelligence summaries
+
+Commander sessions appear in the Roster alongside regular sessions. See [Commander Architecture](architecture/commander.md) for full details.
+
 ## Verify It's Working
 
 1. Open a terminal and start a Claude Code session:

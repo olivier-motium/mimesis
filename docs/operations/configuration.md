@@ -28,7 +28,14 @@ Complete reference for all environment variables and tunable constants.
 
 ## Internal Constants
 
-These constants are defined in `packages/daemon/src/config.ts` and affect daemon behavior.
+These constants are defined in `packages/daemon/src/config/` and affect daemon behavior. The config is organized into modules:
+
+- `index.ts` - Re-exports and main config
+- `timeouts.ts` - Timeout configuration
+- `pty.ts` - PTY session settings
+- `server.ts` - Server bind configuration
+- `fleet.ts` - Fleet/Commander settings
+- `telemetry.ts` - Telemetry configuration
 
 ### Timeout Configuration
 
