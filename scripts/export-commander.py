@@ -35,25 +35,19 @@ HOME = Path.home()
 FILES_TO_EXPORT: list[FileSpec] = [
     # Documentation
     FileSpec("docs/architecture/commander.md", "markdown", "Documentation"),
-    # Daemon - Gateway Handlers
-    FileSpec(
-        "packages/daemon/src/gateway/handlers/commander-handlers.ts",
-        "typescript",
-        "Daemon - Gateway Handlers",
-    ),
     # Daemon - Gateway Core
     FileSpec(
+        "packages/daemon/src/gateway/gateway-server.ts",
+        "typescript",
+        "Daemon - Gateway Core",
+    ),
+    FileSpec(
+        "packages/daemon/src/gateway/commander-session.ts",
+        "typescript",
+        "Daemon - Gateway Core",
+    ),
+    FileSpec(
         "packages/daemon/src/gateway/fleet-prelude-builder.ts",
-        "typescript",
-        "Daemon - Gateway Core",
-    ),
-    FileSpec(
-        "packages/daemon/src/gateway/job-runner.ts",
-        "typescript",
-        "Daemon - Gateway Core",
-    ),
-    FileSpec(
-        "packages/daemon/src/gateway/job-manager.ts",
         "typescript",
         "Daemon - Gateway Core",
     ),
@@ -61,6 +55,73 @@ FILES_TO_EXPORT: list[FileSpec] = [
         "packages/daemon/src/gateway/protocol.ts",
         "typescript",
         "Daemon - Gateway Core",
+    ),
+    FileSpec(
+        "packages/daemon/src/gateway/session-store.ts",
+        "typescript",
+        "Daemon - Gateway Core",
+    ),
+    FileSpec(
+        "packages/daemon/src/gateway/pty-bridge.ts",
+        "typescript",
+        "Daemon - Gateway Core",
+    ),
+    FileSpec(
+        "packages/daemon/src/gateway/outbox-tailer.ts",
+        "typescript",
+        "Daemon - Gateway Core",
+    ),
+    FileSpec(
+        "packages/daemon/src/gateway/entry-converter.ts",
+        "typescript",
+        "Daemon - Gateway Core",
+    ),
+    FileSpec(
+        "packages/daemon/src/gateway/event-merger.ts",
+        "typescript",
+        "Daemon - Gateway Core",
+    ),
+    # Daemon - Gateway Handlers
+    FileSpec(
+        "packages/daemon/src/gateway/handlers/commander-handlers.ts",
+        "typescript",
+        "Daemon - Gateway Handlers",
+    ),
+    FileSpec(
+        "packages/daemon/src/gateway/handlers/pty-session-handlers.ts",
+        "typescript",
+        "Daemon - Gateway Handlers",
+    ),
+    FileSpec(
+        "packages/daemon/src/gateway/handlers/job-handlers.ts",
+        "typescript",
+        "Daemon - Gateway Handlers",
+    ),
+    FileSpec(
+        "packages/daemon/src/gateway/handlers/hook-handlers.ts",
+        "typescript",
+        "Daemon - Gateway Handlers",
+    ),
+    FileSpec(
+        "packages/daemon/src/gateway/handlers/watcher-handlers.ts",
+        "typescript",
+        "Daemon - Gateway Handlers",
+    ),
+    FileSpec(
+        "packages/daemon/src/gateway/handlers/index.ts",
+        "typescript",
+        "Daemon - Gateway Handlers",
+    ),
+    # Daemon - Job System
+    FileSpec(
+        "packages/daemon/src/gateway/job-runner.ts",
+        "typescript",
+        "Daemon - Job System",
+    ),
+    FileSpec(
+        "packages/daemon/src/gateway/job-manager.ts",
+        "typescript",
+        "Daemon - Job System",
     ),
     # Daemon - Fleet Database
     FileSpec(
@@ -120,6 +181,17 @@ FILES_TO_EXPORT: list[FileSpec] = [
         "typescript",
         "Daemon - REST API",
     ),
+    # Daemon - Status Watcher
+    FileSpec(
+        "packages/daemon/src/status-watcher.ts",
+        "typescript",
+        "Daemon - Status Watcher",
+    ),
+    FileSpec(
+        "packages/daemon/src/status-parser.ts",
+        "typescript",
+        "Daemon - Status Watcher",
+    ),
     # UI - Commander Components
     FileSpec(
         "packages/ui/src/components/commander/CommanderTab.tsx",
@@ -133,6 +205,11 @@ FILES_TO_EXPORT: list[FileSpec] = [
     ),
     FileSpec(
         "packages/ui/src/components/commander/CommanderStreamDisplay.tsx",
+        "tsx",
+        "UI - Commander Components",
+    ),
+    FileSpec(
+        "packages/ui/src/components/commander/CommanderTimeline.tsx",
         "tsx",
         "UI - Commander Components",
     ),
@@ -153,7 +230,22 @@ FILES_TO_EXPORT: list[FileSpec] = [
         "UI - Gateway Hooks",
     ),
     FileSpec(
+        "packages/ui/src/hooks/gateway-connection.ts",
+        "typescript",
+        "UI - Gateway Hooks",
+    ),
+    FileSpec(
         "packages/ui/src/hooks/gateway-handlers.ts",
+        "typescript",
+        "UI - Gateway Hooks",
+    ),
+    FileSpec(
+        "packages/ui/src/hooks/gateway-types.ts",
+        "typescript",
+        "UI - Gateway Hooks",
+    ),
+    FileSpec(
+        "packages/ui/src/hooks/useCommanderEvents.ts",
         "typescript",
         "UI - Gateway Hooks",
     ),
@@ -161,13 +253,21 @@ FILES_TO_EXPORT: list[FileSpec] = [
 
 # Hook scripts from ~/.claude/hooks/
 HOOK_SCRIPTS: list[str] = [
+    # Session lifecycle
     "init-status-v5.py",
-    "finalize-status-v5.py",
-    "ingest-status-v5.py",
-    "fleet-forward-hook-event.py",
     "status-working.py",
     "status-stop.py",
     "stop-validator.py",
+    "finalize-status-v5.py",
+    "ingest-status-v5.py",
+    # Event forwarding
+    "fleet-forward-hook-event.py",
+    "emit-hook-event.py",
+    # Session tracking
+    "session-compact.py",
+    # Developer assistance
+    "read-docs-trigger.py",
+    "skill-reminder.py",
 ]
 
 
@@ -193,6 +293,7 @@ def generate_toc(sections: list[str]) -> str:
 def export_files(output_path: Path) -> None:
     """Export all Commander-related files to a single markdown file."""
     output_lines: list[str] = []
+    missing_files: list[str] = []
 
     # Header
     output_lines.append("# Commander Module Export\n")
@@ -232,8 +333,10 @@ def export_files(output_path: Path) -> None:
 
         if content is None:
             output_lines.append("*File not found*\n")
+            missing_files.append(spec.path)
         elif content.startswith("Error"):
             output_lines.append(f"*{content}*\n")
+            missing_files.append(spec.path)
         else:
             output_lines.append(f"```{spec.language}")
             output_lines.append(content)
@@ -254,8 +357,10 @@ def export_files(output_path: Path) -> None:
 
         if content is None:
             output_lines.append("*File not found*\n")
+            missing_files.append(f"~/.claude/hooks/{hook_name}")
         elif content.startswith("Error"):
             output_lines.append(f"*{content}*\n")
+            missing_files.append(f"~/.claude/hooks/{hook_name}")
         else:
             output_lines.append("```python")
             output_lines.append(content)
@@ -267,6 +372,11 @@ def export_files(output_path: Path) -> None:
     output_path.write_text("\n".join(output_lines), encoding="utf-8")
     print(f"Exported Commander module to: {output_path}")
     print(f"Total size: {output_path.stat().st_size:,} bytes")
+
+    if missing_files:
+        print(f"\nWarning: {len(missing_files)} file(s) not found:")
+        for f in missing_files:
+            print(f"  - {f}")
 
 
 def main() -> None:
