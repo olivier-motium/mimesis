@@ -35,6 +35,10 @@ for (const envPath of envPaths) {
 import { initTelemetry, shutdownTelemetry } from "./telemetry/index.js";
 initTelemetry();
 
+// Validate configuration and create directories early
+import { validateConfigOrThrow } from "./config/validation.js";
+validateConfigOrThrow();
+
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { SessionWatcher, type SessionEvent, type SessionState } from "./watcher.js";
@@ -182,8 +186,7 @@ async function main(): Promise<void> {
   console.log(`${colors.dim}Showing sessions from last ${MAX_AGE_HOURS} hours${colors.reset}`);
   console.log();
 
-  // Ensure Fleet Commander base directory exists
-  mkdirSync(FLEET_BASE_DIR, { recursive: true });
+  // Note: Directory creation now handled by validateConfigOrThrow() at module load
 
   // Ensure ports are available before starting servers
   await ensurePortAvailable(API_PORT, STREAM_HOST);

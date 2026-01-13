@@ -68,7 +68,6 @@ export class OutboxTailer {
 
     // Initialize cursor to latest event
     this.cursor = this.outboxRepo.getLatestEventId();
-    console.log(`[OUTBOX] Starting tailer from cursor ${this.cursor}`);
 
     // Start polling loop
     this.pollInterval = setInterval(() => {
@@ -85,7 +84,6 @@ export class OutboxTailer {
       this.pollInterval = null;
     }
     this.running = false;
-    console.log("[OUTBOX] Tailer stopped");
   }
 
   /**
@@ -152,8 +150,8 @@ export class OutboxTailer {
       } finally {
         span.end();
       }
-    } catch (error) {
-      console.error("[OUTBOX] Poll error:", error);
+    } catch {
+      // Poll errors are non-fatal, will retry on next interval
     }
   }
 
@@ -174,8 +172,8 @@ export class OutboxTailer {
       for (const listener of this.listeners) {
         try {
           listener(event);
-        } catch (error) {
-          console.error("[OUTBOX] Listener error:", error);
+        } catch {
+          // Listener errors are non-fatal
         }
       }
     } finally {

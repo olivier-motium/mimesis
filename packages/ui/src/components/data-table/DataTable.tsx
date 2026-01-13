@@ -110,9 +110,7 @@ export function DataTable({
                     style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}
                     className="text-xs font-medium text-muted-foreground"
                   >
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
+                    {!header.isPlaceholder && flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>
                 ))}
               </TableRow>

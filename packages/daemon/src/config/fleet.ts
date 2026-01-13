@@ -27,8 +27,8 @@ export const COMMANDER_CWD = FLEET_BASE_DIR;
 /** Gateway WebSocket port */
 export const FLEET_GATEWAY_PORT = 4452;
 
-/** Gateway WebSocket host */
-export const FLEET_GATEWAY_HOST = "127.0.0.1";
+/** Gateway WebSocket host (configurable via env for remote deployments) */
+export const FLEET_GATEWAY_HOST = process.env.FLEET_GATEWAY_HOST ?? "127.0.0.1";
 
 /** Get the full gateway WebSocket URL */
 export function getFleetGatewayUrl(): string {

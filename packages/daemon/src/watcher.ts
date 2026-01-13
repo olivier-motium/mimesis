@@ -159,9 +159,8 @@ export class SessionWatcher extends EventEmitter {
     try {
       // Delete the JSONL file from disk
       unlinkSync(session.filepath);
-    } catch (error) {
+    } catch {
       // File may already be deleted, continue with cleanup
-      console.warn(`[WATCHER] Could not delete file ${session.filepath}:`, error);
     }
 
     // Remove from memory

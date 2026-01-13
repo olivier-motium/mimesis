@@ -227,7 +227,6 @@ export function handleSessionsSnapshot(
     sessionsMap.set(session.sessionId, session);
   }
   setters.setTrackedSessions(sessionsMap);
-  console.log("[GATEWAY] Sessions snapshot received:", sessionsList.length, "sessions");
 }
 
 export function handleSessionDiscovered(
@@ -240,7 +239,6 @@ export function handleSessionDiscovered(
     updated.set(session.sessionId, session);
     return updated;
   });
-  console.log("[GATEWAY] Session discovered:", session.sessionId);
 }
 
 export function handleSessionUpdated(
@@ -269,7 +267,6 @@ export function handleSessionRemoved(
     updated.delete(sessionId);
     return updated;
   });
-  console.log("[GATEWAY] Session removed:", sessionId);
 }
 
 // ============================================================================
@@ -282,23 +279,20 @@ export function handleCommanderState(
 ): void {
   const state = message.state as CommanderState;
   setters.setCommanderState(state);
-  console.log("[GATEWAY] Commander state:", state.status, "queued:", state.queuedPrompts);
 }
 
 export function handleCommanderQueued(
-  message: Record<string, unknown>,
-  setters: GatewayStateSetters
+  _message: Record<string, unknown>,
+  _setters: GatewayStateSetters
 ): void {
-  const position = message.position as number;
-  const prompt = message.prompt as string;
-  console.log("[GATEWAY] Commander prompt queued at position:", position, "prompt:", prompt.substring(0, 50));
+  // Commander queued events are handled by state updates
 }
 
 export function handleCommanderReady(
   _message: Record<string, unknown>,
   _setters: GatewayStateSetters
 ): void {
-  console.log("[GATEWAY] Commander ready for input");
+  // Commander ready events are handled by state updates
 }
 
 export function handleCommanderStdout(
@@ -365,7 +359,6 @@ export function handleError(
   setters: GatewayStateSetters
 ): void {
   const error = message.message as string;
-  console.error("[GATEWAY] Error:", error);
   setters.setLastError(error);
 }
 
@@ -409,7 +402,6 @@ export function dispatchMessage(
 
   if (handler) {
     handler(message, setters, refs);
-  } else {
-    console.log("[GATEWAY] Unknown message type:", type);
   }
+  // Unknown message types are silently ignored
 }

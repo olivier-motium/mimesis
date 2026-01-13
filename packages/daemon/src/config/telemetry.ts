@@ -15,8 +15,18 @@ export const TELEMETRY_CONFIG = {
   /** Environment variable for write token */
   tokenEnvVar: "LOGFIRE_MIMESIS_WRITE_TOKEN",
 
-  /** Check if telemetry should be enabled */
-  enabled: (): boolean => !!process.env.LOGFIRE_MIMESIS_WRITE_TOKEN,
+  /** Check if telemetry should be enabled (logs warning once if disabled) */
+  enabled: (): boolean => {
+    const hasToken = !!process.env.LOGFIRE_MIMESIS_WRITE_TOKEN;
+    if (!hasToken && !TELEMETRY_CONFIG._warnedDisabled) {
+      console.warn("[TELEMETRY] LOGFIRE_MIMESIS_WRITE_TOKEN not set - telemetry disabled");
+      TELEMETRY_CONFIG._warnedDisabled = true;
+    }
+    return hasToken;
+  },
+
+  /** Internal flag to avoid repeated warnings */
+  _warnedDisabled: false,
 
   /** Get the write token from environment */
   getToken: (): string | undefined => process.env.LOGFIRE_MIMESIS_WRITE_TOKEN,

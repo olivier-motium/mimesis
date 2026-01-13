@@ -71,11 +71,6 @@ export function CommanderTab({
     return stripAnsi(stdoutEvents);
   }, [commanderEvents, hasContent]);
 
-  // Debug: Log state changes
-  useEffect(() => {
-    console.log(`[COMMANDER UI] State update: status=${commanderState.status}, isRunning=${isRunning}, ptySessionId=${commanderState.ptySessionId}, structuredEvents=${structuredEvents.length}`);
-  }, [commanderState.status, isRunning, commanderState.ptySessionId, structuredEvents.length]);
-
   // Auto-scroll to bottom when new content arrives
   useEffect(() => {
     if (scrollRef.current) {

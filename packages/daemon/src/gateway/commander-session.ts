@@ -167,7 +167,6 @@ export class CommanderSessionManager extends EventEmitter {
 
         span.setAttribute("commander.action", "queued");
         span.setAttribute("commander.queue_position", this.promptQueue.length);
-        console.log(`[COMMANDER] Prompt queued (position ${this.promptQueue.length})`);
         return;
       }
 
@@ -195,8 +194,6 @@ export class CommanderSessionManager extends EventEmitter {
     });
 
     try {
-      console.log("[COMMANDER] Resetting session...");
-
       // Stop watching for session file
       if (this.sessionWatcher) {
         await this.sessionWatcher.close();
@@ -232,8 +229,6 @@ export class CommanderSessionManager extends EventEmitter {
 
       // Emit state change
       this.emitStateChange();
-
-      console.log("[COMMANDER] Session reset complete");
     } catch (error) {
       recordError(span, error as Error);
       throw error;
@@ -248,7 +243,6 @@ export class CommanderSessionManager extends EventEmitter {
   async cancel(): Promise<void> {
     if (this.ptySessionId) {
       await this.ptyBridge.signal(this.ptySessionId, "SIGINT");
-      console.log("[COMMANDER] Sent SIGINT to cancel");
     }
   }
 
@@ -256,9 +250,7 @@ export class CommanderSessionManager extends EventEmitter {
    * Handle PTY exit event.
    * Called by gateway when Commander's PTY process exits.
    */
-  handlePtyExit(exitCode: number, signal?: string): void {
-    console.log(`[COMMANDER] PTY exited (code=${exitCode}, signal=${signal})`);
-
+  handlePtyExit(_exitCode: number, _signal?: string): void {
     // Clear PTY session ID (PTY is gone)
     this.ptySessionId = null;
     this.ptySpawnedAt = null;
@@ -269,10 +261,6 @@ export class CommanderSessionManager extends EventEmitter {
       this.emitStateChange();
     }
 
-    // If there are queued prompts, we'll need to recreate PTY on next send
-    if (this.promptQueue.length > 0) {
-      console.log(`[COMMANDER] PTY exited with ${this.promptQueue.length} queued prompts - will recreate on next send`);
-    }
   }
 
   /**
@@ -303,7 +291,6 @@ export class CommanderSessionManager extends EventEmitter {
     const conversation = this.conversationRepo.getOrCreateCommander();
 
     if (conversation.claudeSessionId) {
-      console.log(`[COMMANDER] Found existing session: ${conversation.claudeSessionId}`);
       this.claudeSessionId = conversation.claudeSessionId;
       this.isFirstTurn = false;
       // Note: We don't auto-create PTY here - will resume on first prompt
@@ -364,85 +351,27 @@ export class CommanderSessionManager extends EventEmitter {
     try {
       const conversation = this.conversationRepo.getOrCreateCommander();
 
-      // Build fleet prelude
+      // Build fleet prelude and inject context
       const prelude = this.preludeBuilder.build({
         lastEventIdSeen: conversation.lastOutboxEventIdSeen ?? 0,
         maxEvents: 50,
         includeDocDriftWarnings: true,
       });
+      const fullPrompt = this.buildPromptWithContext(prompt, prelude);
 
-      // Build full prompt with fleet context injection
-      let fullPrompt = prompt;
-
-      // On first turn, inject system prompt as system-reminder
-      if (this.isFirstTurn) {
-        fullPrompt = `<system-reminder>\n${prelude.systemPrompt}\n</system-reminder>\n\n${fullPrompt}`;
-      }
-
-      // Inject fleet delta if there's activity
-      if (this.hasFleetActivity(prelude)) {
-        fullPrompt = `<system-reminder>\n${prelude.fleetDelta}\n</system-reminder>\n\n${fullPrompt}`;
-      }
-
-      // Build command for headless mode
-      // claude -p "<prompt>" --resume <session-id> --dangerously-skip-permissions
-      const command: string[] = ["claude", "-p", fullPrompt];
-
-      // Resume existing conversation if we have a session ID
-      if (this.claudeSessionId) {
-        command.push("--resume", this.claudeSessionId);
-        console.log(`[COMMANDER] Resuming session: ${this.claudeSessionId}`);
-      }
-
-      // Allow all tools without permission prompts
-      command.push("--dangerously-skip-permissions");
+      // Build Claude command
+      const command = this.buildClaudeCommand(fullPrompt);
 
       // Update status
       this.status = "working";
       this.turnCount++;
       this.emitStateChange();
 
-      console.log(`[COMMANDER] Running headless prompt (turn ${this.turnCount}, ${fullPrompt.length} chars)`);
-
-      // Start watching for session file before spawning (for new sessions)
-      if (!this.claudeSessionId) {
-        this.ptySpawnedAt = Date.now();
-        this.startSessionIdCapture();
-      }
-
-      // Create PTY session with command
-      const ptyInfo = await this.ptyBridge.create({
-        projectId: COMMANDER_PROJECT_ID,
-        cwd: COMMANDER_CWD,
-        command,
-        env: {
-          FLEET_SESSION_ID: "commander",
-        },
-      });
-
-      this.ptySessionId = ptyInfo.sessionId;
-
-      // Register with session store
-      this.sessionStore.addFromPty({
-        sessionId: ptyInfo.sessionId,
-        projectId: COMMANDER_PROJECT_ID,
-        cwd: COMMANDER_CWD,
-        pid: ptyInfo.pid,
-      });
-
-      // Start watching Commander directory for status file changes
-      if (this.statusWatcher) {
-        this.statusWatcher.watchProject(COMMANDER_CWD);
-      }
-
-      // If resuming, start JSONL watcher now
-      if (this.claudeSessionId && !this.jsonlWatcher) {
-        this.subscribeToStatusWatcher();
-      }
+      // Create PTY and setup watchers
+      const ptyInfo = await this.createPtyWithSetup(command);
 
       span.setAttribute("commander.pty_session_id", ptyInfo.sessionId);
       span.setAttribute("commander.pid", ptyInfo.pid);
-      console.log(`[COMMANDER] PTY session created: ${ptyInfo.sessionId} (pid=${ptyInfo.pid})`);
 
       // Update cursor after sending (will be committed when turn completes)
       this.conversationRepo.updateLastOutboxEventSeen(
@@ -466,8 +395,89 @@ export class CommanderSessionManager extends EventEmitter {
   }
 
   /**
+   * Build the full prompt with fleet context injected.
+   * Adds system-reminder blocks for system prompt (first turn) and fleet delta.
+   */
+  private buildPromptWithContext(prompt: string, prelude: FleetPrelude): string {
+    let fullPrompt = prompt;
+
+    // On first turn, inject system prompt
+    if (this.isFirstTurn) {
+      fullPrompt = `<system-reminder>\n${prelude.systemPrompt}\n</system-reminder>\n\n${fullPrompt}`;
+    }
+
+    // Inject fleet delta if there's activity
+    if (this.hasFleetActivity(prelude)) {
+      fullPrompt = `<system-reminder>\n${prelude.fleetDelta}\n</system-reminder>\n\n${fullPrompt}`;
+    }
+
+    return fullPrompt;
+  }
+
+  /**
+   * Build the Claude CLI command for headless mode.
+   * Format: claude -p "<prompt>" [--resume <session-id>] --dangerously-skip-permissions
+   */
+  private buildClaudeCommand(fullPrompt: string): string[] {
+    const command: string[] = ["claude", "-p", fullPrompt];
+
+    // Resume existing conversation if we have a session ID
+    if (this.claudeSessionId) {
+      command.push("--resume", this.claudeSessionId);
+    }
+
+    // Allow all tools without permission prompts
+    command.push("--dangerously-skip-permissions");
+
+    return command;
+  }
+
+  /**
+   * Create PTY session and setup all associated watchers.
+   * Handles session ID capture, status watching, and JSONL watching.
+   */
+  private async createPtyWithSetup(command: string[]): Promise<PtySessionInfo> {
+    // Start watching for session file before spawning (for new sessions)
+    if (!this.claudeSessionId) {
+      this.ptySpawnedAt = Date.now();
+      this.startSessionIdCapture();
+    }
+
+    // Create PTY session with command
+    const ptyInfo = await this.ptyBridge.create({
+      projectId: COMMANDER_PROJECT_ID,
+      cwd: COMMANDER_CWD,
+      command,
+      env: {
+        FLEET_SESSION_ID: "commander",
+      },
+    });
+
+    this.ptySessionId = ptyInfo.sessionId;
+
+    // Register with session store
+    this.sessionStore.addFromPty({
+      sessionId: ptyInfo.sessionId,
+      projectId: COMMANDER_PROJECT_ID,
+      cwd: COMMANDER_CWD,
+      pid: ptyInfo.pid,
+    });
+
+    // Start watching Commander directory for status file changes
+    if (this.statusWatcher) {
+      this.statusWatcher.watchProject(COMMANDER_CWD);
+    }
+
+    // If resuming, start JSONL watcher now
+    if (this.claudeSessionId && !this.jsonlWatcher) {
+      this.subscribeToStatusWatcher();
+    }
+
+    return ptyInfo;
+  }
+
+  /**
    * Check if fleet prelude has meaningful activity.
-   * Fixes bug in original hasActivity check.
    */
   private hasFleetActivity(prelude: FleetPrelude): boolean {
     return prelude.fleetDelta.trim().length > 0;
@@ -491,8 +501,6 @@ export class CommanderSessionManager extends EventEmitter {
     const encodedCwd = this.encodePathForClaude(COMMANDER_CWD);
     const sessionsDir = path.join(os.homedir(), ".claude", "projects", encodedCwd);
 
-    console.log(`[COMMANDER] Watching for session file in: ${sessionsDir}`);
-
     // Watch directory directly (not glob pattern) - FSEvents handles this reliably
     this.sessionWatcher = watch(sessionsDir, {
       ignoreInitial: true,
@@ -512,8 +520,6 @@ export class CommanderSessionManager extends EventEmitter {
       if (this.claudeSessionId === sessionId) {
         return;
       }
-
-      console.log(`[COMMANDER] Captured Claude session ID: ${sessionId}`);
 
       this.claudeSessionId = sessionId;
 
@@ -536,8 +542,8 @@ export class CommanderSessionManager extends EventEmitter {
       }
     });
 
-    this.sessionWatcher.on("error", (error) => {
-      console.error("[COMMANDER] Session watcher error:", error);
+    this.sessionWatcher.on("error", () => {
+      // Session watcher errors are non-fatal
     });
   }
 
@@ -565,7 +571,6 @@ export class CommanderSessionManager extends EventEmitter {
     this.statusWatcherUnsubscribe = () => {
       this.statusWatcher?.off("status", boundHandler);
     };
-    console.log(`[COMMANDER] Subscribed to status file updates`);
 
     // Start JSONL watcher for structured content display
     this.startJsonlWatcher();
@@ -593,8 +598,6 @@ export class CommanderSessionManager extends EventEmitter {
       `${this.claudeSessionId}.jsonl`
     );
 
-    console.log(`[COMMANDER] Starting JSONL watcher: ${jsonlPath}`);
-
     this.jsonlWatcher = watch(jsonlPath, {
       ignoreInitial: false, // Process existing content on start
     });
@@ -602,8 +605,8 @@ export class CommanderSessionManager extends EventEmitter {
     this.jsonlWatcher.on("add", () => this.handleJsonlChange(jsonlPath));
     this.jsonlWatcher.on("change", () => this.handleJsonlChange(jsonlPath));
 
-    this.jsonlWatcher.on("error", (error) => {
-      console.error("[COMMANDER] JSONL watcher error:", error);
+    this.jsonlWatcher.on("error", () => {
+      // JSONL watcher errors are non-fatal
     });
   }
 
@@ -612,17 +615,12 @@ export class CommanderSessionManager extends EventEmitter {
    */
   private async handleJsonlChange(jsonlPath: string): Promise<void> {
     try {
-      console.log(`[COMMANDER] JSONL change detected, reading from byte ${this.jsonlBytePosition}`);
       const result = await tailJSONL(jsonlPath, this.jsonlBytePosition);
-      console.log(`[COMMANDER] JSONL read result: newPosition=${result.newPosition}, entries=${result.entries.length}`);
       this.jsonlBytePosition = result.newPosition;
 
       if (result.entries.length === 0) {
-        console.log(`[COMMANDER] No new entries in JSONL`);
         return;
       }
-
-      console.log(`[COMMANDER] Read ${result.entries.length} entries from JSONL`);
 
       // Convert log entries to session events
       const { events } = convertEntriesToEvents(result.entries);
@@ -634,15 +632,8 @@ export class CommanderSessionManager extends EventEmitter {
           event,
         });
       }
-
-      if (events.length > 0) {
-        console.log(`[COMMANDER] Emitted ${events.length} content events`);
-      }
-    } catch (error) {
-      // File might not exist yet or be temporarily locked
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        console.error("[COMMANDER] JSONL read error:", error);
-      }
+    } catch {
+      // File might not exist yet or be temporarily locked - non-fatal
     }
   }
 
@@ -677,10 +668,7 @@ export class CommanderSessionManager extends EventEmitter {
         );
 
         if (newStatus !== this.status) {
-          const oldStatus = this.status;
           this.status = newStatus;
-
-          console.log(`[COMMANDER] Status changed: ${oldStatus} → ${newStatus}`);
 
           this.emitStateChange();
 
@@ -706,10 +694,7 @@ export class CommanderSessionManager extends EventEmitter {
 
     const newStatus = this.mapToCommanderStatus(event.status?.status);
     if (newStatus !== this.status) {
-      const oldStatus = this.status;
       this.status = newStatus;
-
-      console.log(`[COMMANDER] Status file update: ${oldStatus} → ${newStatus}`);
 
       this.emitStateChange();
 
@@ -760,7 +745,6 @@ export class CommanderSessionManager extends EventEmitter {
     try {
       // Pop next prompt from queue
       const item = this.promptQueue.shift()!;
-      console.log(`[COMMANDER] Draining queue: ${this.promptQueue.length} remaining`);
 
       span.setAttribute("commander.remaining_items", this.promptQueue.length);
 
@@ -768,7 +752,6 @@ export class CommanderSessionManager extends EventEmitter {
       await this.runPrompt(item.prompt);
     } catch (error) {
       recordError(span, error as Error);
-      console.error("[COMMANDER] Queue drain error:", error);
     } finally {
       this.isDraining = false;
       span.end();
@@ -791,7 +774,6 @@ export class CommanderSessionManager extends EventEmitter {
    */
   private emitStateChange(): void {
     const state = this.getState();
-    console.log(`[COMMANDER] Emitting state change: status=${state.status}, ptySessionId=${state.ptySessionId}, claudeSessionId=${state.claudeSessionId}`);
     this.emitEvent({
       type: "commander.state",
       state,

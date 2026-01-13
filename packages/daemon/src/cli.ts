@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import os from "node:os";
 import { SessionWatcher, type SessionEvent, type SessionState } from "./watcher.js";
 import { formatStatus, getStatusKey } from "./status-derivation.js";
 import { RECENT_THRESHOLD_MS } from "./config/index.js";
@@ -40,9 +41,9 @@ function formatPrompt(prompt: string): string {
 }
 
 function formatCwd(cwd: string): string {
-  // Shorten home directory
-  const home = process.env.HOME ?? "";
-  if (cwd.startsWith(home)) {
+  // Shorten home directory - use os.homedir() as fallback if HOME is unset
+  const home = process.env.HOME ?? os.homedir();
+  if (home && cwd.startsWith(home)) {
     return "~" + cwd.slice(home.length);
   }
   return cwd;

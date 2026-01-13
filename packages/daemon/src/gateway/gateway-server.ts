@@ -269,7 +269,6 @@ export class GatewayServer {
         });
       }
 
-      console.log(`[GATEWAY] Loaded ${existingSessions.size} sessions from watcher`);
     }
 
     // Subscribe to status watcher (file-based status)
@@ -277,7 +276,6 @@ export class GatewayServer {
       this.statusWatcher.on("status", (event: StatusUpdateEvent) => {
         handleStatusUpdate(this.watcherDeps, event);
       });
-      console.log("[GATEWAY] StatusWatcher subscribed");
     }
 
     // Start WebSocket server
@@ -286,11 +284,9 @@ export class GatewayServer {
       port: FLEET_GATEWAY_PORT,
     });
 
-    console.log(`[GATEWAY] WebSocket server listening on ws://${FLEET_GATEWAY_HOST}:${FLEET_GATEWAY_PORT}`);
-
     this.wss.on("connection", (ws, req) => this.handleConnection(ws, req));
-    this.wss.on("error", (error) => {
-      console.error("[GATEWAY] WebSocket server error:", error);
+    this.wss.on("error", () => {
+      // WebSocket server error
     });
 
     // Start Unix socket server for hook IPC
@@ -336,7 +332,6 @@ export class GatewayServer {
       this.socketServer = null;
     }
 
-    console.log("[GATEWAY] Server stopped");
   }
 
   /**
@@ -371,7 +366,6 @@ export class GatewayServer {
 
     await new Promise<void>((resolve, reject) => {
       this.socketServer!.listen(FLEET_GATEWAY_SOCKET, () => {
-        console.log(`[GATEWAY] Unix socket listening on ${FLEET_GATEWAY_SOCKET}`);
         resolve();
       });
       this.socketServer!.on("error", reject);
@@ -404,8 +398,6 @@ export class GatewayServer {
     // Update metrics
     recordGatewayConnection(this.clients.size);
 
-    console.log(`[GATEWAY] Client connected (total: ${this.clients.size})`);
-
     // Send initial Commander state
     this.send(ws, {
       type: "commander.state",
@@ -433,11 +425,9 @@ export class GatewayServer {
       // Update metrics
       recordGatewayConnection(this.clients.size);
 
-      console.log(`[GATEWAY] Client disconnected (remaining: ${this.clients.size})`);
     });
 
-    ws.on("error", (error) => {
-      console.error("[GATEWAY] Client error:", error.message);
+    ws.on("error", () => {
       this.clients.delete(ws);
 
       // Update metrics

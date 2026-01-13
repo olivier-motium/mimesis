@@ -37,16 +37,12 @@ export function createPtyWsServer(options: PtyWsServerOptions): WebSocketServer 
     // We handle path validation in the connection handler instead.
   });
 
-  console.log(`[PTY WS] Server listening on ws://${host}:${port}/pty`);
-
   wss.on("connection", (ws: WebSocket, req: IncomingMessage) => {
-    console.log("[PTY WS] New connection attempt from:", req.url);
     const url = new URL(req.url || "", `http://${req.headers.host}`);
 
     // Extract PTY ID from path: /pty/:ptyId
     const pathParts = url.pathname.split("/").filter(Boolean);
     if (pathParts.length < 2 || pathParts[0] !== "pty") {
-      console.log("[PTY WS] Invalid path:", url.pathname);
       ws.close(4000, "Invalid path");
       return;
     }
@@ -55,22 +51,17 @@ export function createPtyWsServer(options: PtyWsServerOptions): WebSocketServer 
     const token = url.searchParams.get("token");
 
     if (!token) {
-      console.log("[PTY WS] Missing token");
       ws.close(4001, "Missing token");
       return;
     }
 
-    // Validate token
     if (!ptyManager.validateToken(ptyId, token)) {
-      const session = ptyManager.getPty(ptyId);
-      console.log("[PTY WS] Invalid token for PTY:", ptyId, "session exists:", !!session);
       ws.close(4003, "Invalid token");
       return;
     }
 
     // Add client to PTY session
     if (!ptyManager.addClient(ptyId, ws)) {
-      console.log("[PTY WS] PTY session not found:", ptyId);
       ws.close(4004, "PTY session not found");
       return;
     }
@@ -78,10 +69,7 @@ export function createPtyWsServer(options: PtyWsServerOptions): WebSocketServer 
     // Handle messages from client
     ws.on("message", (data: Buffer | string) => {
       const message = parseWsMessage(data.toString());
-      if (!message) {
-        console.log("[PTY WS] Invalid message format");
-        return;
-      }
+      if (!message) return;
 
       switch (message.type) {
         case "input":
@@ -119,14 +107,9 @@ export function createPtyWsServer(options: PtyWsServerOptions): WebSocketServer 
     });
 
     // Handle errors
-    ws.on("error", (error) => {
-      console.error("[PTY WS] Client error:", error.message);
+    ws.on("error", () => {
       ptyManager.removeClient(ptyId, ws);
     });
-  });
-
-  wss.on("error", (error) => {
-    console.error("[PTY WS] Server error:", error);
   });
 
   return wss;
@@ -146,7 +129,6 @@ export function closePtyWsServer(wss: WebSocketServer): Promise<void> {
       if (err) {
         reject(err);
       } else {
-        console.log("[PTY WS] Server closed");
         resolve();
       }
     });

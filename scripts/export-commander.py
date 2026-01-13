@@ -12,7 +12,6 @@ If output_path is not specified, outputs to commander-module-export.md in projec
 """
 
 import argparse
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import NamedTuple

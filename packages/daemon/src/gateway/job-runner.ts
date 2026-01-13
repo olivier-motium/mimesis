@@ -83,10 +83,6 @@ export class JobRunner {
     const cwd = request.repoRoot || process.cwd();
     const claudePath = getClaudePath();
 
-    console.log(`[JOB] Starting ${request.model} job in ${cwd}`);
-    console.log(`[JOB] Using claude at: ${claudePath}`);
-    console.log(`[JOB] Command: ${claudePath} ${args.join(" ")}`);
-
     return new Promise((resolve, reject) => {
       // Spawn claude process
       this.process = spawn(claudePath, args, {
@@ -100,7 +96,6 @@ export class JobRunner {
 
       // Set timeout
       this.timeout = setTimeout(() => {
-        console.log(`[JOB] Timeout after ${JOB_TIMEOUT_MS}ms`);
         this.abort();
         resolve({
           ok: false,
@@ -125,21 +120,14 @@ export class JobRunner {
           onChunk(chunk);
           this.parser.parse(line);
         } catch {
-          // Log non-JSON lines for debugging (truncate for safety)
-          if (line.trim()) {
-            console.log(`[JOB] Non-JSON output: ${line.slice(0, 200)}`);
-          }
+          // Non-JSON lines are ignored (e.g., warnings during startup)
         }
       });
 
-      // Capture stderr for errors (log in real-time for debugging)
+      // Capture stderr for errors
       let stderr = "";
       this.process.stderr?.on("data", (data) => {
-        const text = data.toString();
-        stderr += text;
-        if (text.trim()) {
-          console.log(`[JOB] stderr: ${text.trim().slice(0, 200)}`);
-        }
+        stderr += data.toString();
       });
 
       // Handle process exit
@@ -155,7 +143,6 @@ export class JobRunner {
         }
 
         if (code !== 0) {
-          console.log(`[JOB] Process exited with code ${code}, signal ${signal}`);
           resolve({
             ok: false,
             error: stderr || `Process exited with code ${code}`,
@@ -172,13 +159,11 @@ export class JobRunner {
           usage: this.parser.getMessage()?.usage,
         };
 
-        console.log(`[JOB] Completed successfully`);
         resolve(result);
       });
 
       this.process.on("error", (error) => {
         this.clearTimeout();
-        console.log(`[JOB] Process error: ${error.message}`);
         resolve({
           ok: false,
           error: error.message,

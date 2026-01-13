@@ -83,8 +83,6 @@ export class TabManager extends EventEmitter {
 
     this.emit("tabCreated", { tab });
 
-    console.log(`[TabManager] Created tab ${tab.tabId} for ${repoRoot}`);
-
     return tab;
   }
 
@@ -110,7 +108,6 @@ export class TabManager extends EventEmitter {
   ): ClaudeSegment | null {
     const tab = this.tabs.get(tabId);
     if (!tab) {
-      console.warn(`[TabManager] appendSegment: tab ${tabId} not found`);
       return null;
     }
 
@@ -151,11 +148,6 @@ export class TabManager extends EventEmitter {
       previousSessionId,
     });
 
-    console.log(
-      `[TabManager] Appended segment ${params.sessionId} to tab ${tabId} ` +
-        `(reason=${params.reason}, previous=${previousSessionId ?? "none"})`
-    );
-
     return segment;
   }
 
@@ -168,24 +160,16 @@ export class TabManager extends EventEmitter {
   markSegmentEnding(tabId: string, sessionId: string): void {
     const tab = this.tabs.get(tabId);
     if (!tab) {
-      console.warn(`[TabManager] markSegmentEnding: tab ${tabId} not found`);
       return;
     }
 
     // Verify the session belongs to this tab
     const activeSegment = tab.segments[tab.activeSegmentIndex];
     if (!activeSegment || activeSegment.sessionId !== sessionId) {
-      console.warn(
-        `[TabManager] markSegmentEnding: session ${sessionId} is not active in tab ${tabId}`
-      );
       return;
     }
 
     this.emit("segmentEnding", { tabId, sessionId });
-
-    console.log(
-      `[TabManager] Marked segment ${sessionId} as ending in tab ${tabId}`
-    );
   }
 
   /**
@@ -278,8 +262,6 @@ export class TabManager extends EventEmitter {
     this.tabs.delete(tabId);
 
     this.emit("tabDestroyed", { tabId });
-
-    console.log(`[TabManager] Destroyed tab ${tabId}`);
 
     return true;
   }

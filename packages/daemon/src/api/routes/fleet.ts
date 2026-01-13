@@ -12,13 +12,19 @@
  * - GET /fleet/commander/history - Get Commander conversation history
  */
 
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { BriefingIngestor } from "../../fleet-db/briefing-ingestor.js";
 import { ProjectRepo } from "../../fleet-db/project-repo.js";
 import { BriefingRepo } from "../../fleet-db/briefing-repo.js";
 import { OutboxRepo } from "../../fleet-db/outbox-repo.js";
 import { JobRepo } from "../../fleet-db/job-repo.js";
+import { getErrorMessage } from "../../utils/errors.js";
+
+/** Standard error response helper */
+function errorResponse(c: Context, error: unknown, status: 400 | 500 = 500) {
+  return c.json({ success: false, error: getErrorMessage(error) }, status);
+}
 
 // Request schemas
 const IngestRequestSchema = z.object({
@@ -101,13 +107,7 @@ export function createFleetRoutes(): Hono {
 
       return c.json(result, result.isDuplicate ? 200 : 201);
     } catch (error) {
-      return c.json(
-        {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        500
-      );
+      return errorResponse(c, error);
     }
   });
 
@@ -120,10 +120,7 @@ export function createFleetRoutes(): Hono {
       const projects = activeOnly ? projectRepo.getActive() : projectRepo.getAll();
       return c.json({ success: true, projects });
     } catch (error) {
-      return c.json(
-        { success: false, error: error instanceof Error ? error.message : String(error) },
-        500
-      );
+      return errorResponse(c, error);
     }
   });
 
@@ -141,10 +138,7 @@ export function createFleetRoutes(): Hono {
 
       return c.json({ success: true, project });
     } catch (error) {
-      return c.json(
-        { success: false, error: error instanceof Error ? error.message : String(error) },
-        500
-      );
+      return errorResponse(c, error);
     }
   });
 
@@ -158,10 +152,7 @@ export function createFleetRoutes(): Hono {
       const briefings = briefingRepo.getByProject(projectId, limit);
       return c.json({ success: true, briefings });
     } catch (error) {
-      return c.json(
-        { success: false, error: error instanceof Error ? error.message : String(error) },
-        500
-      );
+      return errorResponse(c, error);
     }
   });
 
@@ -174,10 +165,7 @@ export function createFleetRoutes(): Hono {
       const briefings = briefingRepo.query(query);
       return c.json({ success: true, briefings });
     } catch (error) {
-      return c.json(
-        { success: false, error: error instanceof Error ? error.message : String(error) },
-        500
-      );
+      return errorResponse(c, error);
     }
   });
 
@@ -190,10 +178,7 @@ export function createFleetRoutes(): Hono {
       const briefings = briefingRepo.getRecent(limit);
       return c.json({ success: true, briefings });
     } catch (error) {
-      return c.json(
-        { success: false, error: error instanceof Error ? error.message : String(error) },
-        500
-      );
+      return errorResponse(c, error);
     }
   });
 
@@ -211,10 +196,7 @@ export function createFleetRoutes(): Hono {
 
       return c.json({ success: true, briefing });
     } catch (error) {
-      return c.json(
-        { success: false, error: error instanceof Error ? error.message : String(error) },
-        500
-      );
+      return errorResponse(c, error);
     }
   });
 
@@ -234,10 +216,7 @@ export function createFleetRoutes(): Hono {
         hasMore: events.length === query.limit,
       });
     } catch (error) {
-      return c.json(
-        { success: false, error: error instanceof Error ? error.message : String(error) },
-        500
-      );
+      return errorResponse(c, error);
     }
   });
 
@@ -250,10 +229,7 @@ export function createFleetRoutes(): Hono {
       const jobs = jobRepo.query(query);
       return c.json({ success: true, jobs });
     } catch (error) {
-      return c.json(
-        { success: false, error: error instanceof Error ? error.message : String(error) },
-        500
-      );
+      return errorResponse(c, error);
     }
   });
 
@@ -271,10 +247,7 @@ export function createFleetRoutes(): Hono {
 
       return c.json({ success: true, job });
     } catch (error) {
-      return c.json(
-        { success: false, error: error instanceof Error ? error.message : String(error) },
-        500
-      );
+      return errorResponse(c, error);
     }
   });
 
@@ -287,10 +260,7 @@ export function createFleetRoutes(): Hono {
       const jobs = jobRepo.getCommanderHistory(limit);
       return c.json({ success: true, jobs });
     } catch (error) {
-      return c.json(
-        { success: false, error: error instanceof Error ? error.message : String(error) },
-        500
-      );
+      return errorResponse(c, error);
     }
   });
 
@@ -314,10 +284,7 @@ export function createFleetRoutes(): Hono {
         },
       });
     } catch (error) {
-      return c.json(
-        { success: false, error: error instanceof Error ? error.message : String(error) },
-        500
-      );
+      return errorResponse(c, error);
     }
   });
 

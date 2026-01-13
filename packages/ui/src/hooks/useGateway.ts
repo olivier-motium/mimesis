@@ -63,13 +63,11 @@ function connectSingleton(fromEventId: number) {
   }
 
   notifyStatus("connecting");
-  console.log("[GATEWAY] Connecting to", GATEWAY_URL);
 
   const ws = new WebSocket(GATEWAY_URL);
   connectionManager.ws = ws;
 
   ws.onopen = () => {
-    console.log("[GATEWAY] Connected");
     notifyStatus("connected");
     connectionManager.reconnectAttempts = 0;
 
@@ -89,23 +87,21 @@ function connectSingleton(fromEventId: number) {
     try {
       const message = JSON.parse(event.data);
       notifyMessage(message);
-    } catch (err) {
-      console.error("[GATEWAY] Failed to parse message:", err);
+    } catch {
+      // Message parse errors are non-fatal
     }
   };
 
-  ws.onerror = (error) => {
-    console.error("[GATEWAY] WebSocket error:", error);
+  ws.onerror = () => {
+    // WebSocket errors trigger onclose, no separate handling needed
   };
 
-  ws.onclose = (event) => {
-    console.log("[GATEWAY] Disconnected:", event.code, event.reason);
+  ws.onclose = () => {
     notifyStatus("disconnected");
     connectionManager.ws = null;
 
     // Only reconnect if there are subscribers
     if (connectionManager.subscribers.size === 0) {
-      console.log("[GATEWAY] No subscribers, not reconnecting");
       return;
     }
 
@@ -113,10 +109,7 @@ function connectSingleton(fromEventId: number) {
     if (connectionManager.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
       connectionManager.reconnectAttempts++;
       const delay = RECONNECT_DELAY_MS * Math.min(connectionManager.reconnectAttempts, 5);
-      console.log(`[GATEWAY] Reconnecting in ${delay}ms (attempt ${connectionManager.reconnectAttempts})`);
       connectionManager.reconnectTimer = setTimeout(() => connectSingleton(fromEventId), delay);
-    } else {
-      console.error("[GATEWAY] Failed to connect after multiple attempts");
     }
   };
 }
@@ -124,8 +117,6 @@ function connectSingleton(fromEventId: number) {
 function sendMessage(message: Record<string, unknown>) {
   if (connectionManager.ws?.readyState === WebSocket.OPEN) {
     connectionManager.ws.send(JSON.stringify(message));
-  } else {
-    console.warn("[GATEWAY] Cannot send - not connected");
   }
 }
 
@@ -302,13 +293,13 @@ export function useGateway(): UseGatewayResult {
   const lastEventIdRef = useRef(0); // Ref for reconnection cursor
 
   // Sessions (legacy PTY sessions)
-  const [sessions, setSessions] = useState<Map<string, SessionState>>(new Map());
+  const [sessions, setSessions] = useState(new Map<string, SessionState>());
   const [attachedSession, setAttachedSession] = useState<string | null>(null);
   const attachedSessionRef = useRef<string | null>(null); // Ref for message handler
-  const [sessionEvents, setSessionEvents] = useState<Map<string, SequencedSessionEvent[]>>(new Map());
+  const [sessionEvents, setSessionEvents] = useState(new Map<string, SequencedSessionEvent[]>());
 
   // Tracked sessions (v5.2 - unified session store)
-  const [trackedSessions, setTrackedSessions] = useState<Map<string, TrackedSession>>(new Map());
+  const [trackedSessions, setTrackedSessions] = useState(new Map<string, TrackedSession>());
 
   // Jobs
   const [activeJob, setActiveJob] = useState<JobState | null>(null);

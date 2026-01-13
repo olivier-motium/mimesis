@@ -112,8 +112,6 @@ export class PtyManager {
     // Using 1 second to catch slow startup failures (claude may take time to check session)
     const STABILITY_CHECK_MS = 1000;
 
-    console.log(`[PTY] Starting stability check for ${ptyId} (waiting ${STABILITY_CHECK_MS}ms)...`);
-
     const exitPromise = new Promise<{ exitCode: number; signal?: number }>((resolve) => {
       proc.onExit(({ exitCode, signal }) => {
         resolve({ exitCode, signal });
@@ -131,9 +129,6 @@ export class PtyManager {
     earlyDataHandler.dispose();
 
     if (stabilityResult.type === "exit") {
-      console.log(
-        `[PTY] Process exited during stability check: ${ptyId} (code=${stabilityResult.exitCode}, signal=${stabilityResult.signal})`
-      );
       // Clean up the process
       try {
         proc.kill();
@@ -145,8 +140,6 @@ export class PtyManager {
         `Session "${sessionId}" may not be resumable - it may have been compacted or cleared.`
       );
     }
-
-    console.log(`[PTY] Stability check passed for ${ptyId}, process is running (captured ${earlyOutputBuffer.length} early chunks)`);
 
     const session: PtySession = {
       id: ptyId,
@@ -183,16 +176,9 @@ export class PtyManager {
 
     // Handle PTY exit (for later exits, not initial stability check)
     // Re-register exit handler since the promise consumed the first one
-    proc.onExit(({ exitCode, signal }) => {
-      console.log(
-        `[PTY] Process exited: ${ptyId} (code=${exitCode}, signal=${signal})`
-      );
+    proc.onExit(() => {
       this.destroyPty(ptyId);
     });
-
-    console.log(
-      `[PTY] Created session ${ptyId} for ${sessionId} (pid=${proc.pid})`
-    );
 
     return this.toPtyInfo(session);
   }
@@ -283,14 +269,8 @@ export class PtyManager {
       const historicalData = session.outputBuffer.join("");
       const msg = serializeWsMessage({ type: "data", payload: historicalData });
       client.send(msg);
-      console.log(
-        `[PTY] Replayed ${session.outputBuffer.length} buffer chunks (${historicalData.length} chars) to new client on ${ptyId}`
-      );
     }
 
-    console.log(
-      `[PTY] Client connected to ${ptyId} (total: ${session.clients.size})`
-    );
     return true;
   }
 
@@ -302,9 +282,6 @@ export class PtyManager {
     if (!session) return;
 
     session.clients.delete(client);
-    console.log(
-      `[PTY] Client disconnected from ${ptyId} (remaining: ${session.clients.size})`
-    );
   }
 
   /**
@@ -342,7 +319,6 @@ export class PtyManager {
     this.processes.delete(ptyId);
     this.sessionToPty.delete(session.sessionId);
 
-    console.log(`[PTY] Destroyed session ${ptyId}`);
     return true;
   }
 
@@ -409,9 +385,6 @@ export class PtyManager {
         const idleTime = now - lastActivity;
 
         if (idleTime > PTY_IDLE_TIMEOUT_MS) {
-          console.log(
-            `[PTY] Destroying idle session ${ptyId} (idle for ${Math.round(idleTime / 1000)}s)`
-          );
           this.destroyPty(ptyId);
         }
       }

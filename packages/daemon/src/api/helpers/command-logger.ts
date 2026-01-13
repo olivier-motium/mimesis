@@ -25,8 +25,7 @@ export function logCommand(
         submitted,
       })
       .run();
-  } catch (error) {
+  } catch {
     // Fire and forget - don't fail the request
-    console.error("[API] Failed to log command:", getErrorMessage(error));
   }
 }
