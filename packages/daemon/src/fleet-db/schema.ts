@@ -64,9 +64,10 @@ export const briefings = sqliteTable(
 export const outboxEvents = sqliteTable("outbox_events", {
   eventId: integer("event_id").primaryKey({ autoIncrement: true }),
   ts: text("ts").notNull(), // ISO timestamp
-  type: text("type").notNull(), // briefing_added|skill_updated|job_completed|error
+  type: text("type").notNull(), // briefing_added|session_started|session_blocked|doc_drift_warning|skill_updated|job_completed|error
   projectId: text("project_id"),
   briefingId: integer("briefing_id"),
+  broadcastLevel: text("broadcast_level"), // silent|mention|highlight - denormalized for fast filtering
   payloadJson: text("payload_json").notNull(),
   delivered: integer("delivered", { mode: "boolean" }).default(false),
 });

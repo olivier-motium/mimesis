@@ -84,6 +84,7 @@ export function createTestDb(): TestDbContext {
       type TEXT NOT NULL,
       project_id TEXT,
       briefing_id INTEGER,
+      broadcast_level TEXT,
       payload_json TEXT NOT NULL,
       delivered INTEGER DEFAULT 0
     );

@@ -199,16 +199,21 @@ export class BriefingIngestor {
         };
       }
 
-      // 3. Insert outbox event
-      const eventId = this.outboxRepo.insertBriefingAdded(briefingId, projectId, {
-        briefing: {
-          briefingId,
-          projectId,
-          status: frontmatter.status,
-          impactLevel: frontmatter.impact_level,
-          broadcastLevel: frontmatter.broadcast_level,
+      // 3. Insert outbox event (pass broadcastLevel for prelude filtering)
+      const eventId = this.outboxRepo.insertBriefingAdded(
+        briefingId,
+        projectId,
+        {
+          briefing: {
+            briefingId,
+            projectId,
+            status: frontmatter.status,
+            impactLevel: frontmatter.impact_level,
+            broadcastLevel: frontmatter.broadcast_level,
+          },
         },
-      });
+        frontmatter.broadcast_level // Denormalize for fast filtering
+      );
 
       return {
         success: true,

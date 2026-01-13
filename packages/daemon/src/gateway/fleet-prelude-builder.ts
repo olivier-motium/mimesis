@@ -8,7 +8,10 @@ import { OutboxRepo, type OutboxEventPayload } from "../fleet-db/outbox-repo.js"
 import { BriefingRepo } from "../fleet-db/briefing-repo.js";
 import { ProjectRepo } from "../fleet-db/project-repo.js";
 import type { OutboxEvent, Briefing, Project } from "../fleet-db/schema.js";
-import { OUTBOX_EVENT_TYPE, DOC_DRIFT_RISK } from "../config/fleet.js";
+import { OUTBOX_EVENT_TYPE, DOC_DRIFT_RISK, BROADCAST_LEVEL } from "../config/fleet.js";
+
+/** Maximum mentions per prelude (cap to prevent context overflow) */
+const MAX_MENTIONS_PER_PRELUDE = 10;
 
 export interface FleetPrelude {
   /** System prompt addition (stable framing) */
@@ -107,45 +110,173 @@ Use this context to provide informed, cross-project intelligence.`;
   }
 
   /**
-   * Format outbox events into readable fleet delta.
+   * Format outbox events into readable fleet delta with compaction.
+   * Applies broadcast_level filtering to prevent context overflow:
+   * - Alerts (blocked/failed/high-risk): Always included
+   * - Highlights: Max 1 per project (newest wins)
+   * - Mentions: Capped at MAX_MENTIONS_PER_PRELUDE (newest first)
+   * - Silent: Skipped entirely
    */
   private formatEvents(events: OutboxEvent[]): string {
+    const compacted = this.compactEvents(events);
+    if (compacted.length === 0) {
+      return "";
+    }
+
     const lines: string[] = ["## Recent Fleet Activity"];
 
-    for (const event of events) {
-      const payload = JSON.parse(event.payloadJson) as OutboxEventPayload;
-      const ts = new Date(event.ts).toLocaleString();
-
-      switch (event.type) {
-        case OUTBOX_EVENT_TYPE.BRIEFING_ADDED:
-          if (payload.briefing) {
-            const { projectId, status, impactLevel, broadcastLevel } = payload.briefing;
-            const impact = impactLevel ? ` [${impactLevel}]` : "";
-            const broadcast = broadcastLevel === "highlight" ? " ⚠️" : "";
-            lines.push(`- ${ts}: Project **${projectId}** session ${status}${impact}${broadcast}`);
-          }
-          break;
-
-        case OUTBOX_EVENT_TYPE.JOB_COMPLETED:
-          if (payload.job) {
-            const { type, status, projectId } = payload.job;
-            const proj = projectId ? ` (${projectId})` : "";
-            lines.push(`- ${ts}: Job ${type}${proj} → ${status}`);
-          }
-          break;
-
-        case OUTBOX_EVENT_TYPE.ERROR:
-          if (payload.error) {
-            lines.push(`- ${ts}: ⚠️ Error: ${payload.error.message}`);
-          }
-          break;
-
-        default:
-          lines.push(`- ${ts}: ${event.type}`);
-      }
+    for (const event of compacted) {
+      lines.push(this.formatSingleEvent(event));
     }
 
     return lines.join("\n");
+  }
+
+  /**
+   * Compact events by broadcast level to prevent context overflow.
+   * Priority: alerts > highlights (1 per project) > mentions (capped at 10)
+   */
+  private compactEvents(events: OutboxEvent[]): OutboxEvent[] {
+    const alerts: OutboxEvent[] = [];
+    const highlights = new Map<string, OutboxEvent>(); // projectId → newest
+    const mentions: OutboxEvent[] = [];
+
+    for (const event of events) {
+      const level = event.broadcastLevel;
+      const projectId = event.projectId ?? "unknown";
+
+      // Always include alerts (blocked, failed, errors, doc drift warnings)
+      if (this.isAlert(event)) {
+        alerts.push(event);
+        continue;
+      }
+
+      // Silent events: skip entirely
+      if (level === BROADCAST_LEVEL.SILENT) {
+        continue;
+      }
+
+      // Highlights: max 1 per project (keep newest by timestamp)
+      if (level === BROADCAST_LEVEL.HIGHLIGHT) {
+        const existing = highlights.get(projectId);
+        if (!existing || event.ts > existing.ts) {
+          highlights.set(projectId, event);
+        }
+        continue;
+      }
+
+      // Mentions: collect for later capping
+      if (level === BROADCAST_LEVEL.MENTION || level === null) {
+        mentions.push(event);
+      }
+    }
+
+    // Cap mentions at MAX_MENTIONS_PER_PRELUDE, newest first
+    const cappedMentions = mentions
+      .sort((a, b) => b.ts.localeCompare(a.ts))
+      .slice(0, MAX_MENTIONS_PER_PRELUDE);
+
+    // Combine and sort by timestamp (oldest first for chronological display)
+    return [
+      ...alerts,
+      ...Array.from(highlights.values()),
+      ...cappedMentions,
+    ].sort((a, b) => a.ts.localeCompare(b.ts));
+  }
+
+  /**
+   * Check if an event is an alert (always shown regardless of caps).
+   */
+  private isAlert(event: OutboxEvent): boolean {
+    // Error events are always alerts
+    if (event.type === OUTBOX_EVENT_TYPE.ERROR) {
+      return true;
+    }
+
+    // Doc drift warnings are alerts
+    if (event.type === OUTBOX_EVENT_TYPE.DOC_DRIFT_WARNING) {
+      return true;
+    }
+
+    // Session blocked is an alert
+    if (event.type === OUTBOX_EVENT_TYPE.SESSION_BLOCKED) {
+      return true;
+    }
+
+    // Check payload for blocked/failed status
+    try {
+      const payload = JSON.parse(event.payloadJson) as OutboxEventPayload;
+      if (payload.briefing?.status === "blocked" || payload.briefing?.status === "failed") {
+        return true;
+      }
+      if (payload.job?.status === "failed") {
+        return true;
+      }
+    } catch {
+      // Ignore parse errors
+    }
+
+    return false;
+  }
+
+  /**
+   * Format a single event into a readable line.
+   */
+  private formatSingleEvent(event: OutboxEvent): string {
+    const payload = JSON.parse(event.payloadJson) as OutboxEventPayload;
+    const ts = new Date(event.ts).toLocaleString();
+
+    switch (event.type) {
+      case OUTBOX_EVENT_TYPE.BRIEFING_ADDED:
+        if (payload.briefing) {
+          const { projectId, status, impactLevel, broadcastLevel } = payload.briefing;
+          const impact = impactLevel ? ` [${impactLevel}]` : "";
+          const broadcast = broadcastLevel === "highlight" ? " ⭐" : "";
+          const alertIcon = (status === "blocked" || status === "failed") ? "🚨 " : "";
+          return `- ${ts}: ${alertIcon}Project **${projectId}** session ${status}${impact}${broadcast}`;
+        }
+        break;
+
+      case OUTBOX_EVENT_TYPE.SESSION_STARTED:
+        if (payload.session) {
+          const { projectId, repoName, branch } = payload.session;
+          const branchInfo = branch ? ` (${branch})` : "";
+          return `- ${ts}: Session started: **${projectId}** - ${repoName}${branchInfo}`;
+        }
+        break;
+
+      case OUTBOX_EVENT_TYPE.SESSION_BLOCKED:
+        if (payload.session) {
+          const { projectId } = payload.session;
+          return `- ${ts}: 🚨 Session blocked: **${projectId}**`;
+        }
+        break;
+
+      case OUTBOX_EVENT_TYPE.DOC_DRIFT_WARNING:
+        if (payload.docDrift) {
+          const { projectId, docPath } = payload.docDrift;
+          return `- ${ts}: ⚠️ High doc drift risk: **${projectId}** - ${docPath}`;
+        }
+        break;
+
+      case OUTBOX_EVENT_TYPE.JOB_COMPLETED:
+        if (payload.job) {
+          const { type, status, projectId } = payload.job;
+          const proj = projectId ? ` (${projectId})` : "";
+          const icon = status === "failed" ? "🚨 " : status === "completed" ? "✅ " : "";
+          return `- ${ts}: ${icon}Job ${type}${proj} → ${status}`;
+        }
+        break;
+
+      case OUTBOX_EVENT_TYPE.ERROR:
+        if (payload.error) {
+          return `- ${ts}: 🚨 Error: ${payload.error.message}`;
+        }
+        break;
+    }
+
+    // Fallback for unknown event types
+    return `- ${ts}: ${event.type}`;
   }
 
   /**

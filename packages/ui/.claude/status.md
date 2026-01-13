@@ -1,30 +1,42 @@
 ---
 status: completed
-updated: 2026-01-13T07:45:00Z
-task: Decompose useGateway.ts hook as part of QA audit fixes
+updated: 2026-01-13T08:20:00Z
+task: UX audit and improvements for Fleet Command UI
 ---
 
 ## Summary
 
-Completed Fix #11 from the QA audit: decomposed the `useGateway.ts` hook from 556 lines to 357 lines (-36%).
+Completed UX audit of Fleet Command UI with 3 targeted improvements. Initial score: 6.2/10.
 
-### Changes Made
+### UX Grading Results
 
-1. **Created `gateway-types.ts`** (143 lines)
-   - Extracted all type definitions (SessionState, TrackedSession, FleetEvent, etc.)
-   - Clean separation of types from implementation
+| Dimension | Score | Notes |
+|-----------|-------|-------|
+| Usability | 6/10 | Good layout, but session selection unclear |
+| Information Architecture | 7/10 | Clear 3-panel structure |
+| User Flows | 6/10 | Empty states waste space |
+| Affordances | 5/10 | Session items don't look clickable |
+| Feedback & State | 6/10 | Status indicators present but subtle |
+| Error Prevention | 7/10 | Clean controls, no dangerous actions |
 
-2. **Created `gateway-connection.ts`** (200 lines)
-   - Extracted singleton WebSocket connection manager
-   - Clean API: `connectGateway()`, `sendGatewayMessage()`, `subscribeToMessages()`, etc.
-   - Survives HMR and React Strict Mode
+### Fixes Implemented
 
-3. **Simplified `useGateway.ts`** (357 lines)
-   - Now imports from extracted modules
-   - Re-exports types for backward compatibility
-   - Cleaner hook composition
+1. **Session List Affordances** (`index.css`)
+   - Added visible border on hover
+   - Enhanced selection state with background and shadow
+   - Added focus-visible for keyboard accessibility
+   - Added subtle transform animation on hover
+
+2. **Auto-select First Running Agent** (`FleetCommand.tsx`)
+   - Auto-selects first working/waiting session when none selected
+   - Eliminates empty Tactical Intel panel on load
+   - Uses `getEffectiveStatus` for accurate status detection
+
+3. **Commander Output Visual Hierarchy** (`index.css`)
+   - Added spacing between timeline events
+   - Enhanced text block styling with left border
+   - Improved thinking block visibility
+   - Added hover shadows for tool steps
 
 ### Verification
-- TypeScript compilation: ✅
 - UI production build: ✅
-- All 284 daemon tests pass: ✅

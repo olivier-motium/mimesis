@@ -115,6 +115,9 @@ export const MODEL = {
 /** Outbox event types */
 export const OUTBOX_EVENT_TYPE = {
   BRIEFING_ADDED: "briefing_added",
+  SESSION_STARTED: "session_started",
+  SESSION_BLOCKED: "session_blocked",
+  DOC_DRIFT_WARNING: "doc_drift_warning",
   SKILL_UPDATED: "skill_updated",
   JOB_COMPLETED: "job_completed",
   ERROR: "error",

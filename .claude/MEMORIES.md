@@ -1531,3 +1531,35 @@ watch(sessionsDir, { ignoreInitial: true, depth: 0 })
 ```
 
 **Rule:** On macOS, always watch directories directly instead of glob patterns when you need `add` events for new files. FSEvents handles directory watching reliably but glob pattern matching is unreliable.
+
+## Commander Event Architecture - Two-Bus Separation (Jan 2026)
+
+**Problem:** Commander was receiving ALL outbox events including high-frequency `silent` ones (session starts), causing context overflow with 10+ concurrent agents.
+
+**Solution:** broadcast_level-based filtering with prelude compaction.
+
+**Key architectural decisions:**
+
+1. **Two buses stay separate:**
+   - Timeline firehose: PostToolUse → gateway.sock → UI (ephemeral, high-frequency)
+   - Commander milestones: Stop → ingest → outbox → prelude (durable, low-frequency)
+
+2. **Denormalized broadcast_level on outbox_events:**
+   - Column added directly to outbox_events table for fast filtering
+   - No JOINs needed to filter by level
+
+3. **Prelude compaction algorithm:**
+   - Alerts: Always included (blocked/failed/errors/doc-drift)
+   - Highlights: Max 1 per project (newest wins)
+   - Mentions: Capped at 10 total (newest first)
+   - Silent: Skipped entirely
+
+4. **SessionStart creates silent outbox event:**
+   - Hook fires on session start → POSTs to `/fleet/session-start`
+   - Creates `session_started` event with `broadcast_level: silent`
+   - Commander can query roster state but doesn't get notified for each start
+
+**Files:**
+- `packages/daemon/src/gateway/fleet-prelude-builder.ts` - Compaction algorithm
+- `packages/daemon/src/fleet-db/outbox-repo.ts` - New insert methods
+- `~/.claude/hooks/session-start-ingest.py` - SessionStart hook

@@ -57,6 +57,15 @@ const JobQuerySchema = z.object({
   offset: z.coerce.number().default(0),
 });
 
+const SessionStartRequestSchema = z.object({
+  sessionId: z.string(),
+  projectId: z.string(),
+  repoName: z.string(),
+  repoRoot: z.string(),
+  gitRemote: z.string().nullish(),
+  branch: z.string().nullish(),
+});
+
 /**
  * Convert Hono queries (Record<string, string[]>) to simple object for Zod.
  * Takes the first value of each array.
@@ -106,6 +115,50 @@ export function createFleetRoutes(): Hono {
       }
 
       return c.json(result, result.isDuplicate ? 200 : 201);
+    } catch (error) {
+      return errorResponse(c, error);
+    }
+  });
+
+  /**
+   * POST /fleet/session-start - Ingest a session start event
+   * Used by SessionStart hook for roster awareness.
+   * Creates a session_started outbox event with broadcast_level: silent.
+   */
+  fleet.post("/fleet/session-start", async (c) => {
+    try {
+      const body = await c.req.json();
+      const parsed = SessionStartRequestSchema.safeParse(body);
+
+      if (!parsed.success) {
+        return c.json(
+          { success: false, error: `Invalid request: ${parsed.error.message}` },
+          400
+        );
+      }
+
+      const { sessionId, projectId, repoName, repoRoot, gitRemote, branch } = parsed.data;
+
+      // 1. Ensure project exists
+      projectRepo.upsert({
+        projectId,
+        repoName,
+        repoRoot,
+        gitRemote: gitRemote ?? undefined,
+        status: "active",
+      });
+
+      // 2. Insert session_started outbox event (broadcast_level: silent)
+      const eventId = outboxRepo.insertSessionStarted(sessionId, projectId, {
+        session: {
+          sessionId,
+          projectId,
+          repoName,
+          branch: branch ?? undefined,
+        },
+      });
+
+      return c.json({ success: true, projectId, eventId }, 201);
     } catch (error) {
       return errorResponse(c, error);
     }

@@ -17,6 +17,17 @@ export interface OutboxEventPayload {
     impactLevel?: string;
     broadcastLevel?: string;
   };
+  session?: {
+    sessionId: string;
+    projectId: string;
+    repoName: string;
+    branch?: string;
+  };
+  docDrift?: {
+    projectId: string;
+    docPath: string;
+    risk: string;
+  };
   job?: {
     jobId: number;
     type: string;
@@ -129,13 +140,72 @@ export class OutboxRepo {
   insertBriefingAdded(
     briefingId: number,
     projectId: string,
-    payload: OutboxEventPayload
+    payload: OutboxEventPayload,
+    broadcastLevel?: string
   ): number {
     return this.insert({
       type: OUTBOX_EVENT_TYPE.BRIEFING_ADDED,
       projectId,
       briefingId,
+      broadcastLevel: broadcastLevel ?? null,
       payloadJson: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Insert a session_started event.
+   * Used for roster awareness - typically broadcast_level: silent.
+   */
+  insertSessionStarted(
+    sessionId: string,
+    projectId: string,
+    payload: OutboxEventPayload,
+    broadcastLevel: string = "silent"
+  ): number {
+    return this.insert({
+      type: OUTBOX_EVENT_TYPE.SESSION_STARTED,
+      projectId,
+      briefingId: null,
+      broadcastLevel,
+      payloadJson: JSON.stringify({ ...payload, sessionId }),
+    });
+  }
+
+  /**
+   * Insert a session_blocked event.
+   * Used for alerting Commander to blocked sessions.
+   */
+  insertSessionBlocked(
+    sessionId: string,
+    projectId: string,
+    payload: OutboxEventPayload,
+    broadcastLevel: string = "mention"
+  ): number {
+    return this.insert({
+      type: OUTBOX_EVENT_TYPE.SESSION_BLOCKED,
+      projectId,
+      briefingId: null,
+      broadcastLevel,
+      payloadJson: JSON.stringify({ ...payload, sessionId }),
+    });
+  }
+
+  /**
+   * Insert a doc_drift_warning event.
+   * Used for alerting Commander to high doc drift risk.
+   */
+  insertDocDriftWarning(
+    projectId: string,
+    docPath: string,
+    payload: OutboxEventPayload,
+    broadcastLevel: string = "mention"
+  ): number {
+    return this.insert({
+      type: OUTBOX_EVENT_TYPE.DOC_DRIFT_WARNING,
+      projectId,
+      briefingId: null,
+      broadcastLevel,
+      payloadJson: JSON.stringify({ ...payload, docDrift: { projectId, docPath, risk: "high" } }),
     });
   }
 
