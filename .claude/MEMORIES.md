@@ -1557,6 +1557,11 @@ echo "=== RUN 3 ===" && claude -p "/command" --allowedTools "..."
 
 **Note:** MCP tools require `mcp__<server>__*` pattern in allowedTools.
 
+**Gotcha - Sequential runs in full background mode:**
+Chaining multiple `claude -p` commands with `&&` in `run_in_background: true` doesn't work reliably. The first command completes but subsequent ones don't start. This is likely because MCP tools (especially Chrome) need some terminal/session context that gets lost in full background mode.
+
+**Workaround:** Run them one at a time without full backgrounding, or use the Task tool to spawn sequential agents.
+
 ## Commander Event Architecture - Two-Bus Separation (Jan 2026)
 
 **Problem:** Commander was receiving ALL outbox events including high-frequency `silent` ones (session starts), causing context overflow with 10+ concurrent agents.

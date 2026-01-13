@@ -66,6 +66,15 @@ export interface TacticalIntelProps {
   onQuickAction?: (action: "approve" | "deny") => void;
   /** Manual reconnect handler */
   onReconnect?: () => void;
+  /** Commander mode - show fleet overview instead of session details */
+  showCommander?: boolean;
+  /** Commander state for fleet intel display */
+  commanderState?: {
+    status: "idle" | "working" | "waiting_for_input";
+    queuedPrompts: number;
+  };
+  /** All sessions for fleet overview */
+  sessions?: Session[];
 }
 
 /** Props for CommandBar */

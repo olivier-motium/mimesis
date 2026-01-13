@@ -197,6 +197,9 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
         gatewayStatus={gateway.status}
         onQuickAction={selectedSessionId ? handleQuickAction : undefined}
         onReconnect={handleReconnect}
+        showCommander={showCommander}
+        commanderState={gateway.commanderState}
+        sessions={sessions}
       />
     </div>
   );

@@ -260,10 +260,25 @@ Shows fleet events and session details.
 - `session: Session | null` - Selected session
 - `fleetEvents: FleetEvent[]` - Fleet event stream
 - `gatewayStatus: GatewayStatus` - Connection status
+- `showCommander?: boolean` - When true, shows Fleet Intel mode instead of session details
+- `commanderState?: CommanderState` - Commander status (for Fleet Intel display)
+- `sessions?: Session[]` - All sessions (for fleet stats in Commander mode)
 
-**Sections:**
-1. **Fleet Events** - Recent fleet events (briefings, skill updates)
-2. **Session Details** - Selected session metadata
+**Modes:**
+1. **Session Mode** (default) - Shows selected session details, pending actions, live state
+2. **Commander Mode** (showCommander=true) - Shows Fleet Intel with agent counts, Commander status, and fleet events
+
+**Session Mode Sections:**
+1. **Session HUD** - Status badge, mission, git context
+2. **Ask/Decide** - Pending tool approval actions (only when waiting)
+3. **Live State** - Current activity and working directory
+4. **File Status** - Task and summary from status file
+
+**Commander Mode Sections:**
+1. **Fleet Overview** - Header with "Fleet Intel" title
+2. **Fleet Stats** - Agent counts (working, attention needed, idle)
+3. **Commander Status** - Thinking/Ready state and queued prompts
+4. **Fleet Events** - Recent cross-project events
 
 ---
 

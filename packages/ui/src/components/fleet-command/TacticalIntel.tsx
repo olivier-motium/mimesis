@@ -17,12 +17,141 @@
  * └─────────────────────────┘
  */
 
-import { GitBranch, AlertTriangle, WifiOff, Loader2, Check, X } from "lucide-react";
+import { GitBranch, AlertTriangle, WifiOff, Loader2, Check, X, Brain, Users, Activity, Zap } from "lucide-react";
 import { getMissionText, getNowText, formatTimeAgo } from "./constants";
 import { getEffectiveStatus } from "@/lib/sessionStatus";
 import type { TacticalIntelProps } from "./types";
 
-export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disconnected", onQuickAction, onReconnect }: TacticalIntelProps) {
+export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disconnected", onQuickAction, onReconnect, showCommander, commanderState, sessions = [] }: TacticalIntelProps) {
+  // Commander mode - show fleet overview instead of session details
+  if (showCommander) {
+    // Calculate fleet stats
+    const workingCount = sessions.filter(s => getEffectiveStatus(s).status === "working").length;
+    const waitingCount = sessions.filter(s => {
+      const { status } = getEffectiveStatus(s);
+      return status === "waiting" && s.hasPendingToolUse;
+    }).length;
+    const idleCount = sessions.filter(s => getEffectiveStatus(s).status === "idle").length;
+
+    return (
+      <aside className="fleet-intel">
+        {/* Fleet Overview Header */}
+        <div className="inspector-hud">
+          <div className="inspector-hud__header">
+            <span className="inspector-hud__status inspector-hud__status--working">
+              Fleet Intel
+            </span>
+          </div>
+          <div className="inspector-hud__mission">
+            Cross-project intelligence powered by Opus
+          </div>
+        </div>
+
+        {/* Fleet Stats */}
+        <div className="inspector-state">
+          <div className="inspector-state__content">
+            <div className="inspector-state__row">
+              <span className="inspector-state__label">
+                <Users size={12} className="mr-2" />
+                Agents
+              </span>
+              <span className="inspector-state__value">{sessions.length}</span>
+            </div>
+            {workingCount > 0 && (
+              <div className="inspector-state__row">
+                <span className="inspector-state__label">
+                  <Activity size={12} className="mr-2" />
+                  Working
+                </span>
+                <span className="inspector-state__value inspector-state__value--working">{workingCount}</span>
+              </div>
+            )}
+            {waitingCount > 0 && (
+              <div className="inspector-state__row">
+                <span className="inspector-state__label">
+                  <AlertTriangle size={12} className="mr-2" />
+                  Attention
+                </span>
+                <span className="inspector-state__value inspector-state__value--waiting">{waitingCount}</span>
+              </div>
+            )}
+            {idleCount > 0 && (
+              <div className="inspector-state__row">
+                <span className="inspector-state__label">
+                  <Zap size={12} className="mr-2" />
+                  Idle
+                </span>
+                <span className="inspector-state__value inspector-state__value--idle">{idleCount}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Commander Status */}
+        {commanderState && (
+          <div className="inspector-state">
+            <div className="inspector-state__content">
+              <div className="inspector-state__row">
+                <span className="inspector-state__label">
+                  <Brain size={12} className="mr-2" />
+                  Commander
+                </span>
+                <span className={`inspector-state__value inspector-state__value--${commanderState.status === "working" ? "working" : commanderState.status === "waiting_for_input" ? "idle" : "idle"}`}>
+                  {commanderState.status === "working" ? "Thinking" : "Ready"}
+                </span>
+              </div>
+              {commanderState.queuedPrompts > 0 && (
+                <div className="inspector-state__row">
+                  <span className="inspector-state__label">Queued</span>
+                  <span className="inspector-state__value inspector-state__value--waiting">{commanderState.queuedPrompts}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Recent Fleet Events */}
+        {fleetEvents.length > 0 && (
+          <div className="inspector-fleet-events">
+            <div className="inspector-fleet-events__content">
+              {fleetEvents.slice(0, 5).map((event) => (
+                <div key={event.eventId} className="inspector-fleet-events__entry">
+                  <span className="inspector-fleet-events__type">{event.type}</span>
+                  {event.projectId && (
+                    <span className="inspector-fleet-events__project">
+                      {event.projectId.split("/").pop()?.slice(0, 12)}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Gateway Status */}
+        {gatewayStatus !== "connected" && (
+          <div className="inspector-gateway">
+            <div className="inspector-gateway__content">
+              <span className={`inspector-gateway__status inspector-gateway__status--${gatewayStatus}`}>
+                {gatewayStatus === "connecting" && <Loader2 size={12} className="animate-spin" />}
+                {gatewayStatus === "disconnected" && <WifiOff size={12} />}
+                {gatewayStatus === "connecting" ? "Connecting..." : "Disconnected"}
+              </span>
+              {gatewayStatus === "disconnected" && onReconnect && (
+                <button
+                  className="inspector-gateway__reconnect"
+                  onClick={onReconnect}
+                >
+                  Reconnect
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </aside>
+    );
+  }
+
   // Empty state - minimal and helpful
   if (!session) {
     return (
