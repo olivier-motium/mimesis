@@ -21,6 +21,21 @@ export const FLEET_SESSIONS_DIR = path.join(FLEET_BASE_DIR, "sessions");
 /** Directory for JSON schemas (Sonnet output validation) */
 export const FLEET_SCHEMAS_DIR = path.join(FLEET_BASE_DIR, "schemas");
 
+/** Directory for Commander knowledge base */
+export const KNOWLEDGE_DIR = path.join(FLEET_BASE_DIR, "knowledge");
+
+/** Path to aliases.json in knowledge directory */
+export const KNOWLEDGE_ALIASES_FILE = path.join(KNOWLEDGE_DIR, "aliases.json");
+
+/** Directory for by-name symlinks */
+export const KNOWLEDGE_BY_NAME_DIR = path.join(KNOWLEDGE_DIR, "by-name");
+
+/** Default staleness threshold for KB (days) */
+export const KB_STALE_DAYS = 7;
+
+/** Briefing window for activity layer (days) */
+export const KB_BRIEFING_WINDOW_DAYS = 14;
+
 /** Working directory for Commander conversation (used with --continue) */
 export const COMMANDER_CWD = FLEET_BASE_DIR;
 

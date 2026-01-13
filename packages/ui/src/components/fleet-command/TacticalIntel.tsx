@@ -17,6 +17,7 @@
 import { GitBranch, AlertTriangle, WifiOff, Loader2, Check, X, Brain, Eye, Activity } from "lucide-react";
 import { getMissionText, getNowText, formatTimeAgo } from "./constants";
 import { getEffectiveStatus } from "@/lib/sessionStatus";
+import { KBPanel } from "./KBPanel";
 import type { TacticalIntelProps } from "./types";
 
 export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disconnected", onQuickAction, onReconnect, showCommander, commanderState }: TacticalIntelProps) {
@@ -65,7 +66,7 @@ export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disc
 
       {/* Commander Status - when Commander tab is active */}
       {showCommander && commanderState && (
-        <div className="p-4 flex-1">
+        <div className="p-4 border-b border-border/50">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
               <Brain size={16} className="text-purple-500" />
@@ -88,6 +89,13 @@ export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disc
           <div className="mt-4 text-xs text-muted-foreground">
             Ask about fleet status, coordinate across projects, or get summaries of agent work.
           </div>
+        </div>
+      )}
+
+      {/* Knowledge Base Panel - when Commander tab is active */}
+      {showCommander && (
+        <div className="flex-1 overflow-hidden">
+          <KBPanel />
         </div>
       )}
 
@@ -184,10 +192,13 @@ export function TacticalIntel({ session, fleetEvents = [], gatewayStatus = "disc
             </div>
           )}
 
-          {/* Now Activity - current action */}
-          {sessionInfo.nowText && sessionInfo.nowText !== "Idle" && (
+          {/* Now Activity - only show if has meaningful context beyond status */}
+          {sessionInfo.nowText &&
+           sessionInfo.nowText !== "Idle" &&
+           sessionInfo.nowText !== "Working" &&
+           sessionInfo.nowText !== "Waiting" && (
             <div className="px-4 pb-3">
-              <div className={`text-xs ${
+              <div className={`text-xs font-mono ${
                 sessionInfo.status === "working" ? "text-status-working" :
                 sessionInfo.status === "waiting" ? "text-status-waiting" :
                 "text-muted-foreground"

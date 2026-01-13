@@ -107,6 +107,26 @@ export const conversations = sqliteTable("conversations", {
   updatedAt: text("updated_at").notNull(),
 });
 
+/**
+ * KB Sync State table - tracks knowledge base synchronization status per project
+ * Used by /knowledge-sync command to implement incremental doc distillation.
+ */
+export const kbSyncState = sqliteTable(
+  "kb_sync_state",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    projectId: text("project_id").notNull(),
+    branch: text("branch").notNull().default("main"),
+    lastCommitSeen: text("last_commit_seen"), // Git commit hash at last sync
+    lastSyncAt: text("last_sync_at").notNull(), // ISO timestamp
+    syncType: text("sync_type").notNull(), // 'full' | 'incremental'
+    filesProcessed: integer("files_processed").notNull().default(0),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [unique("kb_sync_state_project_branch_idx").on(table.projectId, table.branch)]
+);
+
 // Type exports for use in repositories
 export type Project = typeof projects.$inferSelect;
 export type NewProject = typeof projects.$inferInsert;
@@ -122,3 +142,6 @@ export type NewJob = typeof jobs.$inferInsert;
 
 export type Conversation = typeof conversations.$inferSelect;
 export type NewConversation = typeof conversations.$inferInsert;
+
+export type KbSyncState = typeof kbSyncState.$inferSelect;
+export type NewKbSyncState = typeof kbSyncState.$inferInsert;

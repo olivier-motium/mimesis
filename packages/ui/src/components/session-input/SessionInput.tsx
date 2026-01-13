@@ -19,6 +19,7 @@ import { InputHistory } from "./InputHistory";
 
 export interface SessionInputProps {
   sessionId: string | null;
+  sessionName?: string;
   sessionStatus: "working" | "waiting" | "idle";
   onSendStdin: (sessionId: string, data: string) => void;
   onSendSignal: (sessionId: string, signal: "SIGINT" | "SIGTERM" | "SIGKILL") => void;
@@ -31,6 +32,7 @@ export interface SessionInputProps {
 
 export function SessionInput({
   sessionId,
+  sessionName,
   sessionStatus,
   onSendStdin,
   onSendSignal,
@@ -105,12 +107,29 @@ export function SessionInput({
 
   return (
     <div className={cn(
-      "flex items-end gap-2 p-3 border-t border-border bg-background",
+      "border-t border-border bg-background",
       className
     )}>
-      {/* Input area */}
-      <div className="flex-1 relative">
-        <textarea
+      {/* Session context indicator */}
+      {sessionName && (
+        <div className="flex items-center gap-2 px-3 py-1.5 text-[10px] text-muted-foreground border-b border-border/50">
+          <span className={cn(
+            "w-1.5 h-1.5 rounded-full",
+            isWorking ? "bg-status-working animate-pulse" :
+            sessionStatus === "waiting" ? "bg-status-waiting" :
+            "bg-muted-foreground"
+          )} />
+          <span className="font-medium text-foreground/70">{sessionName}</span>
+          <span className="text-muted-foreground/60">
+            {isWorking ? "working" : sessionStatus === "waiting" ? "waiting for input" : "idle"}
+          </span>
+        </div>
+      )}
+
+      <div className="flex items-end gap-2 p-3">
+        {/* Input area */}
+        <div className="flex-1 relative">
+          <textarea
           ref={textareaRef}
           value={value}
           onChange={(e) => setValue(e.target.value)}
@@ -180,6 +199,7 @@ export function SessionInput({
             </>
           )}
         </button>
+        </div>
       </div>
     </div>
   );

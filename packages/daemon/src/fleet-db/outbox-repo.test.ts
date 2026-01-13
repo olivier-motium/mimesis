@@ -42,8 +42,8 @@ describe("OutboxRepo (DB operations)", () => {
       .get();
 
     expect(inserted).toBeDefined();
-    expect(inserted?.ts).toBeDefined();
-    expect(inserted?.ts >= before).toBe(true);
+    expect(inserted!.ts).toBeDefined();
+    expect(inserted!.ts >= before).toBe(true);
   });
 
   it("returns events after cursor in ID order", () => {

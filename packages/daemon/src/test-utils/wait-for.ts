@@ -259,11 +259,12 @@ export function createEventCollector<T>(): {
       return events.slice(0, count);
     },
     waitForEvent: async (predicate: (event: T) => boolean, timeout = 5000): Promise<T> => {
-      return waitForValue(
+      const result = await waitForValue(
         () => events.find(predicate),
         (event): event is T => event !== undefined,
         { timeout, message: "Event not found" }
       );
+      return result as T;
     },
   };
 }

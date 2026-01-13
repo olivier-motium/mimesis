@@ -16,7 +16,13 @@
 }
 
 .mission-card:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.05);
+  border-left-color: var(--nb-text-muted);
+}
+
+.mission-card:active {
+  background: rgba(255, 255, 255, 0.08);
+  transform: scale(0.995);
 }
 
 .mission-card:focus-visible {
@@ -25,9 +31,14 @@
 }
 
 .mission-card--selected {
-  background: rgba(212, 165, 116, 0.04);
-  border-color: rgba(212, 165, 116, 0.12);
-  border-left-color: var(--nb-yellow-dim);
+  background: rgba(212, 165, 116, 0.08);
+  border-color: rgba(212, 165, 116, 0.15);
+  border-left-color: var(--nb-yellow);
+  border-left-width: 3px;
+}
+
+.mission-card--selected:hover {
+  background: rgba(212, 165, 116, 0.12);
 }
 
 /* Status-based left border coloring */

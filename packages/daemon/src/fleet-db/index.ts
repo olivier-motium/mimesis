@@ -107,6 +107,20 @@ export function getFleetDb(): ReturnType<typeof drizzle<typeof schema>> {
         updated_at TEXT NOT NULL
       );
 
+      -- kb_sync_state: tracks knowledge base synchronization per project
+      CREATE TABLE IF NOT EXISTS kb_sync_state (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        project_id TEXT NOT NULL,
+        branch TEXT NOT NULL DEFAULT 'main',
+        last_commit_seen TEXT,
+        last_sync_at TEXT NOT NULL,
+        sync_type TEXT NOT NULL,
+        files_processed INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(project_id, branch)
+      );
+
       -- Indexes for common queries
       CREATE INDEX IF NOT EXISTS idx_briefings_project ON briefings(project_id);
       CREATE INDEX IF NOT EXISTS idx_briefings_created ON briefings(created_at);
@@ -116,6 +130,8 @@ export function getFleetDb(): ReturnType<typeof drizzle<typeof schema>> {
       CREATE INDEX IF NOT EXISTS idx_jobs_project ON jobs(project_id);
       CREATE INDEX IF NOT EXISTS idx_jobs_type ON jobs(type);
       CREATE INDEX IF NOT EXISTS idx_conversations_kind ON conversations(kind);
+      CREATE INDEX IF NOT EXISTS idx_kb_sync_state_project ON kb_sync_state(project_id);
+      CREATE INDEX IF NOT EXISTS idx_kb_sync_state_stale ON kb_sync_state(last_sync_at);
     `);
   }
   return db;
@@ -144,3 +160,5 @@ export function getFleetSqlite(): Database.Database | null {
 export { schema };
 export { ConversationRepo, CONVERSATION_KIND } from "./conversation-repo.js";
 export type { ConversationKind } from "./conversation-repo.js";
+export { KbSyncStateRepo, SYNC_TYPE } from "./kb-sync-state-repo.js";
+export type { SyncType } from "./kb-sync-state-repo.js";

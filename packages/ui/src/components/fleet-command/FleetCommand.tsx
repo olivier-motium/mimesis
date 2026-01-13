@@ -182,6 +182,7 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
             {/* Session Input */}
             <SessionInput
               sessionId={selectedSessionId}
+              sessionName={selectedSession?.gitBranch || selectedSession?.gitRepoId?.split("/").pop()}
               sessionStatus={activeSessionStatus}
               onSendStdin={handleSendStdin}
               onSendSignal={handleSendSignal}

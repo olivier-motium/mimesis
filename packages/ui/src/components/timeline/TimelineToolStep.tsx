@@ -118,13 +118,13 @@ export function TimelineToolStep({ event }: TimelineToolStepProps) {
           {/* Tool input (collapsible) */}
           <div className="border-b border-border/30">
             <button
-              className="w-full px-2 py-0.5 text-left text-xs text-muted-foreground/70 hover:bg-muted/30 flex items-center gap-1"
+              className="w-full px-2 py-1 text-left text-xs text-muted-foreground hover:bg-muted/40 hover:text-foreground flex items-center gap-1.5 transition-colors"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowInput(!showInput);
               }}
             >
-              {showInput ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              {showInput ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
               Input
             </button>
             {showInput && (
@@ -146,13 +146,13 @@ export function TimelineToolStep({ event }: TimelineToolStepProps) {
           {/* Tool result */}
           <div className="border-t border-border/30">
             <button
-              className="w-full px-2 py-0.5 text-left text-xs text-muted-foreground/70 hover:bg-muted/30 flex items-center gap-1"
+              className="w-full px-2 py-1 text-left text-xs text-muted-foreground hover:bg-muted/40 hover:text-foreground flex items-center gap-1.5 transition-colors"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowResult(!showResult);
               }}
             >
-              {showResult ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              {showResult ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
               Result {!isSuccess && "(error)"}
             </button>
             {showResult && (
