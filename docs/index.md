@@ -10,6 +10,7 @@ Real-time monitoring dashboard for Claude Code sessions.
 | Run in production | [Deployment Guide](operations/deployment.md) |
 | Configure the app | [Configuration Reference](architecture/configuration-reference.md) |
 | Understand Commander | [Commander Architecture](architecture/commander.md) |
+| Understand the Knowledge Base | [Knowledge Base Architecture](architecture/knowledge-base.md) |
 | Understand the CLI | [CLI Reference](cli-reference.md) |
 | Learn the architecture | [README](../README.md) |
 | Contribute to the project | [Contributing Guide](contributing.md) |
@@ -73,6 +74,7 @@ Real-time monitoring dashboard for Claude Code sessions.
 | Concept | Description | Location |
 |---------|-------------|----------|
 | **Commander** | Meta-agent for cross-project intelligence, headless jobs, and semantic briefings | [Commander Architecture](architecture/commander.md) |
+| **Knowledge Base** | Two-layer distilled project knowledge (Intent 30% / Reality 70%) for `/improve` suggestions | [KB Architecture](architecture/knowledge-base.md) |
 | **Session Watcher** | Monitors `~/.claude/projects/` for JSONL changes | [README](../README.md#daemon) |
 | **Fleet Gateway** | WebSocket server for PTY sessions and real-time events (port 4452) | [Gateway Architecture](architecture/gateway.md) |
 | **Session Lifecycle** | Session states, compaction, segment chains, work chains | [Session Lifecycle](architecture/session-lifecycle.md) |
