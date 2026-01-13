@@ -9,8 +9,6 @@
  * 5. Idle (collapsible, lowest priority)
  */
 
-import { useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StatusCounts, StatusFilter } from "./ops-table/types";
 
@@ -18,52 +16,45 @@ interface StatusStripProps {
   counts: StatusCounts;
   activeFilter: StatusFilter;
   onFilterChange: (filter: StatusFilter) => void;
-  idleExpanded?: boolean;
-  onIdleExpandedChange?: (expanded: boolean) => void;
 }
 
-const STATUS_STYLES: Record<string, { bg: string; bgActive: string; text: string; border: string; icon: string }> = {
+// Minimal status styles - no icons, just subtle color coding
+const STATUS_STYLES: Record<string, { bg: string; bgActive: string; text: string; border: string }> = {
   all: {
-    bg: "bg-zinc-600/10",
-    bgActive: "bg-zinc-500",
+    bg: "bg-transparent",
+    bgActive: "bg-zinc-600/40",
     text: "text-zinc-400",
-    border: "border-zinc-500/20",
-    icon: "◉",
+    border: "border-transparent",
   },
   waiting: {
-    bg: "bg-status-waiting/10",
-    bgActive: "bg-status-waiting",
+    bg: "bg-transparent",
+    bgActive: "bg-status-waiting/30",
     text: "text-status-waiting",
-    border: "border-status-waiting/20",
-    icon: "!",
+    border: "border-transparent",
   },
   error: {
-    bg: "bg-status-error/10",
-    bgActive: "bg-status-error",
+    bg: "bg-transparent",
+    bgActive: "bg-status-error/30",
     text: "text-status-error",
-    border: "border-status-error/20",
-    icon: "✖",
+    border: "border-transparent",
   },
   stale: {
-    bg: "bg-amber-600/10",
-    bgActive: "bg-amber-600",
+    bg: "bg-transparent",
+    bgActive: "bg-amber-600/30",
     text: "text-amber-500",
-    border: "border-amber-600/20",
-    icon: "⚠",
+    border: "border-transparent",
   },
   working: {
-    bg: "bg-status-working/10",
-    bgActive: "bg-status-working",
+    bg: "bg-transparent",
+    bgActive: "bg-status-working/30",
     text: "text-status-working",
-    border: "border-status-working/20",
-    icon: "●",
+    border: "border-transparent",
   },
   idle: {
-    bg: "bg-status-idle/10",
-    bgActive: "bg-status-idle",
+    bg: "bg-transparent",
+    bgActive: "bg-status-idle/30",
     text: "text-status-idle",
-    border: "border-status-idle/20",
-    icon: "○",
+    border: "border-transparent",
   },
 };
 
@@ -71,14 +62,7 @@ export function StatusStrip({
   counts,
   activeFilter,
   onFilterChange,
-  idleExpanded = false,
-  onIdleExpandedChange,
 }: StatusStripProps) {
-  // Local state if not controlled
-  const [localIdleExpanded, setLocalIdleExpanded] = useState(false);
-  const isIdleExpanded = onIdleExpandedChange ? idleExpanded : localIdleExpanded;
-  const setIdleExpanded = onIdleExpandedChange ?? setLocalIdleExpanded;
-
   // Attention-first ordering
   const primaryBadges: Array<{
     filter: StatusFilter;
@@ -120,32 +104,18 @@ export function StatusStrip({
         );
       })}
 
-      {/* Idle badge with expand/collapse toggle */}
+      {/* Idle badge - minimal */}
       <button
         type="button"
-        onClick={() => {
-          if (activeFilter === "idle") {
-            // Already filtering by idle, toggle expansion
-            setIdleExpanded(!isIdleExpanded);
-          } else {
-            // Filter to idle
-            onFilterChange("idle");
-          }
-        }}
+        onClick={() => onFilterChange("idle")}
         className={cn(
-          "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium border transition-all cursor-pointer",
+          "inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition-all cursor-pointer",
           activeFilter === "idle"
-            ? ["bg-status-idle", "text-white", "border-transparent"]
-            : ["bg-status-idle/10", "text-status-idle", "border-status-idle/20", "hover:opacity-80"]
+            ? ["bg-status-idle/30", "text-status-idle"]
+            : ["bg-transparent", "text-status-idle", "opacity-60 hover:opacity-100"]
         )}
       >
-        <span className="mr-0.5">○</span>
-        Idle: {counts.idle}
-        {isIdleExpanded ? (
-          <ChevronDown className="w-3 h-3 ml-0.5" />
-        ) : (
-          <ChevronRight className="w-3 h-3 ml-0.5" />
-        )}
+        {counts.idle}
       </button>
     </div>
   );
@@ -168,14 +138,13 @@ function StatusBadge({ filter, label, count, isActive, needsAttention, onClick }
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium border transition-all cursor-pointer",
+        "inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition-all cursor-pointer",
         isActive
-          ? [styles.bgActive, "text-white border-transparent"]
-          : [styles.bg, styles.text, styles.border, "hover:opacity-80"]
+          ? [styles.bgActive, styles.text]
+          : [styles.bg, styles.text, "opacity-60 hover:opacity-100"]
       )}
     >
-      <span className="mr-0.5">{styles.icon}</span>
-      {label}: {count}
+      {count}
     </button>
   );
 }

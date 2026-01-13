@@ -115,14 +115,13 @@ body {
   grid-template-rows: 48px 1fr 40px;
 }
 
-/* StatusStrip filter bar */
+/* StatusStrip filter bar - Minimal */
 .fleet-filters {
   grid-area: filters;
   display: flex;
   align-items: center;
   padding: 0 16px;
-  background: var(--nb-black-light);
-  border-bottom: 1px solid var(--nb-border);
+  background: var(--nb-black);
 }
 
 /* OpsTable zone */
@@ -272,6 +271,32 @@ body {
   color: var(--nb-text-dim);
 }
 
+/* Commander toggle button */
+.fleet-command-bar__commander-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--nb-text-dim);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.fleet-command-bar__commander-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--nb-text);
+}
+
+.fleet-command-bar__commander-btn--active {
+  background: rgba(212, 165, 116, 0.1);
+  border-color: rgba(212, 165, 116, 0.2);
+  color: var(--nb-yellow);
+}
+
 /* Zone A: The Roster (Left Sidebar) - Minimal */
 .fleet-roster {
   grid-area: roster;
@@ -287,19 +312,19 @@ body {
 
 .fleet-roster__search-input {
   width: 100%;
-  background: var(--nb-terminal);
-  border: 1px solid var(--nb-border);
-  border-radius: 4px;
-  padding: 8px 8px 8px 32px;
+  background: rgba(255, 255, 255, 0.03);
+  border: none;
+  border-radius: 6px;
+  padding: 10px 10px 10px 32px;
   font-size: 12px;
   font-family: inherit;
   color: var(--nb-text);
   outline: none;
-  transition: border-color 0.2s;
+  transition: background 0.15s ease;
 }
 
 .fleet-roster__search-input:focus {
-  border-color: var(--nb-yellow);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .fleet-roster__search-input::placeholder {
@@ -1072,21 +1097,18 @@ body {
 .inspector-output__entry {
   display: flex;
   gap: 8px;
-  padding: 6px 8px;
-  border-radius: 4px;
-  margin-bottom: 4px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
-.inspector-output__entry--assistant {
-  background: rgba(90, 143, 117, 0.05);
+.inspector-output__entry:last-child {
+  border-bottom: none;
 }
 
-.inspector-output__entry--user {
-  background: rgba(212, 165, 116, 0.05);
-}
-
+.inspector-output__entry--assistant,
+.inspector-output__entry--user,
 .inspector-output__entry--tool {
-  background: rgba(82, 82, 91, 0.06);
+  /* No background colors - minimal design */
 }
 
 .inspector-output__role {

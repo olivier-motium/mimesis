@@ -24,48 +24,22 @@ export function CommandBar({
 
   return (
     <header className="fleet-command-bar">
-      <div style={{ display: "flex", alignItems: "center" }}>
-        {/* Logo */}
+      <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        {/* Logo - Minimal */}
         <div className="fleet-command-bar__logo">
-          <Cpu size={18} />
+          <Cpu size={16} />
           <span>MIMESIS</span>
         </div>
 
-        <div className="fleet-command-bar__divider" />
-
-        {/* Session info (when selected) */}
-        {selectedSession && (
-          <>
-            <div className="fleet-command-bar__session-info">
-              <span className="fleet-command-bar__session-name">
-                {selectedSession.gitBranch || selectedSession.sessionId.slice(-8)}
-              </span>
-              {selectedSession.gitBranch && (
-                <span className="fleet-command-bar__branch">
-                  <GitBranch size={12} />
-                  {selectedSession.gitBranch}
-                </span>
-              )}
-              <span className={`fleet-command-bar__status-badge fleet-command-bar__status-badge--${sessionStatus?.status}`}>
-                {statusLabel}
-              </span>
-            </div>
-            <div className="fleet-command-bar__divider" />
-          </>
-        )}
-
-        {/* Gateway + Agent status */}
+        {/* Agent count - Minimal */}
         <div className="fleet-command-bar__status">
-          <span className={`fleet-command-bar__gateway fleet-command-bar__gateway--${gatewayStatus}`}>
-            {gatewayStatus === "connected" && <Wifi size={12} />}
-            {gatewayStatus === "connecting" && <Loader2 size={12} className="animate-spin" />}
-            {gatewayStatus === "disconnected" && <WifiOff size={12} />}
-            {gatewayStatus === "connected" ? "ONLINE" : gatewayStatus === "connecting" ? "CONNECTING" : "OFFLINE"}
+          <span style={{ color: workingCount > 0 ? "var(--nb-green)" : "var(--nb-text-dim)" }}>
+            {workingCount} active
           </span>
-          <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-            <Layers size={12} />
-            AGENTS: {workingCount}/{sessionCount} Active
+          <span style={{ color: "var(--nb-text-muted)" }}>
+            / {sessionCount}
           </span>
+          {gatewayStatus === "connecting" && <Loader2 size={12} className="animate-spin" style={{ marginLeft: 8, color: "var(--nb-yellow)" }} />}
         </div>
       </div>
 
@@ -78,10 +52,8 @@ export function CommandBar({
             title="Toggle Commander (Ctrl+Tab)"
           >
             <Brain size={14} />
-            Commander
           </button>
         )}
-        <div className="fleet-command-bar__version">v5.0.0</div>
       </div>
     </header>
   );

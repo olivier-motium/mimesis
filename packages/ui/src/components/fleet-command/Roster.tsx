@@ -10,7 +10,7 @@
  */
 
 import { useState } from "react";
-import { Search, ChevronDown, ChevronRight, AlertTriangle, Circle } from "lucide-react";
+import { Search, ChevronDown, ChevronRight } from "lucide-react";
 import { RosterItem } from "./RosterItem";
 import { getEffectiveStatus } from "@/lib/sessionStatus";
 import type { RosterProps } from "./types";
@@ -117,12 +117,11 @@ export function Roster({
           </div>
         ) : (
           <>
-            {/* Needs Attention Section */}
+            {/* Needs Attention Section - Minimal */}
             {attention.length > 0 && (
               <div className="fleet-roster__section fleet-roster__section--attention">
                 <div className="fleet-roster__section-header">
-                  <AlertTriangle size={12} className="fleet-roster__section-icon" />
-                  <span className="fleet-roster__section-name">Needs Attention</span>
+                  <span className="fleet-roster__section-name">Attention</span>
                   <span className="fleet-roster__section-count">{attention.length}</span>
                 </div>
                 <div className="fleet-roster__section-content">
@@ -131,11 +130,10 @@ export function Roster({
               </div>
             )}
 
-            {/* Running Section */}
+            {/* Running Section - Minimal */}
             {running.length > 0 && (
               <div className="fleet-roster__section fleet-roster__section--running">
                 <div className="fleet-roster__section-header">
-                  <Circle size={10} fill="currentColor" className="fleet-roster__section-icon" />
                   <span className="fleet-roster__section-name">Running</span>
                   <span className="fleet-roster__section-count">{running.length}</span>
                 </div>
@@ -145,7 +143,7 @@ export function Roster({
               </div>
             )}
 
-            {/* Idle Section (collapsible) */}
+            {/* Idle Section (collapsible) - Minimal */}
             {idle.length > 0 && (
               <div className="fleet-roster__section fleet-roster__section--idle">
                 <button
@@ -153,11 +151,10 @@ export function Roster({
                   onClick={() => setIdleExpanded(!idleExpanded)}
                 >
                   {idleExpanded ? (
-                    <ChevronDown size={12} className="fleet-roster__section-chevron" />
+                    <ChevronDown size={10} className="fleet-roster__section-chevron" />
                   ) : (
-                    <ChevronRight size={12} className="fleet-roster__section-chevron" />
+                    <ChevronRight size={10} className="fleet-roster__section-chevron" />
                   )}
-                  <Circle size={10} className="fleet-roster__section-icon" />
                   <span className="fleet-roster__section-name">Idle</span>
                   <span className="fleet-roster__section-count">{idle.length}</span>
                 </button>
