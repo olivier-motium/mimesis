@@ -110,9 +110,10 @@ Push and replay queue for fleet events.
 CREATE TABLE outbox_events (
   event_id INTEGER PRIMARY KEY AUTOINCREMENT,
   ts TEXT NOT NULL,                 -- ISO timestamp
-  type TEXT NOT NULL,               -- briefing_added|skill_updated|job_completed|error
+  type TEXT NOT NULL,               -- See Event Types below
   project_id TEXT,
   briefing_id INTEGER,
+  broadcast_level TEXT,             -- silent|mention|highlight (for prelude filtering)
   payload_json TEXT NOT NULL,       -- Event-specific data
   delivered INTEGER DEFAULT 0       -- Boolean: pushed to clients
 );
@@ -120,12 +121,25 @@ CREATE TABLE outbox_events (
 
 **Event Types:**
 
-| Type | Description |
-|------|-------------|
-| `briefing_added` | New briefing created |
-| `skill_updated` | Skill definition changed |
-| `job_completed` | Headless job finished |
-| `error` | System error event |
+| Type | Description | Typical broadcast_level |
+|------|-------------|------------------------|
+| `briefing_added` | New briefing created | mention or highlight |
+| `session_started` | Session begins | silent |
+| `session_blocked` | Session blocked on dependency | alert (always shown) |
+| `doc_drift_warning` | High doc drift risk detected | alert (always shown) |
+| `skill_updated` | Skill definition changed | mention |
+| `job_completed` | Headless job finished | mention |
+| `error` | System error event | alert (always shown) |
+
+**Broadcast Levels:**
+
+| Level | Description |
+|-------|-------------|
+| `silent` | Not shown in Commander prelude (roster awareness only) |
+| `mention` | Included in prelude up to cap (10 max) |
+| `highlight` | Priority in prelude (max 1 per project) |
+
+See [Commander Architecture](commander.md#fleet-prelude-compaction) for the compaction algorithm.
 
 ### Jobs Table
 
@@ -165,6 +179,32 @@ queued → running → completed
 | `skill_patch` | Update skill definition |
 | `doc_patch` | Documentation update |
 | `commander_turn` | Commander conversation turn |
+
+### Conversations Table
+
+Stateful conversation sessions for Commander and future worker sessions.
+
+```sql
+CREATE TABLE conversations (
+  conversation_id TEXT PRIMARY KEY,     -- UUID we control
+  kind TEXT NOT NULL,                   -- 'commander' | 'worker_session' (future)
+  cwd TEXT NOT NULL,                    -- Working directory
+  model TEXT NOT NULL,                  -- opus|sonnet|haiku
+  claude_session_id TEXT,               -- Session ID from Claude CLI (for --resume)
+  last_outbox_event_id_seen INTEGER DEFAULT 0,  -- Fleet prelude cursor
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+```
+
+**Fields:**
+
+| Field | Description |
+|-------|-------------|
+| `conversation_id` | UUID we generate and control (stable across PTY restarts) |
+| `kind` | Conversation type: `commander` for Opus meta-agent |
+| `claude_session_id` | Claude CLI's session ID, captured from JSONL filename |
+| `last_outbox_event_id_seen` | Cursor for fleet prelude delta injection |
 
 ---
 

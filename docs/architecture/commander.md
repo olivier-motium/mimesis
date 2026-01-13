@@ -195,7 +195,7 @@ Session in progress...
 
 ## Commander Session
 
-Commander is an Opus-powered meta-agent with fleet-wide awareness. It uses **headless mode** with **session resumption**.
+Commander is an Opus-powered meta-agent with fleet-wide awareness. It uses a **persistent PTY session** for stateful conversation.
 
 ### How It Works
 
@@ -203,32 +203,36 @@ Commander is an Opus-powered meta-agent with fleet-wide awareness. It uses **hea
 User prompt in UI
        │
        ▼
-gateway.sendCommanderPrompt()
+CommanderSessionManager.sendPrompt()
        │
-       ├── If working → Queue prompt, return
+       ├── If working → Queue prompt, return queued position
+       │
+       ▼
+Ensure PTY exists (spawn if needed)
        │
        ▼
 Build fleet prelude (delta events since last cursor)
        │
        ▼
-Build command: claude -p "<prompt>" --resume <id> --dangerously-skip-permissions
+Inject prelude + prompt into PTY stdin
        │
        ▼
-Spawn PTY process
+Claude processes, hooks fire naturally
        │
        ▼
-Claude runs, writes JSONL, exits
+StatusWatcher detects completion (status file change)
        │
        ▼
 Drain queue if pending prompts
 ```
 
 **Key Characteristics**:
-- **Headless mode**: Each prompt spawns `claude -p` (not interactive TTY)
-- **Session resumption**: `--resume <session-id>` maintains conversation context
-- **Fleet prelude**: Injects recent outbox events as `<system-reminder>` blocks
+- **Interactive PTY**: Persistent `claude` session (not headless `claude -p`)
+- **Native hooks**: All hooks fire naturally (PostToolUse, Stop, etc.)
+- **Fleet prelude**: Injects recent outbox events as `<system-reminder>` blocks in prompt
 - **Delta-only context**: Uses cursor (`last_outbox_event_id_seen`) to avoid re-injecting stale events
-- **Prompt queue**: Queues prompts when busy instead of rejecting
+- **Prompt queue**: Queues prompts when busy, drains automatically when status changes to "waiting_for_input"
+- **Session persistence**: Conversation context maintained via PTY session state (no `--resume` needed)
 
 ### Fleet Prelude Injection
 
@@ -248,6 +252,27 @@ Before each Commander turn, `FleetPreludeBuilder` constructs context:
 ```
 
 **Cursor flow**: Commander stores `last_outbox_event_id_seen` in SQLite. Each prompt queries only `event_id > cursor`. After completion, cursor advances.
+
+### Fleet Prelude Compaction
+
+With many concurrent agents, the prelude could overflow Commander's context. The `FleetPreludeBuilder.compactEvents()` method filters events by `broadcast_level`:
+
+| Priority | Level | Behavior |
+|----------|-------|----------|
+| 1 | **Alerts** | Always included (blocked, failed, errors, doc_drift_warning) |
+| 2 | **Highlight** | Max 1 per project (newest wins) |
+| 3 | **Mention** | Capped at 10 total (newest first) |
+| 4 | **Silent** | Skipped entirely |
+
+**Constants:**
+- `MAX_MENTIONS_PER_PRELUDE = 10`
+
+**Alert detection** (always shown regardless of caps):
+- Event type is `error`, `session_blocked`, or `doc_drift_warning`
+- Payload status is `blocked` or `failed`
+- Job status is `failed`
+
+This ensures Commander sees critical issues while preventing context overflow from routine activity.
 
 ### Commander State
 
