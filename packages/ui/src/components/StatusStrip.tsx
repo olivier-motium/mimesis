@@ -133,20 +133,33 @@ interface StatusBadgeProps {
 function StatusBadge({ filter, label, count, isActive, needsAttention, onClick }: StatusBadgeProps) {
   const styles = STATUS_STYLES[filter];
 
+  // Status indicator for non-"all" filters
+  const showDot = filter !== "all" && count > 0;
+
   return (
     <button
       type="button"
       onClick={onClick}
       title={`${label}: ${count}`}
       className={cn(
-        "inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] font-medium transition-all cursor-pointer",
+        "inline-flex items-center gap-1.5 rounded px-2.5 py-1.5 text-[11px] font-medium transition-all cursor-pointer",
         isActive
-          ? [styles.bgActive, styles.text]
-          : [styles.bg, styles.text, "opacity-60 hover:opacity-100"],
-        needsAttention && "animate-pulse"
+          ? [styles.bgActive, styles.text, "ring-1 ring-current/20"]
+          : [styles.bg, styles.text, "opacity-50 hover:opacity-100"],
+        needsAttention && "animate-pulse ring-2 ring-status-waiting/50"
       )}
     >
-      {count}
+      {showDot && (
+        <span className={cn(
+          "w-1.5 h-1.5 rounded-full bg-current flex-shrink-0",
+          filter === "working" && count > 0 && "animate-pulse"
+        )} />
+      )}
+      <span className="font-semibold">{count}</span>
+      <span className={cn(
+        "text-[9px] uppercase tracking-wide",
+        isActive ? "opacity-70" : "opacity-40"
+      )}>{label.split(" ")[0]}</span>
     </button>
   );
 }

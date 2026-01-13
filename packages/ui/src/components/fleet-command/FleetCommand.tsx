@@ -199,7 +199,6 @@ export function FleetCommand({ sessions }: FleetCommandProps) {
         onReconnect={handleReconnect}
         showCommander={showCommander}
         commanderState={gateway.commanderState}
-        sessions={sessions}
       />
     </div>
   );
