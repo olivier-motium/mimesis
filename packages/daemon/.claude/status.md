@@ -1,42 +1,34 @@
 ---
 status: completed
-updated: 2026-01-13T10:55:00Z
-task: Commander Event Architecture Refactor - broadcast_level filtering and prelude compaction
+updated: 2026-01-14T10:35:00Z
+task: Fix KB sync jobs - SessionStart hook FLEET_ROLE check and timeout increase
 ---
 
 ## Summary
 
-Implemented the Commander Event Architecture refactor to cleanly separate the Timeline firehose from Commander milestones with broadcast_level-based filtering.
+Fixed KB sync jobs that were failing due to SessionStart echo hook not respecting `FLEET_ROLE` environment variable.
 
-### Key Changes
+### Root Cause
 
-1. **Schema**: Added `broadcast_level` column to `outbox_events` (denormalized for fast filtering)
+The first SessionStart hook in `~/.claude/settings.json` was a raw `echo` command that outputted "MANDATORY: read these files" regardless of context. This caused KB sync jobs (which run with `FLEET_ROLE=knowledge_sync`) to spend all their turns reading docs instead of executing the actual sync, hitting the `max_turns` limit.
 
-2. **New Event Types**: `session_started`, `session_blocked`, `doc_drift_warning`
+### Changes Made
 
-3. **SessionStart Hook Pipeline**:
-   - Created `session-start-ingest.py` hook
-   - Registered in settings.json
-   - POSTs to `/fleet/session-start` endpoint
-   - Creates silent outbox events for roster awareness
+1. **Created `~/.claude/hooks/read-docs-reminder.py`**
+   - Python script that checks `FLEET_ROLE` environment variable
+   - Skips output for `knowledge_sync` and `scheduled_job` roles
+   - Preserves exact behavior for interactive sessions
 
-4. **FleetPreludeBuilder Compaction Algorithm**:
-   - Alerts: Always included (blocked/failed/errors)
-   - Highlights: Max 1 per project (newest wins)
-   - Mentions: Capped at 10 (newest first)
-   - Silent: Skipped entirely
+2. **Updated `~/.claude/settings.json`**
+   - Replaced echo command with Python script call
 
-5. **Database Migration**: Applied `ALTER TABLE` to production fleet.db
+3. **Increased job timeout** (`packages/daemon/src/config/fleet.ts`)
+   - Changed from 5 to 15 minutes (900,000ms)
+   - KB sync needs ~9 minutes for full knowledge distillation
 
-### Files Modified
-- `packages/daemon/src/fleet-db/schema.ts`
-- `packages/daemon/src/config/fleet.ts`
-- `packages/daemon/src/fleet-db/outbox-repo.ts`
-- `packages/daemon/src/fleet-db/briefing-ingestor.ts`
-- `packages/daemon/src/api/routes/fleet.ts`
-- `packages/daemon/src/gateway/fleet-prelude-builder.ts`
-- `packages/daemon/src/test-utils/fleet-db-helpers.ts`
-- `~/.claude/hooks/session-start-ingest.py` (NEW)
-- `~/.claude/settings.json`
+### Verification
 
-All 284 tests pass.
+- Job #25: Successfully synced MVP project (9.5 minutes)
+- Job #26: Successfully synced mimesis project
+- KB files updated with fresh timestamps in `~/.claude/commander/knowledge/`
+- Hook fix confirmed: SessionStart hooks now return empty stdout for automation roles

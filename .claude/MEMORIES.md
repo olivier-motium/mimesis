@@ -1639,3 +1639,31 @@ styles/
 - Fits existing job infrastructure (JobManager, JobRunner)
 - Returns immediately with jobId for async tracking
 - Uses Sonnet model for efficient distillation
+
+## SessionStart Hooks Must Check FLEET_ROLE (Jan 2026)
+
+**Problem:** KB sync jobs consumed all turns reading docs instead of syncing, hitting `max_turns` limit.
+
+**Root cause:** The first SessionStart hook in `~/.claude/settings.json` was a raw `echo` command that outputted "MANDATORY: read these files" regardless of context. All Python hooks correctly checked `FLEET_ROLE`, but the echo command didn't.
+
+**Solution:** Replace raw `echo` commands with Python scripts that check `FLEET_ROLE`:
+
+```python
+# ~/.claude/hooks/read-docs-reminder.py
+import os, sys
+
+def main():
+    fleet_role = os.environ.get("FLEET_ROLE", "")
+    if fleet_role in ("knowledge_sync", "scheduled_job"):
+        sys.exit(0)  # Skip for automation roles
+
+    print("MANDATORY: Before executing ANY user request...")
+    sys.exit(0)
+
+if __name__ == "__main__":
+    main()
+```
+
+**Rule:** All SessionStart hooks that output reminders/instructions MUST check `FLEET_ROLE` and skip for automation roles (`knowledge_sync`, `scheduled_job`). Raw shell commands (`echo`, etc.) don't have this check - use Python scripts instead.
+
+**Also fixed:** Job timeout increased from 5 to 15 minutes in `config/fleet.ts` - KB sync needs ~9 minutes for full distillation.

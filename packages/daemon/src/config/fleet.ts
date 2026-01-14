@@ -65,8 +65,8 @@ export const MAX_CONCURRENT_JOBS = 3;
 /** Maximum concurrent jobs per project */
 export const MAX_JOBS_PER_PROJECT = 1;
 
-/** Job timeout (5 minutes) */
-export const JOB_TIMEOUT_MS = 300_000;
+/** Job timeout (15 minutes - KB sync needs time for distillation) */
+export const JOB_TIMEOUT_MS = 900_000;
 
 /** Signal escalation delays for session termination */
 export const SIGNAL_ESCALATION = {
