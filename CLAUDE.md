@@ -29,7 +29,7 @@ The meta index contains a **Document Map** showing exactly when to read each doc
 
 ## 2. Tooling
 
-- Node.js 22+, `pnpm` for package management (never `npm` or `yarn`).
+- Node.js 20.19+, `pnpm` for package management (never `npm` or `yarn`).
 - Formatting: Prettier. Run on save; no style debates.
 - Type checking: TypeScript strict mode; CI must pass.
 
@@ -44,7 +44,7 @@ The meta index contains a **Document Map** showing exactly when to read each doc
 
 ## Project Overview
 
-Mimesis - A real-time dashboard for monitoring Claude Code sessions across multiple projects. Watches `~/.claude/projects/` for session log changes, derives status, and streams updates to a React UI via the Fleet Gateway WebSocket. Goals and summaries come from file-based status (`.claude/status.md`) written by Claude Code hooks.
+Mimesis - A real-time dashboard for monitoring Claude Code sessions across multiple projects. Watches `~/.claude/projects/` for session log changes, derives status, and streams updates to a React UI via the Fleet Gateway WebSocket. Goals and summaries come from file-based status (`.claude/status.v5.<session_id>.md`) written by Claude Code hooks.
 
 ## Development Commands
 
@@ -93,7 +93,7 @@ cd packages/daemon && pnpm build       # TypeScript compile
   - `session-store.ts` - Unified session tracking
   - `pty-bridge.ts` - PTY spawn and I/O
   - `event-merger.ts` - Merge PTY stdout + hook events
-- **`status-watcher.ts`** - Watches `.claude/status.md` files for goal/summary from hooks
+- **`status-watcher.ts`** - Watches `.claude/status.v5.<session_id>.md` files for goal/summary from hooks
 - **`git.ts`** - Git repo info extraction (branch, remote URL)
 - **`schema.ts`** - Zod schemas for session state, exported via `@mimesis/daemon/schema`
 
@@ -180,9 +180,9 @@ Uses XState for deterministic state transitions. The machine processes all log e
 
 | Component | Technology |
 |-----------|------------|
-| Runtime | Node.js 22.13.1 |
+| Runtime | Node.js 20.19+ |
 | Package Manager | pnpm 10.26.0 |
-| File Watching | chokidar v5 (ESM-only) |
+| File Watching | chokidar v4 (ESM-only) |
 | Database | SQLite (better-sqlite3, Drizzle ORM) |
 | Streaming | Fleet Gateway WebSocket |
 | UI Framework | React 19 |

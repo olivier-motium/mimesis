@@ -6,7 +6,7 @@ Guidelines for contributing to the Mimesis project.
 
 ### Prerequisites
 
-- Node.js 22+
+- Node.js 20.19+
 - pnpm 10.x (not npm or yarn)
 
 ### Installation
@@ -46,7 +46,8 @@ mimesis/
 │   │   │   ├── config/  # Configuration modules
 │   │   │   ├── gateway/ # WebSocket Gateway server
 │   │   │   ├── db/      # Database (Drizzle + SQLite)
-│   │   │   └── lib/     # Core library (parser, watcher, status)
+│   │   │   ├── pty/     # PTY management
+│   │   │   └── telemetry/ # Observability (spans, metrics)
 │   │   └── test/        # Tests (Vitest)
 │   └── ui/              # Frontend: React + TanStack
 │       ├── src/
@@ -85,7 +86,7 @@ mimesis/
 // Order: node builtins → third-party → local
 import { readFile } from "node:fs/promises";
 import { Hono } from "hono";
-import { parseSession } from "../lib/parser";
+import { parseSession } from "../parser";
 ```
 
 ### Formatting

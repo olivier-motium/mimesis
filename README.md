@@ -45,7 +45,7 @@ Mimesis uses a 3-column "Fleet Command" layout inspired by RTS games and Melty:
 ### Real-time Intelligence
 - **Fleet Gateway** - WebSocket-based real-time session sync
 - **XState machine** - Deterministic status detection (working/waiting/idle)
-- **Hook-based status** - Goals and summaries from `.claude/status.md`
+- **Hook-based status** - Goals and summaries from `.claude/status.v5.<session_id>.md`
 - **Timeline view** - Structured event rendering with virtualization
 
 ### Keyboard-First Navigation
@@ -84,7 +84,7 @@ Mimesis uses a 3-column "Fleet Command" layout inspired by RTS games and Melty:
 Watches `~/.claude/projects/` for session log changes:
 - Incremental JSONL parsing (tracks byte positions)
 - XState state machine for status detection
-- Reads `.claude/status.md` hook files for goals/summaries
+- Reads `.claude/status.v5.<session_id>.md` hook files for goals/summaries
 - Git branch detection
 - Fleet Gateway for real-time WebSocket streaming
 - REST API for session and terminal control
@@ -112,7 +112,7 @@ pnpm serve  # Daemon (ports 4451, 4452)
 pnpm dev    # UI dev server
 ```
 
-**Note:** Sessions require `.claude/status.md` files (written by Claude Code hooks) to appear in the dashboard.
+**Note:** Sessions require `.claude/status.v5.<session_id>.md` files (written by Claude Code hooks) to appear in the dashboard.
 
 ## Daemon Ports
 
@@ -205,9 +205,9 @@ All endpoints prefixed with `/api/v1` on port 4451:
 
 | Component | Technology |
 |-----------|------------|
-| Runtime | Node.js 22+ |
+| Runtime | Node.js 20.19+ |
 | Package Manager | pnpm |
-| File Watching | chokidar v5 |
+| File Watching | chokidar v4 |
 | State Machine | XState v5 |
 | Gateway | WebSocket (ws) |
 | REST API | Hono |

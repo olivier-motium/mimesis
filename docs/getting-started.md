@@ -4,7 +4,7 @@ Get up and running with Mimesis in under 5 minutes.
 
 ## Prerequisites
 
-- **Node.js** 22.13.1 or later
+- **Node.js** 20.19.0 or later
 - **pnpm** 10.26.0 or later
 - **Claude Code CLI** installed and used at least once
 
@@ -45,7 +45,7 @@ The dashboard uses a 3-column Fleet Command layout:
 | **Center** | Timeline | Virtualized event stream (tool steps, text, thinking) |
 | **Right** | Tactical Intel | Plan steps and modified artifacts |
 
-Session status is derived from hook-based `.claude/status.md` files:
+Session status is derived from hook-based `.claude/status.v5.<session_id>.md` files:
 
 | Status | Meaning |
 |--------|---------|
@@ -55,7 +55,7 @@ Session status is derived from hook-based `.claude/status.md` files:
 | **Idle** | No activity for 10+ minutes |
 
 Each session shows:
-- Hook-based goal and summary from `.claude/status.md`
+- Hook-based goal and summary from `.claude/status.v5.<session_id>.md`
 - Current git branch
 
 ## Commander (Meta-Agent)
@@ -129,7 +129,7 @@ pnpm watch --active   # Only non-idle sessions
 **Sessions not appearing?**
 - Verify Claude Code is running: `ls ~/.claude/projects/`
 - Check file permissions on `~/.claude/projects/`
-- Note: Only sessions with `.claude/status.md` files (hook system) are shown
+- Note: Only sessions with `.claude/status.v5.<session_id>.md` files (hook system) are shown
 
 **Port already in use?**
 - Check what's using daemon ports: `lsof -i :4451 -i :4452`

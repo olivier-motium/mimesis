@@ -685,11 +685,11 @@ interface TerminalLink {
 
 ## File-Based Status System (`status-watcher.ts`, `status-parser.ts`)
 
-Watches `.claude/status.md` files for deterministic session status updates written by Claude Code via hooks.
+Watches `.claude/status.v5.<session_id>.md` files for deterministic session status updates written by Claude Code via hooks.
 
 ### Overview
 
-Instead of deriving status from AI summaries, Claude Code writes its own status to `.claude/status.md` files. The daemon watches these files and streams updates to the UI.
+Instead of deriving status from AI summaries, Claude Code writes its own status to `.claude/status.v5.<session_id>.md` files. The daemon watches these files and streams updates to the UI.
 
 ### StatusWatcher
 
@@ -725,7 +725,7 @@ const currentStatus = watcher.getStatus("/path/to/project");
 
 ### Status File Format
 
-**Location:** `<project>/.claude/status.md`
+**Location:** `<project>/.claude/status.v5.<session_id>.md`
 
 ```markdown
 ---

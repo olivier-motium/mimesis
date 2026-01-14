@@ -4,7 +4,7 @@ How to run Mimesis in production.
 
 ## Prerequisites
 
-- **Node.js** 22.13.1 or later
+- **Node.js** 20.19.0 or later
 - **pnpm** 10.26.0 or later
 
 ---
@@ -191,7 +191,7 @@ curl http://localhost:5173
 
 ### Daemon won't start
 
-1. Check Node.js version: `node --version` (need 22.13.1+)
+1. Check Node.js version: `node --version` (need 20.19.0+)
 2. Port conflicts are handled automatically:
    - Daemon pings existing health endpoint at startup
    - If healthy daemon exists, exits gracefully with message
@@ -203,7 +203,7 @@ curl http://localhost:5173
 1. Verify Claude Code is running: `ls ~/.claude/projects/`
 2. Check file permissions on `~/.claude/projects/`
 3. Run `pnpm watch` to debug file detection
-4. Note: Only sessions with `.claude/status.md` files (hook system) are shown
+4. Note: Only sessions with `.claude/status.v5.<session_id>.md` files (hook system) are shown
 
 ---
 

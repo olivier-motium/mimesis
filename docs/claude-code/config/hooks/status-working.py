@@ -20,7 +20,7 @@ def main():
         sys.exit(0)
 
     # Generate deterministic values
-    status_file = ".claude/status.md"
+    status_file = f".claude/status.v5.{input_data.get('session_id', 'unknown')}.md"
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     # Template for model to fill - minimal decisions required
