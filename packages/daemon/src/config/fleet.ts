@@ -112,6 +112,7 @@ export const JOB_TYPE = {
   SKILL_PATCH: "skill_patch",
   DOC_PATCH: "doc_patch",
   COMMANDER_TURN: "commander_turn",
+  KB_SYNC: "kb_sync",
 } as const;
 
 /** Job status values */

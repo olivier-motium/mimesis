@@ -57,7 +57,7 @@ export function createApiRouter(deps: RouterDependencies): Hono {
   api.route("/", createStreamRoutes(deps));
   api.route("/", createHooksRoutes(deps));
   api.route("/", createFleetRoutes());
-  api.route("/", createKbRoutes());
+  api.route("/", createKbRoutes(deps));
   api.route("/", createAuditRoutes());
 
   return api;

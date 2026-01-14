@@ -1614,3 +1614,28 @@ styles/
 - `packages/daemon/src/gateway/fleet-prelude-builder.ts` - Compaction algorithm
 - `packages/daemon/src/fleet-db/outbox-repo.ts` - New insert methods
 - `~/.claude/hooks/session-start-ingest.py` - SessionStart hook
+
+## KB Sync Button - Job-Based Architecture (Jan 2026)
+
+**Problem:** KB sync buttons in Commander UI just showed a message "Run /knowledge-sync in Commander" instead of actually syncing.
+
+**Solution:** POST `/kb/sync` endpoints now create headless jobs via JobManager.
+
+**Implementation:**
+- `POST /kb/sync` creates a job that runs `/knowledge-sync` command
+- `POST /kb/sync/:projectId` creates a job for single project sync
+- Jobs run with `FLEET_ROLE=knowledge_sync` env var for isolation
+- UI shows "Sync Started (Job #N)" green feedback instead of purple "Run in Commander"
+
+**Key changes:**
+- `gateway-server.ts` - Added `getJobManager()` getter to expose JobManager
+- `api/types.ts` - Added `jobManager?: JobManager` to RouterDependencies
+- `api/routes/kb.ts` - Now receives deps and creates actual jobs
+- `schema.ts` - Added `jobId` field to KBSyncResponseSchema
+- `KBPanel.tsx` - Shows job-based feedback with green status indicator
+
+**Why job-based:**
+- Works without active Commander session (unlike PTY approach)
+- Fits existing job infrastructure (JobManager, JobRunner)
+- Returns immediately with jobId for async tracking
+- Uses Sonnet model for efficient distillation

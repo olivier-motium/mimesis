@@ -15,6 +15,7 @@ import { Hono, type Context } from "hono";
 import { z } from "zod";
 import fs from "node:fs";
 import path from "node:path";
+import type { RouterDependencies } from "../types.js";
 import { KbSyncStateRepo } from "../../fleet-db/kb-sync-state-repo.js";
 import { ProjectRepo } from "../../fleet-db/project-repo.js";
 import { BriefingRepo } from "../../fleet-db/briefing-repo.js";
@@ -23,6 +24,7 @@ import {
   KNOWLEDGE_ALIASES_FILE,
   KB_STALE_DAYS,
   KB_BRIEFING_WINDOW_DAYS,
+  COMMANDER_CWD,
 } from "../../config/fleet.js";
 import { getErrorMessage } from "../../utils/errors.js";
 
@@ -171,8 +173,9 @@ function validateProjectId(projectId: string): string | null {
 /**
  * Create the KB API routes.
  */
-export function createKbRoutes(): Hono {
+export function createKbRoutes(deps: RouterDependencies): Hono {
   const kb = new Hono();
+  const { jobManager } = deps;
 
   // Initialize repositories
   const syncStateRepo = new KbSyncStateRepo();
@@ -469,19 +472,40 @@ export function createKbRoutes(): Hono {
 
   /**
    * POST /kb/sync - Trigger sync for all projects
-   * Note: This is a placeholder - actual sync is triggered via /knowledge-sync command
+   * Creates a headless job that runs /knowledge-sync command.
    */
   kb.post("/kb/sync", async (c) => {
     try {
+      if (!jobManager) {
+        return c.json({
+          success: false,
+          error: "Job manager not available. Use /knowledge-sync in Commander instead.",
+        }, 503);
+      }
+
       const body = await c.req.json().catch(() => ({}));
       const parsed = SyncRequestSchema.safeParse(body);
       const full = parsed.success ? parsed.data.full : false;
 
-      // Return instructions for now - actual sync requires Claude invocation
+      // Create headless job for KB sync
+      const jobId = await jobManager.createJob(
+        {
+          type: "kb_sync",
+          model: "sonnet",
+          repoRoot: COMMANDER_CWD,
+          env: { FLEET_ROLE: "knowledge_sync" },
+          request: {
+            prompt: `/knowledge-sync${full ? " --full" : ""}`,
+            maxTurns: 20,
+          },
+        },
+        () => {} // No-op listener - UI will poll for status
+      );
+
       return c.json({
         success: true,
-        message: `Use the /knowledge-sync${full ? " --full" : ""} command in Commander to sync the knowledge base.`,
-        hint: "KB sync requires Claude invocation for doc distillation.",
+        jobId,
+        message: "KB sync started",
       });
     } catch (error) {
       return errorResponse(c, error);
@@ -490,10 +514,17 @@ export function createKbRoutes(): Hono {
 
   /**
    * POST /kb/sync/:projectId - Trigger sync for specific project
-   * Note: This is a placeholder - actual sync is triggered via /knowledge-sync command
+   * Creates a headless job that runs /knowledge-sync for a specific project.
    */
   kb.post("/kb/sync/:projectId", async (c) => {
     try {
+      if (!jobManager) {
+        return c.json({
+          success: false,
+          error: "Job manager not available. Use /knowledge-sync in Commander instead.",
+        }, 503);
+      }
+
       const rawProjectId = c.req.param("projectId");
       const projectId = validateProjectId(rawProjectId);
 
@@ -508,11 +539,27 @@ export function createKbRoutes(): Hono {
       const parsed = SyncRequestSchema.safeParse(body);
       const full = parsed.success ? parsed.data.full : false;
 
-      // Return instructions for now - actual sync requires Claude invocation
+      // Create headless job for project-specific KB sync
+      const jobId = await jobManager.createJob(
+        {
+          type: "kb_sync",
+          projectId,
+          model: "sonnet",
+          repoRoot: COMMANDER_CWD,
+          env: { FLEET_ROLE: "knowledge_sync" },
+          request: {
+            prompt: `/knowledge-sync ${projectId}${full ? " --full" : ""}`,
+            maxTurns: 20,
+          },
+        },
+        () => {} // No-op listener - UI will poll for status
+      );
+
       return c.json({
         success: true,
-        message: `Use the /knowledge-sync ${projectId}${full ? " --full" : ""} command in Commander to sync this project.`,
-        hint: "KB sync requires Claude invocation for doc distillation.",
+        jobId,
+        projectId,
+        message: "KB sync started for project",
       });
     } catch (error) {
       return errorResponse(c, error);

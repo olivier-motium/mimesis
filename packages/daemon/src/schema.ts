@@ -221,6 +221,11 @@ export type KBActivity = z.infer<typeof KBActivitySchema>;
 /** KB sync response */
 export const KBSyncResponseSchema = z.object({
   message: z.string(),
-  hint: z.string(),
+  /** Job ID for async sync tracking (returned when sync job is created) */
+  jobId: z.number().optional(),
+  /** Project ID for project-specific sync */
+  projectId: z.string().optional(),
+  /** @deprecated Hint is no longer needed with job-based sync */
+  hint: z.string().optional(),
 });
 export type KBSyncResponse = z.infer<typeof KBSyncResponseSchema>;

@@ -1,14 +1,16 @@
 ---
 status: completed
-updated: 2026-01-13T19:15:00Z
-task: Added audit button to KBPanel
+updated: 2026-01-14T09:35:00Z
+task: KB sync button fix - buttons now trigger actual sync jobs
 ---
 
 ## Summary
 
-Added `/audit` skill integration to the UI:
+Fixed KB sync buttons to actually trigger KB sync instead of just showing a message dialog.
 
-- Added audit button (Search icon) to each project row in KBPanel.tsx
-- Added audit API client functions to kb-api.ts (getProjectAudits, getAuditContent, saveAuditResult)
-- Updated footer hint to mention `/audit` command
-- All TypeScript builds pass
+### Changes Made
+- Updated daemon to expose JobManager and pass it to KB API routes
+- Modified POST /kb/sync endpoints to create headless jobs that run /knowledge-sync
+- Added KB_SYNC job type and env field support to job system
+- Updated UI to show proper feedback when sync job starts (green "Sync Started" vs purple "Run in Commander")
+- Updated schema types to include jobId in sync responses

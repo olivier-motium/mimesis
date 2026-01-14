@@ -33,6 +33,8 @@ export interface JobRequest {
   model: "opus" | "sonnet" | "haiku";
   /** Conversation binding for stateful Commander turns */
   conversation?: ConversationBinding;
+  /** Environment variables to pass to the Claude process */
+  env?: Record<string, string>;
   request: {
     prompt: string;
     systemPrompt?: string;
@@ -91,6 +93,7 @@ export class JobRunner {
         env: {
           ...process.env,
           ANTHROPIC_MODEL: this.getModelId(request.model),
+          ...request.env, // Custom environment variables (e.g., FLEET_ROLE)
         },
       });
 

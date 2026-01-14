@@ -242,6 +242,7 @@ async function main(): Promise<void> {
       kittyRc,
       linkRepo,
       tabManager,
+      jobManager: gatewayServer.getJobManager(),
       getSession: (id) => watcher.getSessions().get(id),
       getAllSessions: () => watcher.getSessions(),
       deleteSession: (id) => watcher.deleteSession(id),

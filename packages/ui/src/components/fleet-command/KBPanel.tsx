@@ -24,9 +24,10 @@ import {
   FileText,
   Loader2,
   Search,
+  Play,
 } from "lucide-react";
 import { useKBState } from "../../hooks/useKBState";
-import type { KBProject } from "../../lib/kb-api";
+import type { KBProject, KBSyncResponse } from "../../lib/kb-api";
 
 /** Format relative time from ISO string */
 function formatRelativeTime(isoString: string | null): string {
@@ -90,26 +91,27 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
   const [state, actions] = useKBState(true, 30000); // Auto-refresh every 30s
   const [syncingProject, setSyncingProject] = useState<string | null>(null);
   const [syncingAll, setSyncingAll] = useState(false);
-  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [syncResponse, setSyncResponse] = useState<KBSyncResponse | { error: string } | null>(null);
 
-  // Auto-dismiss sync message after 15 seconds (enough time to read the command)
+  // Auto-dismiss sync message after 10 seconds for job-based sync, 15s for fallback
   useEffect(() => {
-    if (syncMessage) {
-      const timer = setTimeout(() => setSyncMessage(null), 15000);
+    if (syncResponse) {
+      const isJobBased = "jobId" in syncResponse && syncResponse.jobId;
+      const timer = setTimeout(() => setSyncResponse(null), isJobBased ? 10000 : 15000);
       return () => clearTimeout(timer);
     }
-  }, [syncMessage]);
+  }, [syncResponse]);
 
   const handleSyncAll = async (full: boolean = false) => {
     setSyncingAll(true);
-    setSyncMessage(null);
+    setSyncResponse(null);
     try {
       const result = await actions.syncAll(full);
-      setSyncMessage(result.message);
+      setSyncResponse(result);
       onSyncMessage?.(result.message);
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Sync failed";
-      setSyncMessage(`Error: ${msg}`);
+      setSyncResponse({ error: msg });
     } finally {
       setSyncingAll(false);
     }
@@ -117,14 +119,14 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
 
   const handleSyncProject = async (projectId: string, full: boolean = false) => {
     setSyncingProject(projectId);
-    setSyncMessage(null);
+    setSyncResponse(null);
     try {
       const result = await actions.syncProject(projectId, full);
-      setSyncMessage(result.message);
+      setSyncResponse(result);
       onSyncMessage?.(result.message);
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Sync failed";
-      setSyncMessage(`Error: ${msg}`);
+      setSyncResponse({ error: msg });
     } finally {
       setSyncingProject(null);
     }
@@ -133,9 +135,23 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
   const handleAuditProject = (projectName: string) => {
     // Show the /audit command for the user to run in Commander
     const message = `Use /audit ${projectName} <target> command in Commander to audit a specific feature or path.`;
-    setSyncMessage(message);
+    setSyncResponse({ message, hint: "Run in Commander" });
     onSyncMessage?.(message);
   };
+
+  // Helper to determine sync feedback type
+  const getSyncFeedback = () => {
+    if (!syncResponse) return null;
+    if ("error" in syncResponse) {
+      return { type: "error" as const, message: syncResponse.error };
+    }
+    if ("jobId" in syncResponse && syncResponse.jobId) {
+      return { type: "job" as const, jobId: syncResponse.jobId, message: syncResponse.message };
+    }
+    return { type: "fallback" as const, message: syncResponse.message };
+  };
+
+  const feedback = getSyncFeedback();
 
   // Loading state
   if (state.loading && state.projects.length === 0) {
@@ -158,11 +174,16 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
           Knowledge Base Not Initialized
         </h3>
         <p className="text-xs text-muted-foreground mb-4 max-w-[240px]">
-          {syncMessage || state.message || "Run /knowledge-sync to populate the knowledge base."}
+          {feedback?.message || state.message || "Run /knowledge-sync to populate the knowledge base."}
         </p>
-        {syncMessage ? (
-          <div className="text-xs text-purple-500 bg-purple-500/10 px-3 py-2 rounded-md font-mono">
-            /knowledge-sync
+        {feedback?.type === "job" ? (
+          <div className="text-xs text-status-working bg-status-working/10 px-3 py-2 rounded-md font-mono flex items-center gap-2">
+            <Play size={12} />
+            Sync started (Job #{feedback.jobId})
+          </div>
+        ) : feedback?.type === "error" ? (
+          <div className="text-xs text-destructive bg-destructive/10 px-3 py-2 rounded-md">
+            {feedback.message}
           </div>
         ) : (
           <button
@@ -250,25 +271,36 @@ export function KBPanel({ onSyncMessage }: KBPanelProps) {
       )}
 
       {/* Sync message feedback */}
-      {syncMessage && (
+      {feedback && (
         <div className={`mx-4 mt-2 mb-2 p-3 rounded-md ${
-          syncMessage.startsWith("Error:")
+          feedback.type === "error"
             ? "bg-destructive/10 border border-destructive/20"
+            : feedback.type === "job"
+            ? "bg-status-working/10 border border-status-working/20"
             : "bg-purple-500/10 border border-purple-500/20"
         }`}>
           <div className="flex items-start justify-between gap-2">
             <div className="flex-1">
-              <div className={`text-xs font-medium mb-1 ${
-                syncMessage.startsWith("Error:") ? "text-destructive" : "text-purple-500"
+              <div className={`text-xs font-medium mb-1 flex items-center gap-1.5 ${
+                feedback.type === "error"
+                  ? "text-destructive"
+                  : feedback.type === "job"
+                  ? "text-status-working"
+                  : "text-purple-500"
               }`}>
-                {syncMessage.startsWith("Error:") ? "Sync Failed" : "Run in Commander"}
+                {feedback.type === "job" && <Play size={12} />}
+                {feedback.type === "error"
+                  ? "Sync Failed"
+                  : feedback.type === "job"
+                  ? `Sync Started (Job #${feedback.jobId})`
+                  : "Run in Commander"}
               </div>
-              <div className="text-[11px] text-foreground/80 font-mono break-words">
-                {syncMessage}
+              <div className="text-[11px] text-foreground/80 break-words">
+                {feedback.message}
               </div>
             </div>
             <button
-              onClick={() => setSyncMessage(null)}
+              onClick={() => setSyncResponse(null)}
               className="p-1 rounded hover:bg-foreground/10 text-muted-foreground hover:text-foreground transition-colors"
               title="Dismiss"
             >

@@ -26,6 +26,8 @@ export interface JobCreateMessage {
     project_id?: string;
     repo_root?: string;
     model: "opus" | "sonnet" | "haiku";
+    /** Environment variables to pass to the Claude process */
+    env?: Record<string, string>;
     request: {
       prompt: string;
       system_prompt?: string;
@@ -67,6 +69,7 @@ export async function handleJobCreate(
         projectId: message.job.project_id,
         repoRoot: message.job.repo_root,
         model: message.job.model,
+        env: message.job.env,
         request: {
           prompt: message.job.request.prompt,
           systemPrompt: message.job.request.system_prompt,

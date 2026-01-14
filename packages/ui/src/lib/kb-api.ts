@@ -109,21 +109,28 @@ export async function getKBStats(): Promise<KBStats & { initialized: boolean }> 
 
 /**
  * Trigger KB sync for all projects.
- * Note: Returns instructions - actual sync requires Commander.
+ * Creates a headless job that runs /knowledge-sync.
  */
 export async function triggerKBSync(full: boolean = false): Promise<KBSyncResponse> {
   const response = await apiCall<{
     success: boolean;
-  } & KBSyncResponse>("/kb/sync", {
+    message: string;
+    jobId?: number;
+    hint?: string;
+  }>("/kb/sync", {
     method: "POST",
     body: JSON.stringify({ full }),
   });
-  return { message: response.message, hint: response.hint };
+  return {
+    message: response.message,
+    jobId: response.jobId,
+    hint: response.hint,
+  };
 }
 
 /**
  * Trigger KB sync for a specific project.
- * Note: Returns instructions - actual sync requires Commander.
+ * Creates a headless job that runs /knowledge-sync for the project.
  */
 export async function triggerProjectKBSync(
   projectId: string,
@@ -131,11 +138,20 @@ export async function triggerProjectKBSync(
 ): Promise<KBSyncResponse> {
   const response = await apiCall<{
     success: boolean;
-  } & KBSyncResponse>(`/kb/sync/${encodeURIComponent(projectId)}`, {
+    message: string;
+    jobId?: number;
+    projectId?: string;
+    hint?: string;
+  }>(`/kb/sync/${encodeURIComponent(projectId)}`, {
     method: "POST",
     body: JSON.stringify({ full }),
   });
-  return { message: response.message, hint: response.hint };
+  return {
+    message: response.message,
+    jobId: response.jobId,
+    projectId: response.projectId,
+    hint: response.hint,
+  };
 }
 
 // ============================================================================

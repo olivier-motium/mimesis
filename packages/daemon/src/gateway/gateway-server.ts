@@ -294,6 +294,14 @@ export class GatewayServer {
   }
 
   /**
+   * Get the job manager instance.
+   * Used by API routes that need to create jobs (e.g., KB sync).
+   */
+  getJobManager(): JobManager {
+    return this.jobManager;
+  }
+
+  /**
    * Stop the gateway server.
    */
   async stop(): Promise<void> {

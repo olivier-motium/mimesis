@@ -240,11 +240,33 @@ Returns fleet-wide KB statistics:
 
 ### POST /api/kb/sync
 
-Triggers KB sync (returns instructions for manual execution):
+Triggers KB sync by creating a headless job that runs `/knowledge-sync`:
 
 ```json
+// Request
+{ "full": false }  // Optional: true for full re-distill
+
+// Response
 {
-  "message": "Run /knowledge-sync in Commander to sync the knowledge base"
+  "success": true,
+  "jobId": 123,
+  "message": "KB sync started"
+}
+```
+
+The job runs with `FLEET_ROLE=knowledge_sync` and uses Sonnet model. UI shows "Sync Started (Job #N)" feedback.
+
+### POST /api/kb/sync/:projectId
+
+Triggers KB sync for a specific project:
+
+```json
+// Response
+{
+  "success": true,
+  "jobId": 124,
+  "projectId": "mimesis__607a7a7c",
+  "message": "KB sync started for project"
 }
 ```
 
