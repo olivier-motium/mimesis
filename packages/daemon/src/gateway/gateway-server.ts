@@ -15,10 +15,12 @@ import { WebSocketServer, WebSocket } from "ws";
 import type { IncomingMessage } from "node:http";
 import { createServer, type Server as NetServer, type Socket as NetSocket } from "node:net";
 import { existsSync, unlinkSync } from "node:fs";
+import { URL } from "node:url";
 import {
   FLEET_GATEWAY_HOST,
   FLEET_GATEWAY_PORT,
   FLEET_GATEWAY_SOCKET,
+  FLEET_GATEWAY_TOKEN,
   RING_BUFFER_SIZE_BYTES,
 } from "../config/index.js";
 import {
@@ -72,6 +74,7 @@ import {
   setupCommanderEventForwarding,
 } from "./handlers/commander-handlers.js";
 import { CommanderSessionManager } from "./commander-session.js";
+import { SubscriptionManager } from "./subscription-manager.js";
 import {
   withSpan,
   addWebSocketAttributes,
@@ -100,6 +103,7 @@ export class GatewayServer {
   private wss: WebSocketServer | null = null;
   private socketServer: NetServer | null = null;
   private clients = new Map<WebSocket, ClientState>();
+  private subscriptionManager = new SubscriptionManager();
 
   // Core components
   private ptyBridge: PtyBridge;
@@ -171,6 +175,7 @@ export class GatewayServer {
         bufferManager: this.bufferManager,
         statusWatcher: this.statusWatcher,
         clients: this.clients,
+        subscriptionManager: this.subscriptionManager,
         send: (ws, msg) => this.send(ws, msg),
         getCommanderPtySessionId: () => this.commanderSession.getPtySessionId(),
         onCommanderPtyExit: (code, signal) => this.commanderSession.handlePtyExit(code, signal),
@@ -205,7 +210,7 @@ export class GatewayServer {
     if (!this._hookDeps) {
       this._hookDeps = {
         mergerManager: this.mergerManager,
-        clients: this.clients,
+        subscriptionManager: this.subscriptionManager,
         send: (ws, msg) => this.send(ws, msg),
       };
     }
@@ -282,6 +287,16 @@ export class GatewayServer {
     this.wss = new WebSocketServer({
       host: FLEET_GATEWAY_HOST,
       port: FLEET_GATEWAY_PORT,
+      verifyClient: FLEET_GATEWAY_TOKEN
+        ? (info, callback) => {
+            const token = this.extractToken(info.req);
+            if (token === FLEET_GATEWAY_TOKEN) {
+              callback(true);
+            } else {
+              callback(false, 401, "Unauthorized");
+            }
+          }
+        : undefined,
     });
 
     this.wss.on("connection", (ws, req) => this.handleConnection(ws, req));
@@ -402,6 +417,7 @@ export class GatewayServer {
     };
 
     this.clients.set(ws, clientState);
+    this.subscriptionManager.addClient(ws);
 
     // Update metrics
     recordGatewayConnection(this.clients.size);
@@ -429,6 +445,7 @@ export class GatewayServer {
         // Don't need to do anything special, just remove from clients
       }
       this.clients.delete(ws);
+      this.subscriptionManager.removeClient(ws);
 
       // Update metrics
       recordGatewayConnection(this.clients.size);
@@ -437,6 +454,7 @@ export class GatewayServer {
 
     ws.on("error", () => {
       this.clients.delete(ws);
+      this.subscriptionManager.removeClient(ws);
 
       // Update metrics
       recordGatewayConnection(this.clients.size);
@@ -507,6 +525,18 @@ export class GatewayServer {
       case "commander.cancel":
         handleCommanderCancel(this.commanderDeps, ws);
         break;
+
+      case "scope.set":
+        this.subscriptionManager.setScope(ws, (message as any).scope);
+        break;
+
+      case "session.subscribe":
+        this.handleSessionSubscribe(ws, message as any);
+        break;
+
+      case "session.unsubscribe":
+        this.subscriptionManager.unsubscribeSession(ws, (message as any).session_id);
+        break;
     }
   }
 
@@ -516,6 +546,7 @@ export class GatewayServer {
   private handleFleetSubscribe(ws: WebSocket, state: ClientState, fromEventId: number): void {
     state.fleetSubscribed = true;
     state.fleetCursor = fromEventId;
+    this.subscriptionManager.setFleetSubscribed(ws, true, fromEventId);
 
     // Replay events after cursor
     const events = this.outboxTailer.getEventsAfter(fromEventId);
@@ -544,6 +575,7 @@ export class GatewayServer {
     if (ptySession) {
       // Full PTY attach - events, stdin, signals available
       state.attachedSession = sessionId;
+      this.subscriptionManager.subscribeSession(ws, sessionId);
 
       // Replay events from sequence
       const merger = this.mergerManager.get(sessionId);
@@ -596,16 +628,16 @@ export class GatewayServer {
     if (state.attachedSession === message.session_id) {
       state.attachedSession = null;
     }
+    this.subscriptionManager.unsubscribeSession(ws, message.session_id);
   }
 
   /**
    * Broadcast fleet event to subscribed clients.
    */
   private broadcastFleetEvent(event: GatewayMessage): void {
-    for (const [ws, state] of this.clients) {
-      if (state.fleetSubscribed) {
-        this.send(ws, event);
-      }
+    const recipients = this.subscriptionManager.getRecipients("fleet");
+    for (const ws of recipients) {
+      this.send(ws, event);
     }
   }
 
@@ -643,10 +675,11 @@ export class GatewayServer {
   }
 
   /**
-   * Broadcast message to all connected clients.
+   * Broadcast message to all connected clients (lifecycle category).
    */
   private broadcast(message: GatewayMessage): void {
-    for (const ws of this.clients.keys()) {
+    const recipients = this.subscriptionManager.getRecipients("lifecycle");
+    for (const ws of recipients) {
       this.send(ws, message);
     }
   }
@@ -657,6 +690,37 @@ export class GatewayServer {
   private send(ws: WebSocket, message: GatewayMessage): void {
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(serializeGatewayMessage(message));
+    }
+  }
+
+  /**
+   * Extract authentication token from WebSocket upgrade request.
+   * Checks query parameter `?token=...`.
+   */
+  private extractToken(req: IncomingMessage): string | null {
+    try {
+      const url = new URL(req.url ?? "", `http://${req.headers.host ?? "localhost"}`);
+      const queryToken = url.searchParams.get("token");
+      if (queryToken) return queryToken;
+    } catch {
+      // Fall through
+    }
+    return null;
+  }
+
+  /**
+   * Handle session.subscribe message - subscribe to session events and optionally replay.
+   */
+  private handleSessionSubscribe(ws: WebSocket, message: { session_id: string; from_seq?: number }): void {
+    this.subscriptionManager.subscribeSession(ws, message.session_id);
+    if (message.from_seq !== undefined) {
+      const merger = this.mergerManager.get(message.session_id);
+      if (merger) {
+        const events = merger.getEventsFrom(message.from_seq);
+        for (const { seq, event } of events) {
+          this.send(ws, { type: "event", session_id: message.session_id, seq, event } as any);
+        }
+      }
     }
   }
 }

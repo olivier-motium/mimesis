@@ -11,6 +11,7 @@ import type { EventMergerManager } from "../event-merger.js";
 import type { RingBufferManager } from "../ring-buffer.js";
 import type { StatusWatcher } from "../../status-watcher.js";
 import type { GatewayMessage, SessionEvent } from "../protocol.js";
+import type { SubscriptionManager } from "../subscription-manager.js";
 
 /**
  * Client state for session tracking.
@@ -34,6 +35,7 @@ export interface PtyHandlerDependencies {
   bufferManager: RingBufferManager;
   statusWatcher?: StatusWatcher;
   clients: Map<WebSocket, ClientState>;
+  subscriptionManager: SubscriptionManager;
   send: (ws: WebSocket, message: GatewayMessage) => void;
   /** Get Commander's PTY session ID (for routing Commander output to all clients) */
   getCommanderPtySessionId?: () => string | null;
@@ -161,7 +163,7 @@ export function handlePtyOutput(
   sessionId: string,
   event: SessionEvent
 ): void {
-  const { mergerManager, clients, send, getCommanderPtySessionId } = deps;
+  const { mergerManager, send, getCommanderPtySessionId } = deps;
 
   const merger = mergerManager.getOrCreate(sessionId);
   const data = (event as { data: string }).data;
@@ -176,18 +178,12 @@ export function handlePtyOutput(
     console.log(`[COMMANDER PTY] Received ${data.length} chars of stdout (seq=${seq})`);
   }
 
-  // Broadcast to clients
-  for (const [ws, state] of clients) {
-    // For Commander output, broadcast to ALL clients
-    // For regular PTY output, only send to attached clients
-    if (isCommanderOutput || state.attachedSession === sessionId) {
-      send(ws, {
-        type: isCommanderOutput ? "commander.stdout" : "event",
-        session_id: sessionId,
-        seq,
-        event,
-      });
-    }
+  // Broadcast to clients using subscription manager routing
+  const category = isCommanderOutput ? "commander" as const : "session" as const;
+  const messageType = isCommanderOutput ? "commander.stdout" : "event";
+  const recipients = deps.subscriptionManager.getRecipients(category, sessionId);
+  for (const ws of recipients) {
+    send(ws, { type: messageType, session_id: sessionId, seq, event } as any);
   }
 }
 
@@ -208,15 +204,14 @@ export function handlePtyExit(
     onCommanderPtyExit(code, signal);
   }
 
-  // Notify attached clients
+  // Notify subscribed clients
+  const recipients = deps.subscriptionManager.getRecipients("session", sessionId);
+  for (const ws of recipients) {
+    send(ws, { type: "session.ended", session_id: sessionId, exit_code: code, signal } as any);
+  }
+  // Clear attachment state
   for (const [ws, state] of clients) {
     if (state.attachedSession === sessionId) {
-      send(ws, {
-        type: "session.ended",
-        session_id: sessionId,
-        exit_code: code,
-        signal,
-      });
       state.attachedSession = null;
     }
   }

@@ -50,6 +50,13 @@ export {
   type ParsedError,
 } from "./stream-parser.js";
 
+// Subscription management
+export {
+  SubscriptionManager,
+  type ConnectionScope,
+  type MessageCategory,
+} from "./subscription-manager.js";
+
 // Protocol types
 export {
   // Client messages
@@ -77,6 +84,10 @@ export {
   type JobStreamMessage,
   type JobCompletedMessage,
   type ErrorMessage,
+  // Scope & subscription messages
+  type ScopeSetMessage,
+  type SessionSubscribeMessage,
+  type SessionUnsubscribeMessage,
   // Session tracking messages (v5.2)
   type SessionsListMessage,
   type SessionsSnapshotMessage,

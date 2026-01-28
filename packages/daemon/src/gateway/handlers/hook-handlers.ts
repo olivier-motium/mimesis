@@ -7,7 +7,7 @@
 import type { WebSocket } from "ws";
 import type { EventMergerManager } from "../event-merger.js";
 import { parseHookEvent, type HookEvent, type SessionEvent, type GatewayMessage } from "../protocol.js";
-import type { ClientState } from "./pty-session-handlers.js";
+import type { SubscriptionManager } from "../subscription-manager.js";
 import { getTracer } from "../../telemetry/spans.js";
 
 /**
@@ -15,7 +15,7 @@ import { getTracer } from "../../telemetry/spans.js";
  */
 export interface HookHandlerDependencies {
   mergerManager: EventMergerManager;
-  clients: Map<WebSocket, ClientState>;
+  subscriptionManager: SubscriptionManager;
   send: (ws: WebSocket, message: GatewayMessage) => void;
 }
 
@@ -26,7 +26,7 @@ export function handleHookEvent(
   deps: HookHandlerDependencies,
   line: string
 ): void {
-  const { mergerManager, clients, send } = deps;
+  const { mergerManager, subscriptionManager, send } = deps;
 
   const hookEvent = parseHookEvent(line);
   if (!hookEvent) return;
@@ -54,16 +54,10 @@ export function handleHookEvent(
 
     span.setAttribute("hook.seq", seq);
 
-    // Broadcast to attached clients
-    for (const [ws, state] of clients) {
-      if (state.attachedSession === sessionId) {
-        send(ws, {
-          type: "event",
-          session_id: sessionId,
-          seq,
-          event,
-        });
-      }
+    // Broadcast to subscribed clients
+    const recipients = subscriptionManager.getRecipients("session", sessionId);
+    for (const ws of recipients) {
+      send(ws, { type: "event", session_id: sessionId, seq, event } as any);
     }
   } finally {
     span.end();

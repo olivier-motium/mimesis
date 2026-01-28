@@ -109,6 +109,22 @@ export interface SessionsListMessage {
   type: "sessions.list";
 }
 
+export interface ScopeSetMessage {
+  type: "scope.set";
+  scope: "global" | "session" | "observer";
+}
+
+export interface SessionSubscribeMessage {
+  type: "session.subscribe";
+  session_id: string;
+  from_seq?: number;
+}
+
+export interface SessionUnsubscribeMessage {
+  type: "session.unsubscribe";
+  session_id: string;
+}
+
 export type ClientMessage =
   | FleetSubscribeMessage
   | SessionCreateMessage
@@ -123,7 +139,10 @@ export type ClientMessage =
   | CommanderResetMessage
   | CommanderCancelMessage
   | PingMessage
-  | SessionsListMessage;
+  | SessionsListMessage
+  | ScopeSetMessage
+  | SessionSubscribeMessage
+  | SessionUnsubscribeMessage;
 
 // =============================================================================
 // Gateway → Client Messages
